@@ -473,3 +473,125 @@ test("records and login sessions survive an API restart", async () => {
     after.evidence.some((x) => x.title === "Integration workflow evidence"),
   );
 });
+
+test("standard reassignment preserves history and isolates evidence and hours even when KSB codes overlap", async () => {
+  let s = await state(),
+    l = s.learners.at(-1),
+    previous = l.standardId;
+  const target = s.standards.find((st) => st.id !== previous),
+    historicalEvidence = s.evidence.filter((e) => e.learnerId === l.id),
+    historicalHours = l.hours;
+  const learnerCookie = await login("apprentice@archetype.demo");
+  assert.equal(
+    (
+      await command(
+        "learner.assignStandard",
+        {
+          learnerId: s.learners[0].id,
+          standardId: target.id,
+          target: 0,
+          otjTarget: 278,
+          reason: "Not allowed",
+        },
+        learnerCookie,
+      )
+    ).status,
+    403,
+  );
+  let r = await command("learner.assignStandard", {
+    learnerId: l.id,
+    standardId: target.id,
+    target: 0,
+    otjTarget: 278,
+    reason: "Programme correction agreed with learner.",
+  });
+  assert.equal(r.status, 200);
+  l = r.data.state.learners.find((x) => x.id === l.id);
+  assert.equal(l.standardId, target.id);
+  assert.equal(l.progress, 0);
+  assert.equal(l.hours, 0);
+  assert.equal(l.level, target.level);
+  assert.equal(l.programmeHistory[0].standardId, previous);
+  assert.equal(l.programmeHistory[0].hours, historicalHours);
+  assert.equal(l.gatewayStatus, "Not ready");
+  assert.ok(
+    historicalEvidence.every((e) =>
+      r.data.state.evidence.some((x) => x.id === e.id),
+    ),
+  );
+  const submitted = historicalEvidence.find((e) => e.status === "Submitted");
+  assert.equal(
+    (
+      await command("evidence.assess", {
+        id: submitted.id,
+        learnerId: l.id,
+        status: "Accepted",
+        feedback: "Must not assess archived evidence",
+      })
+    ).status,
+    400,
+  );
+  r = await command("evidence.save", {
+    learnerId: l.id,
+    title: "New programme evidence",
+    type: "Work product",
+    date: today(),
+    description: "Specific evidence for the newly assigned standard.",
+    criteria: [target.criteria[0].code],
+    status: "Submitted",
+    files: [],
+  });
+  assert.equal(r.status, 200);
+  const item = r.data.state.evidence.at(-1);
+  assert.equal(item.standardId, target.id);
+  r = await command("evidence.assess", {
+    id: item.id,
+    learnerId: l.id,
+    status: "Accepted",
+    feedback: "Meets current programme criterion.",
+  });
+  assert.equal(r.status, 200);
+  assert.equal(
+    r.data.state.learners.find((x) => x.id === l.id).progress,
+    Math.round(100 / target.criteria.length),
+  );
+});
+
+test("legacy records without standard IDs are bound before a programme changes", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const db = new DatabaseSync(join(dir, "archetype.sqlite"));
+  const data = JSON.parse(
+      db.prepare("SELECT data FROM workspace WHERE id=1").get().data,
+    ),
+    l = data.learners[1],
+    old = l.standardId;
+  for (const key of ["evidence", "otj"])
+    for (const record of data[key])
+      if (record.learnerId === l.id) delete record.standardId;
+  db.prepare("UPDATE workspace SET data=? WHERE id=1").run(
+    JSON.stringify(data),
+  );
+  db.close();
+  const target = data.standards.find((st) => st.id !== old);
+  let r = await command("learner.assignStandard", {
+    learnerId: l.id,
+    standardId: target.id,
+    target: 0,
+    otjTarget: 278,
+    reason: "Test migration of original prototype records.",
+  });
+  assert.equal(r.status, 200);
+  const learner = r.data.state.learners.find((x) => x.id === l.id);
+  assert.equal(learner.progress, 0);
+  assert.equal(learner.hours, 0);
+  assert.ok(
+    r.data.state.evidence
+      .filter((e) => e.learnerId === l.id)
+      .every((e) => e.standardId === old),
+  );
+  assert.ok(
+    r.data.state.otj
+      .filter((e) => e.learnerId === l.id)
+      .every((e) => e.standardId === old),
+  );
+});

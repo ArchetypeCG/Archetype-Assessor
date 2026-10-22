@@ -69,6 +69,36 @@ if (!demo && get().users.some((u) => u.email.endsWith("@archetype.demo")))
   throw Error(
     "This database contains public demo credentials. Start with DEMO_MODE=1 for preview, or use a separate DATA_DIR and ADMIN_PASSWORD for production.",
   );
+// Add starter library entries to existing fictional demos without rewriting learners,
+// assignments, user edits, or any evidence. Production databases are untouched.
+if (demo && get().users.some((u) => u.email.endsWith("@archetype.demo"))) {
+  const s = get(),
+    examples = seed();
+  let added = 0;
+  for (const st of examples.standards)
+    if (!s.standards.some((x) => x.reference === st.reference)) {
+      s.standards.push(st);
+      added++;
+    }
+  for (const resource of examples.resources)
+    if (!s.resources.some((x) => x.title === resource.title)) {
+      s.resources.push(resource);
+      added++;
+    }
+  if (added) {
+    s.revision++;
+    s.audit.unshift({
+      id: id(),
+      by: "system",
+      actor: "Workspace upgrade",
+      role: "System",
+      action: "demo.library.upgrade",
+      learnerId: null,
+      date: new Date().toISOString(),
+    });
+    put(s);
+  }
+}
 function fail(message, status = 400) {
   const e = Error(message);
   e.status = status;
@@ -241,13 +271,9 @@ function command(s, u, kind, p) {
       const old = p.id ? s.learners.find((x) => x.id === p.id) : null;
       if (p.id && !old) fail("Learner not found.", 404);
       if (old) learnerFor(s, u, old.id);
-      if (
-        old &&
-        old.standardId !== p.standardId &&
-        s.evidence.some((e) => e.learnerId === old.id)
-      )
+      if (old && old.standardId !== p.standardId)
         fail(
-          "A learner with evidence cannot change standard. Create a new programme record.",
+          "Use the dedicated Assign standard action to preserve existing programme history.",
         );
       const item = normalizeLearner(p, s, old);
       if (u.role === "Assessor" && item.assessorId !== u.id)
@@ -262,17 +288,54 @@ function command(s, u, kind, p) {
         fail("Import between 1 and 1,000 records.");
       for (const row of p.rows) {
         const old = s.learners.find((l) => l.ref === row.ref);
-        if (
-          old &&
-          old.standardId !== row.standardId &&
-          s.evidence.some((e) => e.learnerId === old.id)
-        )
-          fail("Cannot change a standard with existing evidence.");
+        if (old && old.standardId !== row.standardId)
+          fail(
+            "Use Assign standard for programme changes so existing records retain their history.",
+          );
         const item = normalizeLearner(row, s, old);
         if (old) Object.assign(old, item);
         else s.learners.push(item);
       }
       return { count: p.rows.length };
+    }
+    case "learner.assignStandard": {
+      requireRole(u, editors);
+      if (!l) fail("Select a learner.");
+      const standard = s.standards.find((x) => x.id === p.standardId);
+      if (!standard) fail("Select a valid standard.");
+      if (standard.id === l.standardId)
+        fail("This standard is already assigned.");
+      const reason = text(p.reason, "Assignment reason", 2000);
+      const target = number(p.target, "Target progress");
+      const otjTarget = number(p.otjTarget, "Learning target", 1, 10000);
+      // Bind pre-migration evidence and hours before changing the active programme.
+      for (const key of ["evidence", "otj"])
+        for (const record of s[key]) {
+          if (record.learnerId === l.id && !record.standardId)
+            record.standardId = l.standardId;
+        }
+      l.programmeHistory ||= [];
+      l.programmeHistory.push({
+        standardId: l.standardId,
+        changedAt: new Date().toISOString(),
+        by: u.id,
+        reason,
+        progress: derive(l, s).progress,
+        hours: derive(l, s).hours,
+        gatewayStatus: l.gatewayStatus,
+        gatewayDate: l.gatewayDate,
+        epaDate: l.epaDate,
+      });
+      l.standardId = standard.id;
+      l.level = standard.level;
+      l.target = target;
+      l.otjTarget = otjTarget;
+      l.gatewayStatus = "Not ready";
+      l.gatewayDate = "";
+      l.epaDate = "";
+      l.gatewayNotes = "";
+      l.gatewayBy = "";
+      return { learnerId: l.id };
     }
     case "standard.save": {
       requireRole(u, ["Manager", "IQA"]);
@@ -312,6 +375,8 @@ function command(s, u, kind, p) {
       if (p.id && !old) fail("Evidence not found.", 404);
       if (old && !["Draft", "Changes requested"].includes(old.status))
         fail("Only drafts or returned evidence can be edited.");
+      if (old?.standardId && old.standardId !== l.standardId)
+        fail("Archived programme evidence is read-only.");
       const codes =
         s.standards
           .find((x) => x.id === l.standardId)
@@ -331,6 +396,7 @@ function command(s, u, kind, p) {
       const item = {
         id: old?.id || id(),
         learnerId: l.id,
+        standardId: l.standardId,
         title: text(p.title, "Evidence title", 200),
         type: text(p.type, "Evidence type", 80),
         date: date(p.date, "evidence date", true),
@@ -352,7 +418,9 @@ function command(s, u, kind, p) {
       requireRole(u, [...editors, "Apprentice"]);
       const e = s.evidence.find((x) => x.id === p.id);
       if (!e) fail("Evidence not found.", 404);
-      learnerFor(s, u, e.learnerId);
+      const programmeLearner = learnerFor(s, u, e.learnerId);
+      if (e.standardId && e.standardId !== programmeLearner.standardId)
+        fail("Archived programme evidence is read-only.");
       if (
         !["Draft", "Changes requested"].includes(e.status) ||
         !e.criteria.length
@@ -366,7 +434,9 @@ function command(s, u, kind, p) {
       requireRole(u, editors);
       const e = s.evidence.find((x) => x.id === p.id);
       if (!e) fail("Evidence not found.", 404);
-      learnerFor(s, u, e.learnerId);
+      const programmeLearner = learnerFor(s, u, e.learnerId);
+      if (e.standardId && e.standardId !== programmeLearner.standardId)
+        fail("Archived programme evidence is read-only.");
       if (e.status !== "Submitted")
         fail("Only submitted evidence can be assessed.");
       e.status = choice(
@@ -394,6 +464,7 @@ function command(s, u, kind, p) {
         learnerId: l.id,
         date: d,
         hours: number(p.hours, "Hours", 0.25, 24),
+        standardId: l.standardId,
         activity: text(p.activity, "Learning activity", 200),
         reflection: text(p.reflection, "Learning reflection"),
         criteria: Array.isArray(p.criteria) ? p.criteria : [],
@@ -406,7 +477,9 @@ function command(s, u, kind, p) {
       requireRole(u, editors);
       const x = s.otj.find((x) => x.id === p.id);
       if (!x) fail("Learning log not found.", 404);
-      learnerFor(s, u, x.learnerId);
+      const programmeLearner = learnerFor(s, u, x.learnerId);
+      if (x.standardId && x.standardId !== programmeLearner.standardId)
+        fail("Archived programme learning logs are read-only.");
       if (x.status !== "Pending") fail("This log has already been reviewed.");
       x.status = choice(p.status, ["Approved", "Returned"], "decision");
       x.feedback = optional(p.feedback);

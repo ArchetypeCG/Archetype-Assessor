@@ -15,7 +15,10 @@ export function derive(l, s, now = today()) {
   const standard = s.standards.find((x) => x.id === l.standardId),
     criteria = standard?.criteria ?? [];
   const accepted = s.evidence.filter(
-    (x) => x.learnerId === l.id && x.status === "Accepted",
+    (x) =>
+      x.learnerId === l.id &&
+      x.status === "Accepted" &&
+      (!x.standardId || x.standardId === l.standardId),
   );
   const achieved = new Set(accepted.flatMap((e) => e.criteria));
   const progress = criteria.length
@@ -26,7 +29,12 @@ export function derive(l, s, now = today()) {
       )
     : 0;
   const hours = s.otj
-    .filter((x) => x.learnerId === l.id && x.status === "Approved")
+    .filter(
+      (x) =>
+        x.learnerId === l.id &&
+        x.status === "Approved" &&
+        (!x.standardId || x.standardId === l.standardId),
+    )
     .reduce((n, x) => n + x.hours, 0);
   const exceptions = [];
   if (l.status === "Active") {
@@ -162,6 +170,49 @@ export function seed() {
       ].map(([code, type, text]) => ({ code, type, text })),
     },
   ];
+  for (const [name, reference, level, wording] of [
+    [
+      "Team Leader",
+      "Example TL · training template",
+      3,
+      [
+        "Understand team objectives and organisational priorities.",
+        "Explain approaches to motivating and supporting a team.",
+        "Understand stakeholder needs and communication methods.",
+        "Plan and delegate activities to meet team objectives.",
+        "Give clear feedback and support team development.",
+        "Use information to review team performance.",
+        "Model inclusive, professional and accountable behaviour.",
+        "Reflect on feedback and improve leadership practice.",
+      ],
+    ],
+    [
+      "Operations Manager",
+      "Example OM · training template",
+      5,
+      [
+        "Understand operational strategy and resource planning.",
+        "Explain financial and risk management principles.",
+        "Understand change and stakeholder management approaches.",
+        "Translate organisational goals into operational plans.",
+        "Lead improvements using performance information.",
+        "Manage resources and communicate decisions clearly.",
+        "Demonstrate ethical and inclusive leadership.",
+        "Adapt to changing priorities and learn from outcomes.",
+      ],
+    ],
+  ])
+    standards.push({
+      id: id(),
+      name,
+      reference,
+      level,
+      version: "Illustrative — replace with verified standard",
+      criteria: standards[0].criteria.map((c, i) => ({
+        ...c,
+        text: wording[i],
+      })),
+    });
   const users = [
     ["manager", "Victoria Bryant", "Manager"],
     ["assessor", "Lee Horsley", "Assessor"],
@@ -212,11 +263,11 @@ export function seed() {
       "Harbour & Co",
       "South Coast Services",
     ][i % 4],
-    standardId: standards[0].id,
+    standardId: standards[i % standards.length].id,
     assessorId: "assessor",
     iqaId: "iqa",
     status: i === 22 ? "Paused" : i === 23 ? "Completed" : "Active",
-    level: 3,
+    level: standards[i % standards.length].level,
     target: [65, 45, 80, 50, 30, 75][i % 6],
     otjTarget: 278,
     startDate: offset(-300 - i * 4),
@@ -246,6 +297,7 @@ export function seed() {
       evidence.push({
         id: id(),
         learnerId: l.id,
+        standardId: l.standardId,
         title: [
           "Understanding our organisation",
           "Working with policy",
@@ -275,6 +327,7 @@ export function seed() {
     otj.push({
       id: id(),
       learnerId: l.id,
+      standardId: l.standardId,
       date: offset(-7),
       hours: 80 + i * 4,
       activity: "Illustrative accumulated learning hours",
@@ -297,6 +350,7 @@ export function seed() {
       tasks.push({
         id: id(),
         learnerId: l.id,
+        standardId: l.standardId,
         title: "Arrange outstanding review and evidence check",
         owner: "assessor",
         due: offset(i % 2 === 0 ? -3 : 7),
@@ -313,7 +367,41 @@ export function seed() {
     otj,
     reviews,
     tasks,
-    resources: [],
+    resources: [
+      {
+        id: id(),
+        title: "Your apprenticeship: getting started",
+        category: "Learning material",
+        description:
+          "General apprenticeship guidance and information for learners. Check programme-specific requirements with your provider.",
+        url: "https://www.apprenticeships.gov.uk/apprentices",
+        standardId: "",
+        files: [],
+        by: "manager",
+      },
+      {
+        id: id(),
+        title: "Off-the-job training guidance",
+        category: "Policy & compliance",
+        description:
+          "Provider guidance on off-the-job training. Use the rules applicable to your apprenticeship start date.",
+        url: "https://www.gov.uk/government/publications/apprenticeships-off-the-job-training",
+        standardId: "",
+        files: [],
+        by: "manager",
+      },
+      {
+        id: id(),
+        title: "Prepare for your progress review",
+        category: "Template",
+        description:
+          "Bring a work example, reflect on new knowledge and skills, discuss wellbeing and support, and agree your next learning goals.",
+        url: "",
+        standardId: "",
+        files: [],
+        by: "manager",
+      },
+    ],
     appointments: [],
     messages: [],
     quality: [],

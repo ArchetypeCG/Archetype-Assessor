@@ -1,8 +1,26 @@
 # Archetype · WBL Intelligence
 
-A connected apprenticeship portfolio and delivery workspace, modelled on the supplied **WBL Intelligence / Uploads / AutoTracking / Standards** HTML reference. The application keeps Archetype branding and introduces a React interface, a Node.js API, real account permissions, authenticated file downloads and a persistent SQLite database.
+A connected apprenticeship portfolio and delivery workspace, modelled on the supplied **WBL Intelligence / Uploads / AutoTracking / Standards** HTML reference. The application uses the supplied model’s final deep-navy, bright-blue and cyan palette, rounded white cards and command-centre layout. It keeps Archetype branding and provides separate master-user, assessor, apprentice, IQA and employer experiences backed by a Node.js API and persistent SQLite database.
 
-![Archetype delivery command centre with fictional demo data](docs/dashboard.png)
+![Master user command centre with fictional demo data](docs/dashboard.png)
+
+<details><summary>See the assessor dashboard</summary>
+
+![Assessor dashboard](docs/assessor-dashboard.png)
+
+</details>
+
+<details><summary>See the apprentice dashboard</summary>
+
+![Apprentice dashboard](docs/apprentice-dashboard.png)
+
+</details>
+
+<details><summary>See the individual progress report</summary>
+
+![Individual progress report](docs/progress-report.png)
+
+</details>
 
 ## Preview in GitHub Codespaces
 
@@ -18,29 +36,33 @@ npm ci
 npm run dev
 ```
 
-Open the Local address printed by Vite. The command starts both the frontend and API; do not run just Vite. API port 3001 is internal and does not need to be forwarded. The development workspace uses fictional demonstration learners and accounts.
+Open the Local address printed by Vite. The command starts both the frontend and API; do not run just Vite. API port 3001 is internal and does not need to be forwarded. The development workspace uses fictional demonstration learners and accounts. Fresh demos include Business Administrator, Team Leader and Operations Manager templates and three starter resources. These are illustrative standards; replace them with official wording/version before delivery. Existing demo databases receive missing starter-library entries additively; existing learners, evidence and assignments are preserved.
 
 ### Demo accounts
 
 On the sign-in screen, select a role then click **Sign in**. The password for the five original demo accounts is `ArchetypeDemo2026!`.
 
-| Role       | Account                   | Scope                                                               |
-| ---------- | ------------------------- | ------------------------------------------------------------------- |
-| Manager    | manager@archetype.demo    | All records, account creation, import and recovery                  |
-| Assessor   | assessor@archetype.demo   | Assigned learners, evidence decisions, reviews and hours            |
-| IQA        | iqa@archetype.demo        | Assigned learners, standards and quality sampling                   |
-| Apprentice | apprentice@archetype.demo | Jamie Davies's own evidence, learning logs, reviews and actions     |
-| Employer   | employer@archetype.demo   | Northstar Digital learners, reviews and actions; no portfolio files |
+| Role                  | Account                   | Scope                                                               |
+| --------------------- | ------------------------- | ------------------------------------------------------------------- |
+| Master user (Manager) | manager@archetype.demo    | All records, account creation, import and recovery                  |
+| Assessor              | assessor@archetype.demo   | Assigned learners, evidence decisions, reviews and hours            |
+| IQA                   | iqa@archetype.demo        | Assigned learners, standards and quality sampling                   |
+| Apprentice            | apprentice@archetype.demo | Jamie Davies's own evidence, learning logs, reviews and actions     |
+| Employer              | employer@archetype.demo   | Northstar Digital learners, reviews and actions; no portfolio files |
 
 These are public demo credentials. Do not use the demo database for real learner information. Account scope is checked by the API, not just hidden in the interface.
 
 ## Implemented workflows
 
-- **Command centre:** live portfolio health, risk distribution, priority queue and caseload oversight.
+- **Master dashboard:** the reference’s five KPI hero, portfolio health, priority queue, team pulse, quick actions, health score, 30-day milestones, programme intelligence and compliance radar.
+- **Assessor dashboard:** assigned caseload, assessment queue, pending learning logs, review planner and intervention priorities; no master account-management navigation.
+- **Apprentice dashboard:** personal progress ring, K/S/B coverage, upload-work and learning-log shortcuts, latest feedback, action plan and learning toolkit.
+- **IQA and employer dashboards:** their own sampling priorities or employer cohort, scoped by the server.
+- **Individual progress report:** verified KSBs, criterion-level coverage, evidence, approved hours, review discussion, next steps and readiness; CSV export and browser print/save PDF.
 - **Apprentices:** add/edit records, assign assessor/IQA/standard, search, status/RAG filters, sorting and pagination.
 - **Portfolios:** evidence files and reflections; multiple KSB mappings; draft, submit, return, revise, accept or reject; feedback and decision history.
 - **Automatic tracking:** only accepted evidence contributes to KSB coverage. Approved logs calculate OTJ totals. Date and progress exceptions calculate RAG dynamically.
-- **Standards:** versioned standard library, pasted K/S/B text parsing, editable extraction preview and duplicate-code validation. Example criteria are explicitly illustrative. New standard versions are separate records. To protect mapping integrity, a learner with evidence cannot switch standard in place.
+- **Standards:** versioned standard library, pasted K/S/B text parsing, editable extraction preview and duplicate-code validation. Example criteria are explicitly illustrative. New standard versions are separate records. Use **Assign standard** from the learner profile or standard library to change a programme. Earlier evidence and hours are retained against the original standard, a history entry records the reason and actor, and gateway readiness resets. Matching KSB codes from different standards do not carry progress across automatically. The regular edit/import route blocks programme changes; use the dedicated assignment action to preserve history.
 - **Learning logs:** dated reflections and hours, assessor approval or return. New logs are capped at 24 hours/day per entry; historic sample logs are clearly identified.
 - **Reviews:** discussion, agreed actions, automatic last/next-review updates and separate authenticated participant acknowledgements.
 - **Actions and interventions:** owners, deadlines, overdue cohorts and completion/reopening.
@@ -63,7 +85,7 @@ npm run build
 npm run preview
 ```
 
-`npm run preview` explicitly serves the built frontend and demo API on port 3000. It needs `npm run build` first. The test suite uses an isolated temporary database and covers permissions, evidence and files, assessment transitions, hours, review acknowledgements, messaging, IQA, imports, snapshots, concurrency, gateway and restart persistence.
+`npm run preview` explicitly serves the built frontend and demo API on port 3000. It needs `npm run build` first. The test suite uses an isolated temporary database and covers permissions, evidence and files, assessment transitions, hours, review acknowledgements, messaging, IQA, imports, snapshots, concurrency, gateway, restart persistence, standard reassignment and legacy record migration.
 
 ## Storage and production startup
 

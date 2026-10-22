@@ -56,7 +56,14 @@ import {
   reportRows,
   localDate,
 } from "./lib";
+import RoleDashboard, {
+  dashboardTitle,
+  pageLabel,
+  activeRecord,
+} from "./dashboards";
+import ProgressReport from "./progress-report";
 import "./style.css";
+import "./reference-theme.css";
 const Context = createContext();
 const useApp = () => useContext(Context);
 const navGroups = [
@@ -75,6 +82,7 @@ const navGroups = [
     "PORTFOLIOS & LEARNING",
     [
       [Layers, "Portfolios"],
+      [FileBarChart, "Progress report"],
       [BookOpen, "Standards & KSBs"],
       [Clock, "Off-the-job learning"],
       [FolderOpen, "Resources"],
@@ -230,6 +238,7 @@ function App() {
       ? [
           "Command centre",
           "Portfolios",
+          "Progress report",
           "Standards & KSBs",
           "Off-the-job learning",
           "Resources",
@@ -243,13 +252,43 @@ function App() {
         ? [
             "Command centre",
             "Apprentices",
+            "Progress report",
             "Action plans",
             "Reviews Hub",
             "Calendar",
             "Gateway & EPA",
             "Messages",
           ]
-        : null;
+        : user.role === "Assessor"
+          ? [
+              "Command centre",
+              "Apprentices",
+              "Alerts",
+              "Action plans",
+              "Progress report",
+              "Portfolios",
+              "Standards & KSBs",
+              "Off-the-job learning",
+              "Resources",
+              "Messages",
+              "Interventions",
+              "Reviews Hub",
+              "Calendar",
+              "Gateway & EPA",
+            ]
+          : user.role === "IQA"
+            ? [
+                "Command centre",
+                "Apprentices",
+                "Progress report",
+                "Portfolios",
+                "Standards & KSBs",
+                "Resources",
+                "Messages",
+                "Reviews Hub",
+                "Audit & quality",
+              ]
+            : null;
   const priority = state.learners.flatMap((l) => l.exceptions).length;
   return (
     <Context.Provider value={ctx}>
@@ -273,7 +312,12 @@ function App() {
               <Layers size={19} />
             </div>
             <div>
-              WBL Intelligence<small>Apprenticeship operations</small>
+              WBL Intelligence
+              <small>
+                {user.role === "Manager"
+                  ? "Master workspace"
+                  : user.role + " workspace"}
+              </small>
             </div>
             <ChevronRight size={14} />
           </div>
@@ -285,7 +329,13 @@ function App() {
               return (
                 links.length > 0 && (
                   <div className="nav-group" key={group}>
-                    <div className="nav-caption">{group}</div>
+                    <div className="nav-caption">
+                      {group === "COMMAND CENTRE" && user.role === "Apprentice"
+                        ? "MY WORKSPACE"
+                        : group === "COMMAND CENTRE" && user.role === "Assessor"
+                          ? "MY DELIVERY"
+                          : group}
+                    </div>
                     {links.map(([Icon, title]) => (
                       <button
                         key={title}
@@ -295,7 +345,7 @@ function App() {
                         onClick={() => go(title)}
                       >
                         <Icon size={17} />
-                        <span>{title}</span>
+                        <span>{pageLabel(title, user.role)}</span>
                         {title === "Alerts" && priority > 0 && (
                           <b>{priority}</b>
                         )}
@@ -322,7 +372,9 @@ function App() {
               <div className="avatar">{initials(user.name)}</div>
               <div>
                 {user.name}
-                <small>{user.role}</small>
+                <small>
+                  {user.role === "Manager" ? "Master user" : user.role}
+                </small>
               </div>
               <button
                 aria-label="Sign out"
@@ -361,7 +413,9 @@ function App() {
               </button>
               <span>Workspace</span>
               <ChevronRight size={13} />
-              <strong>{profile ? "Learner profile" : page}</strong>
+              <strong>
+                {profile ? "Learner profile" : pageLabel(page, user.role)}
+              </strong>
             </div>
             <div className="topbar-right">
               <span className="workspace-live">
@@ -393,17 +447,25 @@ function App() {
                   {profile
                     ? state.learners.find((l) => l.id === profile.id)?.name
                     : page === "Command centre"
-                      ? restricted
-                        ? "Your learning workspace"
-                        : "Delivery command centre"
-                      : page}
+                      ? dashboardTitle[user.role]
+                      : pageLabel(page, user.role)}
                   <span>.</span>
                 </h1>
                 <p>
                   {profile
                     ? "A complete picture of learning, progress and support."
                     : page === "Command centre"
-                      ? "Clarity across every learner. Confidence in every next step."
+                      ? {
+                          Manager:
+                            "Clarity across every learner. Confidence in every next step.",
+                          Assessor:
+                            "Your caseload, your assessment priorities, your next conversations.",
+                          Apprentice:
+                            "Your progress, your portfolio, and the next step in your apprenticeship.",
+                          IQA: "Consistent assessment. Clear decisions. Quality you can trace.",
+                          Employer:
+                            "Support your apprentices and stay connected to their progress.",
+                        }[user.role]
                       : descriptions[page] ||
                         "Connected records. Meaningful progress. One workspace."}
                 </p>
@@ -452,6 +514,8 @@ function App() {
   );
 }
 const descriptions = {
+  "Progress report":
+    "Your progress, evidence, learning hours and next steps in one clear report.",
   Apprentices: "Every apprentice, connected to the support they need.",
   Alerts: "The right intervention, before a small gap becomes a bigger one.",
   "Action plans": "Clear ownership. Agreed next steps. Nothing left behind.",
@@ -599,6 +663,8 @@ function Page({ page }) {
       return <Reports />;
     case "Portfolios":
       return <PortfolioHub />;
+    case "Progress report":
+      return <IndividualReport />;
     case "Standards & KSBs":
       return <Standards />;
     case "Off-the-job learning":
@@ -628,254 +694,15 @@ function Page({ page }) {
   }
 }
 function Dashboard() {
-  const { s, user, go, openLearner, setModal } = useApp(),
-    ls = s.learners,
-    active = ls.filter((l) => l.status === "Active"),
-    reds = ls.filter((l) => l.rag === "Red"),
-    pending = s.evidence.filter((e) => e.status === "Submitted"),
-    overdue = ls.filter((l) => l.exceptions.some((x) => x.type === "review")),
-    average = ls.length
-      ? Math.round(ls.reduce((n, l) => n + l.progress, 0) / ls.length)
-      : 0,
-    staff = !["Apprentice", "Employer"].includes(user.role);
+  const { s, user, go, openLearner, setModal } = useApp();
   return (
-    <>
-      <section className="hero">
-        <div>
-          <span className="hero-kicker">
-            <i />
-            YOUR PORTFOLIO, IN FOCUS
-          </span>
-          <h2>
-            {staff ? (
-              <>
-                See the whole picture.
-                <br />
-                Shape the next chapter.
-              </>
-            ) : (
-              <>
-                Your ambition.
-                <br />
-                Taking shape.
-              </>
-            )}
-          </h2>
-          <p>
-            {staff
-              ? "A connected view of progress, evidence and delivery risk."
-              : "Keep learning, capture your experience, and celebrate your progress."}
-            <br />
-            {staff
-              ? "Turn insight into the support that makes a difference."
-              : "Your next step starts with what you do today."}
-          </p>
-          <button onClick={() => go(staff ? "Apprentices" : "Portfolios")}>
-            {staff ? "Explore your learners" : "Open your portfolio"}
-            <ArrowRight size={16} />
-          </button>
-        </div>
-        <div className="hero-art" aria-hidden="true">
-          <div className="orbit" />
-          <div className="orbit second" />
-          <div className="arch one" />
-          <div className="arch two" />
-          <span>✳</span>
-          <small>PROGRESS WITH PURPOSE</small>
-        </div>
-        <div className="hero-stamp">
-          <ShieldCheck size={13} /> LEARNING & DELIVERY INTELLIGENCE
-        </div>
-      </section>
-      <div className="metrics">
-        <Metric
-          label="Active apprentices"
-          value={active.length}
-          detail={`${ls.length} learners in your workspace`}
-          icon={Users}
-        />
-        <Metric
-          label="Verified KSB coverage"
-          value={average + "%"}
-          detail="Accepted evidence against assigned criteria"
-          icon={Target}
-        />
-        <Metric
-          label="Evidence awaiting review"
-          value={pending.length}
-          detail="Submitted and ready for assessment"
-          icon={Layers}
-        />
-        <Metric
-          label={staff ? "Learners at risk" : "Approved learning hours"}
-          value={staff ? reds.length : ls.reduce((n, l) => n + l.hours, 0)}
-          detail={
-            staff
-              ? `${overdue.length} with overdue progress reviews`
-              : "Across your visible learning records"
-          }
-          icon={staff ? TriangleAlert : Clock}
-          tone={staff ? "risk" : ""}
-        />
-      </div>
-      <div className="grid dashboard-grid">
-        <Panel
-          title="Portfolio health"
-          subtitle="A live view of progress and delivery risk"
-          action={
-            <button className="text-link" onClick={() => go("Analytics")}>
-              Explore insights <ArrowUpRight size={14} />
-            </button>
-          }
-        >
-          <div className="health-layout">
-            <div
-              className="donut"
-              style={{
-                background: `conic-gradient(#dc786e 0 ${ls.length ? (reds.length / ls.length) * 100 : 0}%,#e2b762 0 ${ls.length ? ((reds.length + ls.filter((l) => l.rag === "Amber").length) / ls.length) * 100 : 0}%,#74a58b 0 100%)`,
-              }}
-            >
-              <div>
-                <strong>{ls.length}</strong>
-                <span>apprentices</span>
-              </div>
-            </div>
-            <div className="health-legend">
-              {["Green", "Amber", "Red"].map((r) => (
-                <button
-                  key={r}
-                  onClick={() => go(staff ? "Alerts" : "Portfolios")}
-                >
-                  <Tag>{r}</Tag>
-                  <strong>{ls.filter((l) => l.rag === r).length}</strong>
-                  <small>
-                    {r === "Green"
-                      ? "On track"
-                      : r === "Amber"
-                        ? "Needs attention"
-                        : "Priority support"}
-                  </small>
-                </button>
-              ))}
-            </div>
-          </div>
-        </Panel>
-        <Panel
-          title="Your next move"
-          subtitle="Small actions. Meaningful progress."
-          className="next-move"
-        >
-          <span className="focus-icon">
-            <Target size={24} />
-          </span>
-          <h3>
-            {staff
-              ? "Close the loop on learning."
-              : "Turn experience into evidence."}
-          </h3>
-          <p>
-            {staff
-              ? `${pending.length} evidence items are waiting for a decision. Your feedback helps learners move forward.`
-              : "Reflect on a challenge you solved at work. What did you learn, and how will you use it?"}
-          </p>
-          <button className="text-link" onClick={() => go("Portfolios")}>
-            {staff ? "Open assessment queue" : "Build your portfolio"}
-            <ArrowRight size={16} />
-          </button>
-        </Panel>
-      </div>
-      <div className="grid two">
-        <Panel
-          title="Priority queue"
-          subtitle="The learners who need your attention"
-          action={
-            <button
-              className="text-link"
-              onClick={() => go(staff ? "Interventions" : "Reviews Hub")}
-            >
-              View all <ArrowUpRight size={14} />
-            </button>
-          }
-        >
-          {[...ls]
-            .filter((l) => l.exceptions.length)
-            .sort((a, b) => b.exceptions.length - a.exceptions.length)
-            .slice(0, 4)
-            .map((l) => (
-              <button
-                className="priority-row"
-                key={l.id}
-                onClick={() => openLearner(l.id)}
-              >
-                <span className="avatar">{initials(l.name)}</span>
-                <div>
-                  <strong>{l.name}</strong>
-                  <small>{l.exceptions[0].text}</small>
-                </div>
-                <Tag>{l.rag}</Tag>
-                <ChevronRight size={15} />
-              </button>
-            ))}
-          {!ls.some((l) => l.exceptions.length) && (
-            <Empty>No urgent exceptions. Keep up the progress.</Empty>
-          )}
-        </Panel>
-        <Panel
-          title="Team & caseload pulse"
-          subtitle="Connected people. Clear ownership."
-        >
-          {s.users
-            .filter((u) => ["Assessor", "IQA"].includes(u.role))
-            .map((u) => {
-              const assigned = ls.filter(
-                (l) => l.assessorId === u.id || l.iqaId === u.id,
-              );
-              return (
-                <div className="team-row" key={u.id}>
-                  <div className="avatar cool">{initials(u.name)}</div>
-                  <div>
-                    <strong>{u.name}</strong>
-                    <small>
-                      {u.role} · {assigned.length} apprentices
-                    </small>
-                  </div>
-                  <span>
-                    {assigned.filter((l) => l.rag === "Red").length}
-                    <small>at risk</small>
-                  </span>
-                </div>
-              );
-            })}
-          {staff && (
-            <div className="quick-actions">
-              <button onClick={() => go("Reviews Hub")}>
-                <CalendarDays size={15} />
-                Reviews
-              </button>
-              <button onClick={() => go("Compliance Hub")}>
-                <ShieldCheck size={15} />
-                Compliance
-              </button>
-              <button onClick={() => go("Report Studio")}>
-                <FileBarChart size={15} />
-                Reports
-              </button>
-            </div>
-          )}
-        </Panel>
-      </div>
-      <div className="insight-note">
-        <ShieldCheck size={19} />
-        <div>
-          <strong>Progress you can trace.</strong>
-          <p>
-            Risk is calculated from review dates, compliance dates and verified
-            KSB progress. Every saved decision is recorded in the audit trail.
-          </p>
-        </div>
-        <span>CONNECTED BY DESIGN ↗</span>
-      </div>
-    </>
+    <RoleDashboard
+      s={s}
+      user={user}
+      go={go}
+      openLearner={openLearner}
+      setModal={setModal}
+    />
   );
 }
 function FilterBar({ query, setQuery, filters = [], children }) {
@@ -1140,6 +967,22 @@ function LearnerProfile() {
           </Button>
         )}
       </div>
+      {["Manager", "Assessor"].includes(user.role) && (
+        <div className="standard-assignment-bar">
+          <div>
+            <BookOpen size={19} />
+            <span>
+              Assigned standard<strong>{stdOf(s, l)}</strong>
+            </span>
+          </div>
+          <Button
+            secondary
+            onClick={() => setModal({ type: "assignStandard", learner: l })}
+          >
+            Assign a different standard <ArrowRight size={15} />
+          </Button>
+        </div>
+      )}
       <div className="learner-banner">
         <div className="avatar large">{initials(l.name)}</div>
         <div>
@@ -1206,6 +1049,26 @@ function LearnerProfile() {
                 value={`${l.english} / ${l.maths}`}
               />
               <Detail label="Notes" value={l.notes || "No additional notes"} />
+              {l.programmeHistory?.length > 0 && (
+                <details className="programme-history">
+                  <summary>
+                    Previous standard assignments · {l.programmeHistory.length}
+                  </summary>
+                  {l.programmeHistory.map((h, i) => (
+                    <div key={i}>
+                      <strong>
+                        {s.standards.find((st) => st.id === h.standardId)
+                          ?.name || "Previous standard"}
+                      </strong>
+                      <p>
+                        {fmt(h.changedAt)} · {h.progress}% verified · {h.hours}h
+                        learning
+                      </p>
+                      <small>{h.reason}</small>
+                    </div>
+                  ))}
+                </details>
+              )}
             </Panel>
             <Panel title="Attention & interventions">
               {l.exceptions.map((x, i) => (
@@ -1252,6 +1115,10 @@ function Detail({ label, value }) {
     </div>
   );
 }
+function IndividualReport() {
+  const ctx = useApp();
+  return <ProgressReport {...ctx} />;
+}
 function PortfolioHub() {
   const { s, learnerId, user } = useApp(),
     l = s.learners.find((x) => x.id === learnerId);
@@ -1269,7 +1136,11 @@ function PortfolioHub() {
             />
             <Metric
               label="Evidence items"
-              value={s.evidence.filter((x) => x.learnerId === l.id).length}
+              value={
+                s.evidence.filter(
+                  (x) => x.learnerId === l.id && activeRecord(s, x),
+                ).length
+              }
               detail="Across this learner’s portfolio"
               icon={Layers}
             />
@@ -1277,7 +1148,10 @@ function PortfolioHub() {
               label="Awaiting assessment"
               value={
                 s.evidence.filter(
-                  (x) => x.learnerId === l.id && x.status === "Submitted",
+                  (x) =>
+                    x.learnerId === l.id &&
+                    activeRecord(s, x) &&
+                    x.status === "Submitted",
                 ).length
               }
               detail="Only accepted evidence counts towards coverage"
@@ -1295,11 +1169,13 @@ function PortfolioHub() {
 }
 function Evidence({ learner }) {
   const { s, user, setModal } = useApp(),
+    [history, HISTORY] = useState(false),
     [q, Q] = useState(""),
     [status, S] = useState("");
   const items = s.evidence.filter(
     (x) =>
       x.learnerId === learner.id &&
+      (history || activeRecord(s, x)) &&
       (!status || x.status === status) &&
       `${x.title} ${x.description}`.toLowerCase().includes(q.toLowerCase()),
   );
@@ -1317,6 +1193,14 @@ function Evidence({ learner }) {
       }
     >
       <div className="filterbar">
+        <label className="history-toggle">
+          <input
+            type="checkbox"
+            checked={history}
+            onChange={(e) => HISTORY(e.target.checked)}
+          />
+          Include earlier standards
+        </label>
         <div className="searchbox">
           <Search size={16} />
           <input
@@ -1358,6 +1242,9 @@ function Evidence({ learner }) {
               </button>
               <small>
                 {e.type} · {fmt(e.date)} · {e.files.length} files
+                {e.standardId && e.standardId !== learner.standardId
+                  ? " · Earlier standard"
+                  : ""}
               </small>
             </td>
             <td>
@@ -1651,11 +1538,15 @@ function Tasks({ learner }) {
 }
 function OTJ({ learner }) {
   const { s, user, setModal, act } = useApp(),
+    [showHistory, SHOWHISTORY] = useState(false),
     [filter, F] = useState("");
   const ls = learner ? [learner] : s.learners,
     ids = new Set(ls.map((l) => l.id)),
     items = s.otj.filter(
-      (x) => ids.has(x.learnerId) && (!filter || x.status === filter),
+      (x) =>
+        ids.has(x.learnerId) &&
+        (showHistory || activeRecord(s, x)) &&
+        (!filter || x.status === filter),
     );
   return (
     <>
@@ -1669,8 +1560,12 @@ function OTJ({ learner }) {
         <Metric
           label="Pending logs"
           value={
-            s.otj.filter((x) => ids.has(x.learnerId) && x.status === "Pending")
-              .length
+            s.otj.filter(
+              (x) =>
+                ids.has(x.learnerId) &&
+                activeRecord(s, x) &&
+                x.status === "Pending",
+            ).length
           }
           detail="Awaiting assessor verification"
           icon={ClipboardCheck}
@@ -1695,6 +1590,14 @@ function OTJ({ learner }) {
         }
       >
         <div className="filterbar">
+          <label className="history-toggle">
+            <input
+              type="checkbox"
+              checked={showHistory}
+              onChange={(e) => SHOWHISTORY(e.target.checked)}
+            />
+            Include earlier standards
+          </label>
           <select
             aria-label="Learning log status"
             value={filter}
@@ -1723,7 +1626,10 @@ function OTJ({ learner }) {
               <tr key={x.id}>
                 <td className="wide-cell">
                   <strong>{x.activity}</strong>
-                  <small>{x.reflection}</small>
+                  <small>
+                    {x.reflection}
+                    {!activeRecord(s, x) ? " · Earlier standard" : ""}
+                  </small>
                   {x.feedback && <small>Feedback: {x.feedback}</small>}
                 </td>
                 <td>
@@ -1735,7 +1641,8 @@ function OTJ({ learner }) {
                   <Tag>{x.status}</Tag>
                 </td>
                 <td>
-                  {x.status === "Pending" &&
+                  {activeRecord(s, x) &&
+                    x.status === "Pending" &&
                     ["Manager", "Assessor"].includes(user.role) && (
                       <div className="button-row">
                         <button
@@ -2446,7 +2353,13 @@ function demoLabel() {
 function Standards() {
   const { s, user, setModal, learnerId } = useApp(),
     [selected, S] = useState(s.standards[0]?.id || ""),
-    st = s.standards.find((x) => x.id === selected) || s.standards[0];
+    library =
+      user.role === "Apprentice"
+        ? s.standards.filter((st) =>
+            s.learners.some((l) => l.standardId === st.id),
+          )
+        : s.standards,
+    st = library.find((x) => x.id === selected) || library[0];
   return (
     <>
       <Panel
@@ -2462,7 +2375,7 @@ function Standards() {
         }
       >
         <div className="standard-cards">
-          {s.standards.map((x) => (
+          {library.map((x) => (
             <button
               key={x.id}
               className={"standard-card " + (st?.id === x.id ? "selected" : "")}
@@ -2485,6 +2398,41 @@ function Standards() {
           <Empty>Create a standard, then add learners to it.</Empty>
         )}
       </Panel>
+      {["Manager", "Assessor"].includes(user.role) && (
+        <Panel
+          title="Apprentice standard assignments"
+          subtitle="Choose the right programme for each apprentice. Programme changes preserve historic evidence and hours."
+        >
+          <Table
+            headers={[
+              "Apprentice",
+              "Assigned standard",
+              "Verified progress",
+              "Action",
+            ]}
+          >
+            {s.learners.map((l) => (
+              <tr key={l.id}>
+                <td>
+                  <LearnerLink id={l.id} />
+                </td>
+                <td>{stdOf(s, l)}</td>
+                <td>{l.progress}%</td>
+                <td>
+                  <button
+                    className="text-link"
+                    onClick={() =>
+                      setModal({ type: "assignStandard", learner: l })
+                    }
+                  >
+                    Assign standard <ArrowUpRight size={14} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </Table>
+        </Panel>
+      )}
       {st && (
         <Panel title={st.name + " · criteria"} subtitle={st.version}>
           <Table headers={["Code", "Type", "Full criterion wording"]}>
@@ -2983,7 +2931,9 @@ function Team() {
                 </div>
               </td>
               <td>
-                <Tag tone="blue">{u.role}</Tag>
+                <Tag tone="blue">
+                  {u.role === "Manager" ? "Master user" : u.role}
+                </Tag>
               </td>
               <td>{ls.length}</td>
               <td>{ls.filter((l) => l.rag === "Red").length}</td>
@@ -3296,127 +3246,123 @@ function Login({ demo, onLogin, error }) {
     [email, EM] = useState(""),
     [pw, PW] = useState("");
   return (
-    <div className="login">
-      <div className="login-story">
-        <a className="brand" href="#">
-          archetype<span>.</span>
-        </a>
-        <div className="login-story-content">
-          <span className="eyebrow">WORK-BASED LEARNING INTELLIGENCE</span>
-          <h1>
-            Great futures.
-            <br />
-            Built together.
-          </h1>
-          <p>
-            Connect every learner, every moment of progress,
-            <br />
-            and every person who helps make it happen.
-          </p>
-          <div className="login-features">
-            <span>
-              <ShieldCheck size={17} />
-              Confident delivery
-            </span>
-            <span>
-              <Layers size={17} />
-              Connected portfolios
-            </span>
-            <span>
-              <Target size={17} />
-              Meaningful progress
-            </span>
-          </div>
+    <div className="reference-login">
+      <div className="reference-login-brand">
+        <span className="login-brand-icon">
+          <Layers size={26} />
+        </span>
+        <div>
+          <strong>
+            archetype<span>.</span>
+          </strong>
+          <small>WBL INTELLIGENCE</small>
         </div>
-        <div className="login-shapes" aria-hidden="true">
-          <div />
-          <div />
-        </div>
-        <small>YOUR NEXT CHAPTER STARTS HERE ↗</small>
       </div>
-      <div className="login-form-wrap">
-        <div className="login-box">
-          <span className="eyebrow">YOUR CONNECTED WORKSPACE</span>
-          <h2>
-            Welcome back<span>.</span>
-          </h2>
-          <p>Sign in to your apprenticeship workspace.</p>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              B(true);
-              E("");
-              try {
-                await onLogin(email, pw);
-              } catch (e) {
-                E(e.message);
-              } finally {
-                B(false);
-              }
-            }}
-          >
-            <label>
-              Email address
-              <input
-                type="email"
-                required
-                autoComplete="username"
-                placeholder="you@yourorganisation.co.uk"
-                value={email}
-                onChange={(e) => EM(e.target.value)}
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                value={pw}
-                onChange={(e) => PW(e.target.value)}
-              />
-            </label>
-            {(err || error) && (
-              <div className="form-error" role="alert">
-                {err || error}
-              </div>
-            )}
-            <Button disabled={busy}>
-              {busy ? "Signing in…" : "Sign in"}
-              <ArrowRight size={16} />
-            </Button>
-          </form>
-          {demo?.enabled && (
-            <div className="demo-accounts">
-              <span className="eyebrow">EXPLORE A DEMO ACCOUNT</span>
-              <p>
-                Fictional data. Select an account, then sign in.
-                <br />
-                Demo password: <code>ArchetypeDemo2026!</code>
-              </p>
-              <div>
-                {demo.accounts?.map((a) => (
-                  <button
-                    key={a.email}
-                    type="button"
-                    onClick={() => {
-                      EM(a.email);
-                      PW("ArchetypeDemo2026!");
-                    }}
-                  >
-                    <span>{a.role}</span>
-                    <small>{a.name}</small>
-                    <ArrowUpRight size={14} />
-                  </button>
-                ))}
-              </div>
+      <div className="reference-login-card">
+        <span className="login-workspace-chip">
+          <ShieldCheck size={14} />
+          CONNECTED APPRENTICESHIP DELIVERY
+        </span>
+        <h1>Welcome to your workspace.</h1>
+        <p>
+          A dedicated experience for every role.
+          <br />
+          One connected picture of learning and progress.
+        </p>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            B(true);
+            E("");
+            try {
+              await onLogin(email, pw);
+            } catch (e) {
+              E(e.message);
+            } finally {
+              B(false);
+            }
+          }}
+        >
+          <label>
+            Email address
+            <input
+              type="email"
+              required
+              autoComplete="username"
+              value={email}
+              onChange={(e) => EM(e.target.value)}
+              placeholder="you@yourorganisation.co.uk"
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              required
+              autoComplete="current-password"
+              value={pw}
+              onChange={(e) => PW(e.target.value)}
+            />
+          </label>
+          {(err || error) && (
+            <div className="form-error" role="alert">
+              {err || error}
             </div>
           )}
-          <div className="login-security">
-            <LockKeyhole size={13} />
-            Role-based access · encrypted password hashes
+          <Button disabled={busy}>
+            {busy ? "Signing in…" : "Sign in"}
+            <ArrowRight size={17} />
+          </Button>
+        </form>
+        {demo?.enabled && (
+          <div className="reference-demo-roles">
+            <span className="eyebrow">EXPLORE THE DIFFERENT WORKSPACES</span>
+            <p>
+              Select a demo account, then sign in.
+              <br />
+              Public demo password: <code>ArchetypeDemo2026!</code>
+            </p>
+            <div>
+              {demo.accounts?.map((a) => (
+                <button
+                  key={a.email}
+                  onClick={() => {
+                    EM(a.email);
+                    PW("ArchetypeDemo2026!");
+                  }}
+                >
+                  <span className="demo-role-icon">
+                    {a.role === "Manager" ? (
+                      <LayoutDashboard size={18} />
+                    ) : a.role === "Assessor" ? (
+                      <ClipboardCheck size={18} />
+                    ) : a.role === "Apprentice" ? (
+                      <GraduationCap size={18} />
+                    ) : a.role === "IQA" ? (
+                      <ShieldCheck size={18} />
+                    ) : (
+                      <Building2 size={18} />
+                    )}
+                  </span>
+                  <div>
+                    <strong>
+                      {a.role === "Manager" ? "Master user" : a.role}
+                    </strong>
+                    <small>{a.name}</small>
+                  </div>
+                  <ArrowUpRight size={14} />
+                </button>
+              ))}
+            </div>
           </div>
+        )}
+        <div className="reference-login-security">
+          <LockKeyhole size={13} />
+          Individual accounts · role-based permissions · server-saved records
         </div>
+      </div>
+      <div className="reference-login-footer">
+        APPRENTICESHIP DELIVERY & COMPLIANCE WORKSPACE
       </div>
     </div>
   );
@@ -3495,6 +3441,7 @@ function ModalHost() {
     review: "Record progress review",
     task: "Create an action",
     standard: "Create apprenticeship standard",
+    assignStandard: "Assign apprenticeship standard",
     resource: "Add learning resource",
     appointment: "Schedule appointment",
     quality: "Record IQA sample",
@@ -3578,6 +3525,9 @@ function ModalHost() {
         kind = "evidence.assess";
         p.id = item.id;
         p.learnerId = item.learnerId;
+      } else if (type === "assignStandard") {
+        kind = "learner.assignStandard";
+        p.learnerId = learner.id;
       } else if (type === "standard") {
         kind = "standard.save";
         p.criteria = parsed;
@@ -3755,6 +3705,58 @@ function ModalHost() {
         </div>
         <form onSubmit={submit}>
           <div className="form-grid">
+            {type === "assignStandard" && (
+              <>
+                <p className="body-copy wide">
+                  Assign a standard to {learner?.name}. Previous evidence, hours
+                  and assessment decisions are preserved against their original
+                  standard. Verified progress and hours are calculated
+                  separately for the newly assigned standard.
+                </p>
+                <Field
+                  label="New apprenticeship standard"
+                  name="standardId"
+                  type="select"
+                  options={[
+                    { value: "", label: "Choose a different standard" },
+                    ...standards.filter((x) => x.value !== learner?.standardId),
+                  ]}
+                  required
+                  wide
+                />
+                <Field
+                  label="Target progress %"
+                  name="target"
+                  type="number"
+                  defaultValue="0"
+                  min="0"
+                  max="100"
+                  required
+                />
+                <Field
+                  label="OTJ target hours"
+                  name="otjTarget"
+                  type="number"
+                  defaultValue={learner?.otjTarget || 278}
+                  min="1"
+                  max="10000"
+                  required
+                />
+                <Field
+                  label="Assignment reason"
+                  name="reason"
+                  type="textarea"
+                  placeholder="Record why the programme or standard is changing."
+                  required
+                  wide
+                />
+                <label className="checkbox-label wide">
+                  <input type="checkbox" required />I understand that previous
+                  programme evidence will be retained as history and will not
+                  automatically count towards the new standard.
+                </label>
+              </>
+            )}
             {type === "learner" && (
               <>
                 <Field
@@ -3781,6 +3783,13 @@ function ModalHost() {
                   defaultValue={item?.employer}
                   required
                 />
+                {item && (
+                  <input
+                    type="hidden"
+                    name="standardId"
+                    value={item.standardId}
+                  />
+                )}
                 <Field
                   label="Apprenticeship standard"
                   name="standardId"
@@ -3790,6 +3799,7 @@ function ModalHost() {
                     ...standards,
                   ]}
                   defaultValue={item?.standardId}
+                  disabled={Boolean(item)}
                   required
                 />
                 <Field
@@ -3872,8 +3882,8 @@ function ModalHost() {
                 />
                 <p className="caption wide">
                   Progress is calculated from accepted evidence, not an editable
-                  percentage. Changing a standard is blocked once evidence
-                  exists.
+                  percentage. Use Assign standard from the profile or standard
+                  library to change a programme and retain its history.
                 </p>
               </>
             )}
@@ -3969,6 +3979,14 @@ function ModalHost() {
             {type === "evidenceDetail" && (
               <div className="wide evidence-detail">
                 <Tag>{item.status}</Tag>
+                {item.standardId && item.standardId !== learner?.standardId && (
+                  <p className="blue-callout">
+                    Earlier standard:{" "}
+                    {s.standards.find((st) => st.id === item.standardId)?.name}.
+                    Retained for audit; it does not count towards the current
+                    programme.
+                  </p>
+                )}
                 <h3>{item.title}</h3>
                 <p>
                   {item.type} · {fmt(item.date)} · {nameOf(s, item.by)}
@@ -3999,7 +4017,9 @@ function ModalHost() {
                     ))}
                   </details>
                 )}
-                {["Draft", "Changes requested"].includes(item.status) &&
+                {(!item.standardId ||
+                  item.standardId === learner?.standardId) &&
+                  ["Draft", "Changes requested"].includes(item.status) &&
                   ["Manager", "Assessor", "Apprentice"].includes(user.role) && (
                     <div className="button-row">
                       <Button
@@ -4035,7 +4055,9 @@ function ModalHost() {
                       )}
                     </div>
                   )}
-                {item.status === "Submitted" &&
+                {(!item.standardId ||
+                  item.standardId === learner?.standardId) &&
+                  item.status === "Submitted" &&
                   ["Manager", "Assessor"].includes(user.role) && (
                     <div className="assessment-form">
                       <Field
@@ -4348,6 +4370,7 @@ function ModalHost() {
                   label="Accepted evidence to sample"
                   name="evidenceId"
                   type="select"
+                  defaultValue={modal.evidenceId}
                   options={[
                     { value: "", label: "Select accepted evidence" },
                     ...s.evidence
@@ -4624,6 +4647,7 @@ function ModalHost() {
             {!(
               type === "evidenceDetail" &&
               !(
+                (!item.standardId || item.standardId === learner?.standardId) &&
                 item.status === "Submitted" &&
                 ["Manager", "Assessor"].includes(user.role)
               )
