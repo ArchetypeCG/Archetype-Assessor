@@ -1,26 +1,4696 @@
-import React, {useState} from 'react';
-import {createRoot} from 'react-dom/client';
-import {LayoutDashboard, Layers, BookOpen, CalendarDays, MessageSquare, Settings, ArrowUpRight, ArrowRight, Plus, Search, Bell, Check, X, FileText, UploadCloud, ChevronRight, Target, Clock, Menu, Download} from 'lucide-react';
-import './style.css';
-const initial=[{id:1,title:'Leading a team through change',category:'Professional discussion',unit:'S4 · Leadership & management',date:'20 Oct 2026',status:'Approved',description:'Reflection on coordinating our team through the new project workflow.'},{id:2,title:'Customer experience improvement plan',category:'Work product',unit:'K3 · Business understanding',date:'18 Oct 2026',status:'In review',description:'An improvement plan based on customer feedback and service data.'},{id:3,title:'Monthly development reflection',category:'Reflective account',unit:'B1 · Personal development',date:'16 Oct 2026',status:'Draft',description:'My learning and next steps from this month.'}];
-function read(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}}
-function App(){const [page,setPage]=useState('Overview'),[evidence,setEvidence]=useState(()=>read('archetype-evidence',initial)),[modal,setModal]=useState(false),[detail,setDetail]=useState(null),[query,setQuery]=useState(''),[filter,setFilter]=useState('All evidence'),[notice,setNotice]=useState(false),[mobile,setMobile]=useState(false),[toast,setToast]=useState(''),[messages,setMessages]=useState(()=>read('archetype-messages',[]));
-function notify(s){setToast(s);setTimeout(()=>setToast(''),3500)}
-function save(items){setEvidence(items);localStorage.setItem('archetype-evidence',JSON.stringify(items))}
-function navigate(p){setPage(p);setQuery('');setMobile(false)}
-const visible=evidence.filter(e=>(filter==='All evidence'||e.status===filter)&&`${e.title} ${e.unit}`.toLowerCase().includes(query.toLowerCase()));
-function submit(e){e.preventDefault();const f=new FormData(e.target),file=f.get('file');if(file.size>5*1024*1024){notify('Please choose a file smaller than 5 MB.');return}const add=data=>{try{save([{id:Date.now(),title:f.get('title'),category:f.get('category'),unit:f.get('unit'),date:new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),status:f.get('action'),description:f.get('description'),filename:file.name,filedata:data},...evidence]);setModal(false);notify('Evidence saved to this browser.')}catch{notify('Browser storage is full. Try a smaller attachment.')}};if(file.size){const reader=new FileReader();reader.onload=()=>add(reader.result);reader.readAsDataURL(file)}else add(null)}
-return <div className="app"><aside className={mobile?'sidebar open':'sidebar'}><a className="brand" href="#" onClick={e=>{e.preventDefault();navigate('Overview')}}><span className="brandmark">a<span>↗</span></span>archetype<span className="brand-dot">.</span></a><div className="workspace"><span className="workspace-icon">N</span><div>Northstar Learning<small>Apprentice workspace</small></div><span>⌄</span></div><span className="nav-label">YOUR WORKSPACE</span><nav>{[[LayoutDashboard,'Overview'],[Layers,'My portfolio'],[BookOpen,'Learning plan'],[CalendarDays,'Reviews'],[MessageSquare,'Messages']].map(([Icon,label])=><button className={page===label?'active':''} key={label} onClick={()=>navigate(label)}><Icon size={19}/>{label}{label==='Messages'&&<span className="badge">2</span>}</button>)}</nav><div className="sidebar-bottom"><div className="help-card"><span>Make your next move.</span><p>A little progress, every day.<br/>Your future self will thank you.</p><button onClick={()=>navigate('Learning plan')}>Explore your learning <ArrowUpRight size={15}/></button></div><button className="settings" onClick={()=>navigate('Settings')}><Settings size={18}/>Settings</button><div className="profile"><div className="avatar">JD</div><div>Jamie Davies<small>Level 3 Apprentice</small></div><span className="online"/></div></div></aside><div className="main-wrap"><header><div className="breadcrumb"><button className="mobile-menu" aria-label="Toggle menu" onClick={()=>setMobile(!mobile)}><Menu/></button>Workspace <ChevronRight size={14}/><strong>{page}</strong></div><div className="header-right"><span className="demo">Demo workspace · saved on this device</span><button className="bell" aria-label="Notifications" onClick={()=>setNotice(!notice)}><Bell size={19}/><i/></button><div className="avatar small">JD</div></div>{notice&&<div className="notifications"><strong>You’re making progress</strong><p>Sarah approved your leadership evidence.</p><p>Your progress review is on 29 October.</p><small>Sample notifications</small></div>}</header><main><div className="page-heading"><div><div className="eyebrow">YOUR APPRENTICESHIP, YOUR NEXT CHAPTER</div><h1>{page==='Overview'?'Good morning, Jamie':page}<span className="heading-dot">.</span></h1><p>{page==='Overview'?'Every small step is shaping something bigger. Let’s keep going.':page==='My portfolio'?'Your skills, your experience, your evidence. All in one place.':'A clear path from where you are to where you want to be.'}</p></div><button className="primary" onClick={()=>setModal(true)}><Plus size={18}/>Add evidence</button></div>
-{page==='Overview'&&<><section className="hero"><div className="hero-content"><div className="pill"><span/>ON THE RIGHT TRACK</div><h2>Your ambition.<br/>Taking shape.</h2><p>You’re building the skills for what comes next.<br/>Keep capturing the moments that matter.</p><button onClick={()=>navigate('My portfolio')}>Continue your portfolio <ArrowRight size={17}/></button></div><div className="hero-art" aria-hidden="true"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="arch arch-back"/><div className="arch arch-front"/><div className="art-star">✳</div><div className="art-caption">GROW INTO YOUR POTENTIAL ↗</div></div><div className="hero-foot">BUSINESS ADMINISTRATOR <span>LEVEL 3</span></div></section><section className="stats"><Stat label="Overall progress" value="68" suffix="%" detail="A strong foundation. Keep building." type="progress"/><Stat label="Evidence collected" value={evidence.length} suffix=" items" detail={`${evidence.filter(x=>x.status==='In review').length} awaiting assessor review`} icon={<Layers/>}/><Stat label="Off-the-job learning" value="142" suffix=" hrs" detail="of 278 planned learning hours" icon={<Clock/>}/><Stat label="Next progress review" value="29" suffix=" Oct" detail="Thursday · 10:00 AM" icon={<CalendarDays/>}/></section><div className="dashboard-grid"><section className="panel evidence-panel"><div className="section-heading"><div><h3>Your latest evidence</h3><p>Little moments. Real progress.</p></div><button className="text-button" onClick={()=>navigate('My portfolio')}>View portfolio <ArrowUpRight size={16}/></button></div><EvidenceList items={evidence.slice(0,3)} onSelect={setDetail}/></section><section className="panel focus"><div className="focus-top"><span className="icon-box"><Target size={20}/></span><span>YOUR NEXT STEP</span></div><h3>Turn experience<br/>into evidence.</h3><p>Reflect on a challenge you solved at work this week. What did you learn?</p><button onClick={()=>{setModal(true)}}>Add a reflection <ArrowRight size={16}/></button><div className="focus-bottom">A few minutes now. A skill for life.</div></section></div><section className="journey"><div><span className="eyebrow">THE BIGGER PICTURE</span><h3>Your journey, at a glance</h3></div><div className="journey-step complete"><Check size={15}/><div>Getting started<small>Foundation complete</small></div></div><div className="journey-line"/><div className="journey-step current"><span>2</span><div>Building confidence<small>You are here</small></div></div><div className="journey-line"/><div className="journey-step"><span>3</span><div>Ready for assessment<small>Your next chapter</small></div></div></section></>}
-{page==='My portfolio'&&<section className="panel"><div className="toolbar"><div className="search"><Search size={18}/><input aria-label="Search evidence" placeholder="Search your evidence…" value={query} onChange={e=>setQuery(e.target.value)}/></div><select aria-label="Filter status" value={filter} onChange={e=>setFilter(e.target.value)}>{['All evidence','Approved','In review','Draft'].map(s=><option key={s}>{s}</option>)}</select></div><EvidenceList items={visible} onSelect={setDetail}/>{!visible.length&&<p className="empty">No evidence matches. Add evidence or change your search.</p>}</section>}
-{page==='Learning plan'&&<section className="panel"><div className="section-heading"><div><h3>Business Administrator · Level 3</h3><p>Your knowledge, skills and behaviours</p></div><span className="status approved">In progress</span></div>{[['K1','The organisation',85],['K3','Business understanding',70],['S4','Leadership & management',60],['S6','Project management',45],['B1','Personal development',80]].map(([code,title,n])=><div className="learning-row" key={code}><span className="file-icon">{code}</span><div><h4>{title}</h4><div className="progress-track"><i style={{width:n+'%'}}/></div></div><strong>{n}%</strong></div>)}<p className="footnote">Illustrative learning plan. Your training provider will set your actual standard and progress.</p></section>}
-{page==='Reviews'&&<section className="panel"><div className="section-heading"><div><h3>Your next conversation</h3><p>Make time to look back, and plan ahead.</p></div></div><div className="review-card"><div className="date-block"><span>OCT</span>29</div><div><h3>Progress review with Sarah Mitchell</h3><p>Thursday, 29 October 2026 · 10:00–11:00 AM</p><p>Review evidence, discuss your learning and agree your next goals.</p><span className="status review">Sample appointment</span></div></div><h3>Prepare for your review</h3><ul className="checklist"><li>Bring an example of work you’re proud of.</li><li>Reflect on challenges and the support you need.</li><li>Think about your goals for the next month.</li></ul></section>}
-{page==='Messages'&&<section className="panel messages"><div className="section-heading"><div><h3>Sarah Mitchell</h3><p>Your assessor · demo conversation</p></div><div className="avatar">SM</div></div><div className="message received">Hi Jamie! Great reflection on leading your team through change. Your evidence is clear and thoughtful. Let’s discuss your next goals at our review.<small>Sarah · Sample message</small></div>{messages.map((m,i)=><div className="message sent" key={i}>{m}<small>Saved locally · not delivered</small></div>)}<form onSubmit={e=>{e.preventDefault();const input=e.target.elements.message;const next=[...messages,input.value];setMessages(next);localStorage.setItem('archetype-messages',JSON.stringify(next));input.value='';notify('Demo message saved locally.')}}><label htmlFor="message">Write a demo message</label><textarea id="message" name="message" required placeholder="Share an update or ask a question…"/><button className="primary">Save message <ArrowRight size={16}/></button></form></section>}
-{page==='Settings'&&<section className="panel"><h3>Your workspace</h3><p>This prototype stores evidence and attachments in your browser. It has no server, authentication or shared assessor access.</p><p>Sample progress and appointments help illustrate the experience. Avoid uploading sensitive learner data.</p><button className="secondary" onClick={()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({evidence,messages},null,2)],{type:'application/json'}));a.download='archetype-portfolio.json';a.click();URL.revokeObjectURL(a.href)}}><Download size={17}/>Export portfolio</button></section>}
-<footer><span className="footer-brand">archetype.</span><span>A little progress. A world of possibility.</span><span>Made for your next chapter ↗</span></footer></main></div>
-{modal&&<div className="overlay" onClick={()=>setModal(false)}><section role="dialog" aria-modal="true" aria-labelledby="upload-title" className="modal" onClick={e=>e.stopPropagation()}><button className="close" aria-label="Close dialog" onClick={()=>setModal(false)}><X/></button><span className="eyebrow">BUILD YOUR PORTFOLIO</span><h2 id="upload-title">Make your progress visible.</h2><p>Add an experience, reflection or piece of work.</p><form onSubmit={submit}><label>Evidence title<input name="title" required maxLength={120} placeholder="What have you been working on?"/></label><div className="form-grid"><label>Evidence type<select name="category">{['Reflective account','Work product','Professional discussion','Witness statement'].map(x=><option key={x}>{x}</option>)}</select></label><label>Link to your learning<select name="unit">{['K1 · The organisation','K3 · Business understanding','S4 · Leadership & management','S6 · Project management','B1 · Personal development'].map(x=><option key={x}>{x}</option>)}</select></label></div><label>Your reflection<textarea name="description" required rows={4} placeholder="What did you do, what did you learn, and how will you use it?"/></label><label className="upload"><UploadCloud/><span>Attach supporting evidence <small>Optional · up to 5 MB · stored on this device</small></span><input name="file" type="file"/></label><label>Status<select name="action"><option>Draft</option><option>In review</option></select></label><p className="footnote">Demo only: “In review” organises your evidence locally; it does not send it to an assessor.</p><button className="primary" type="submit">Save evidence <ArrowRight size={16}/></button></form></section></div>}
-{detail&&<div className="overlay" onClick={()=>setDetail(null)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="detail-title" onClick={e=>e.stopPropagation()}><button className="close" aria-label="Close evidence" onClick={()=>setDetail(null)}><X/></button><span className={'status '+statusClass(detail.status)}>{detail.status}</span><h2 id="detail-title">{detail.title}</h2><p>{detail.category} · {detail.date}</p><span className="unit-tag">{detail.unit}</span><p className="reflection">{detail.description}</p>{detail.filedata&&<a className="secondary" href={detail.filedata} download={detail.filename}><Download size={16}/>{detail.filename}</a>}{detail.status==='Approved'&&<div className="feedback"><strong>Assessor feedback · sample</strong><p>Clear reflection and a strong link to your learning. Well done on putting your skills into practice.</p><small>Sarah Mitchell</small></div>}{detail.status==='Draft'&&<button className="primary" onClick={()=>{save(evidence.map(x=>x.id===detail.id?{...x,status:'In review'}:x));setDetail(null);notify('Marked as in review locally.')}}>Mark as in review <ArrowRight size={16}/></button>}</section></div>}{toast&&<div className="toast" role="status"><Check size={18}/>{toast}</div>}</div>}
-function statusClass(s){return s==='Approved'?'approved':s==='In review'?'review':'draft'}
-function EvidenceList({items,onSelect}){return <div className="evidence-list">{items.map(e=><button key={e.id} className="evidence-row" onClick={()=>onSelect(e)}><span className={'file-icon '+statusClass(e.status)}><FileText size={21}/></span><div className="evidence-title"><h4>{e.title}</h4><p>{e.category}<span>·</span>{e.unit}</p></div><div className="evidence-meta"><span className={'status '+statusClass(e.status)}>{e.status==='Approved'&&<Check size={12}/>} {e.status}</span><small>{e.date}</small></div><ChevronRight size={16}/></button>)}</div>}
-function Stat({label,value,suffix,detail,icon,type}){return <div className="stat"><div className="stat-label">{label}{icon&&<span>{icon}</span>}</div><div className="stat-value">{value}<span>{suffix}</span>{type&&<span className="growth">↗ 12% this month</span>}</div>{type&&<div className="progress-track"><i style={{width:'68%'}}/></div>}<p>{detail}</p></div>}
-createRoot(document.getElementById('root')).render(<App/>);
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  createContext,
+  useRef,
+} from "react";
+import { createRoot } from "react-dom/client";
+import {
+  LayoutDashboard,
+  Users,
+  TriangleAlert,
+  ListChecks,
+  ChartNoAxesCombined,
+  FileBarChart,
+  ShieldCheck,
+  GraduationCap,
+  Building2,
+  CalendarDays,
+  Layers,
+  BookOpen,
+  MessageSquare,
+  ClipboardCheck,
+  History,
+  Settings,
+  Search,
+  Plus,
+  ArrowUpRight,
+  ArrowRight,
+  ChevronRight,
+  ChevronLeft,
+  Check,
+  X,
+  Menu,
+  LogOut,
+  Download,
+  Upload,
+  RefreshCw,
+  Clock,
+  Target,
+  FileText,
+  Send,
+  LockKeyhole,
+  BriefcaseBusiness,
+  CheckCheck,
+  FolderOpen,
+  ExternalLink,
+} from "lucide-react";
+import {
+  fmt,
+  initials,
+  csv,
+  download,
+  filePayload,
+  parseStandard,
+  reportRows,
+  localDate,
+} from "./lib";
+import "./style.css";
+const Context = createContext();
+const useApp = () => useContext(Context);
+const navGroups = [
+  [
+    "COMMAND CENTRE",
+    [
+      [LayoutDashboard, "Command centre"],
+      [Users, "Apprentices"],
+      [TriangleAlert, "Alerts"],
+      [ListChecks, "Action plans"],
+      [ChartNoAxesCombined, "Analytics"],
+      [FileBarChart, "Report Studio"],
+    ],
+  ],
+  [
+    "PORTFOLIOS & LEARNING",
+    [
+      [Layers, "Portfolios"],
+      [BookOpen, "Standards & KSBs"],
+      [Clock, "Off-the-job learning"],
+      [FolderOpen, "Resources"],
+      [MessageSquare, "Messages"],
+    ],
+  ],
+  [
+    "OPERATIONS",
+    [
+      [Target, "Interventions"],
+      [CalendarDays, "Reviews Hub"],
+      [ShieldCheck, "Compliance Hub"],
+      [GraduationCap, "Gateway & EPA"],
+      [CalendarDays, "Calendar"],
+    ],
+  ],
+  [
+    "INTELLIGENCE",
+    [
+      [Building2, "Employers"],
+      [ChartNoAxesCombined, "Forecasting"],
+      [Users, "Team & caseloads"],
+      [ClipboardCheck, "Audit & quality"],
+    ],
+  ],
+];
+async function api(path, options = {}) {
+  const res = await fetch("/api/" + path, {
+    credentials: "same-origin",
+    ...options,
+    headers: { "Content-Type": "application/json", ...options.headers },
+  });
+  const out = await res.json();
+  if (!res.ok) {
+    const e = Error(out.error || "Request failed");
+    e.status = res.status;
+    throw e;
+  }
+  return out;
+}
+function App() {
+  const [state, setState] = useState(null),
+    [user, setUser] = useState(null),
+    [demo, setDemo] = useState(null),
+    [page, setPage] = useState("Command centre"),
+    [learnerId, setLearnerId] = useState(""),
+    [profile, setProfile] = useState(null),
+    [modal, setModal] = useState(null),
+    [toast, setToast] = useState(""),
+    [error, setError] = useState(""),
+    [mobile, setMobile] = useState(false),
+    [busy, setBusy] = useState(false);
+  const timer = useRef();
+  useEffect(() => {
+    refresh();
+    api("demo")
+      .then(setDemo)
+      .catch(() => {});
+    return () => clearTimeout(timer.current);
+  }, []);
+  function notify(message) {
+    setToast(message);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setToast(""), 4500);
+  }
+  async function refresh() {
+    try {
+      const r = await api("state");
+      setState(r.state);
+      setUser(r.user);
+      setLearnerId((x) => x || r.state.learners[0]?.id || "");
+      setDemo((d) => ({ ...d, enabled: r.demo }));
+      setError("");
+    } catch (e) {
+      if (e.status === 401) {
+        setUser(null);
+        setState(null);
+      } else setError(e.message);
+    }
+  }
+  async function command(kind, payload) {
+    setBusy(true);
+    try {
+      const r = await api("command", {
+        method: "POST",
+        body: JSON.stringify({ kind, payload, revision: state.revision }),
+      });
+      setState(r.state);
+      notify("Changes saved to the workspace");
+      return r.result;
+    } catch (e) {
+      if (e.status === 409) await refresh();
+      if (e.status === 401) {
+        setUser(null);
+        setState(null);
+      }
+      throw e;
+    } finally {
+      setBusy(false);
+    }
+  }
+  function act(kind, payload) {
+    return command(kind, payload).catch((e) => notify(e.message));
+  }
+  function go(p) {
+    setPage(p);
+    setMobile(false);
+    setProfile(null);
+    window.scrollTo({ top: 0 });
+  }
+  function openLearner(id, tab = "Overview") {
+    setLearnerId(id);
+    setProfile({ id, tab });
+    setPage("Apprentices");
+    setMobile(false);
+    window.scrollTo({ top: 0 });
+  }
+  const ctx = {
+    s: state,
+    user,
+    demo,
+    command,
+    act,
+    go,
+    openLearner,
+    learnerId,
+    setLearnerId,
+    profile,
+    setProfile,
+    modal,
+    setModal,
+    notify,
+    busy,
+    refresh,
+  };
+  if (!user)
+    return (
+      <Login
+        demo={demo}
+        onLogin={async (email, password) => {
+          await api("login", {
+            method: "POST",
+            body: JSON.stringify({ email, password }),
+          });
+          await refresh();
+        }}
+        error={error}
+      />
+    );
+  const restricted = ["Apprentice", "Employer"].includes(user.role);
+  const allowed =
+    user.role === "Apprentice"
+      ? [
+          "Command centre",
+          "Portfolios",
+          "Standards & KSBs",
+          "Off-the-job learning",
+          "Resources",
+          "Messages",
+          "Action plans",
+          "Reviews Hub",
+          "Calendar",
+          "Gateway & EPA",
+        ]
+      : user.role === "Employer"
+        ? [
+            "Command centre",
+            "Apprentices",
+            "Action plans",
+            "Reviews Hub",
+            "Calendar",
+            "Gateway & EPA",
+            "Messages",
+          ]
+        : null;
+  const priority = state.learners.flatMap((l) => l.exceptions).length;
+  return (
+    <Context.Provider value={ctx}>
+      <div className="app-shell">
+        <aside className={mobile ? "side open" : "side"}>
+          <a
+            href="#"
+            className="brand"
+            onClick={(e) => {
+              e.preventDefault();
+              go("Command centre");
+            }}
+          >
+            <span className="brand-icon">
+              a<span>↗︎</span>
+            </span>
+            archetype<span className="brand-period">.</span>
+          </a>
+          <div className="workspace-label">
+            <div className="workspace-emblem">
+              <Layers size={19} />
+            </div>
+            <div>
+              WBL Intelligence<small>Apprenticeship operations</small>
+            </div>
+            <ChevronRight size={14} />
+          </div>
+          <div className="nav-scroll">
+            {navGroups.map(([group, items]) => {
+              const links = items.filter(
+                ([, title]) => !allowed || allowed.includes(title),
+              );
+              return (
+                links.length > 0 && (
+                  <div className="nav-group" key={group}>
+                    <div className="nav-caption">{group}</div>
+                    {links.map(([Icon, title]) => (
+                      <button
+                        key={title}
+                        className={
+                          "nav-link " + (page === title ? "active" : "")
+                        }
+                        onClick={() => go(title)}
+                      >
+                        <Icon size={17} />
+                        <span>{title}</span>
+                        {title === "Alerts" && priority > 0 && (
+                          <b>{priority}</b>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )
+              );
+            })}
+          </div>
+          <div className="side-bottom">
+            <div className="storage-indicator">
+              <span />
+              Server connected <small>SQLite · autosaved</small>
+            </div>
+            <button
+              className={"nav-link " + (page === "Settings" ? "active" : "")}
+              onClick={() => go("Settings")}
+            >
+              <Settings size={17} />
+              Settings & export
+            </button>
+            <div className="user-block">
+              <div className="avatar">{initials(user.name)}</div>
+              <div>
+                {user.name}
+                <small>{user.role}</small>
+              </div>
+              <button
+                aria-label="Sign out"
+                onClick={async () => {
+                  await api("logout", { method: "POST", body: "{}" });
+                  setUser(null);
+                  setState(null);
+                  setLearnerId("");
+                  setProfile(null);
+                  setModal(null);
+                  setMobile(false);
+                  setPage("Command centre");
+                }}
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
+          </div>
+        </aside>
+        {mobile && (
+          <button
+            className="mobile-scrim"
+            aria-label="Close navigation"
+            onClick={() => setMobile(false)}
+          />
+        )}
+        <div className="workspace-main">
+          <header className="topbar">
+            <div className="crumb">
+              <button
+                className="mobile-toggle"
+                aria-label="Open navigation"
+                onClick={() => setMobile(!mobile)}
+              >
+                <Menu size={22} />
+              </button>
+              <span>Workspace</span>
+              <ChevronRight size={13} />
+              <strong>{profile ? "Learner profile" : page}</strong>
+            </div>
+            <div className="topbar-right">
+              <span className="workspace-live">
+                <i />
+                Live workspace
+              </span>
+              {demo?.enabled && (
+                <span className="demo-chip">FICTIONAL DEMO DATA</span>
+              )}
+              <button
+                title="Refresh workspace"
+                aria-label="Refresh workspace"
+                onClick={refresh}
+              >
+                <RefreshCw size={16} />
+              </button>
+              <div className="avatar mini">{initials(user.name)}</div>
+            </div>
+          </header>
+          <main>
+            <div className="page-heading">
+              <div>
+                <div className="eyebrow">
+                  {restricted
+                    ? "YOUR LEARNING. YOUR NEXT CHAPTER."
+                    : "DELIVERY, LEARNING & COMPLIANCE"}
+                </div>
+                <h1>
+                  {profile
+                    ? state.learners.find((l) => l.id === profile.id)?.name
+                    : page === "Command centre"
+                      ? restricted
+                        ? "Your learning workspace"
+                        : "Delivery command centre"
+                      : page}
+                  <span>.</span>
+                </h1>
+                <p>
+                  {profile
+                    ? "A complete picture of learning, progress and support."
+                    : page === "Command centre"
+                      ? "Clarity across every learner. Confidence in every next step."
+                      : descriptions[page] ||
+                        "Connected records. Meaningful progress. One workspace."}
+                </p>
+              </div>
+              <div className="heading-actions">
+                {!restricted && (
+                  <span className="date-label">
+                    {new Date().toLocaleDateString("en-GB", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "long",
+                      timeZone: "Europe/London",
+                    })}
+                  </span>
+                )}
+                {["Manager", "Assessor"].includes(user.role) && (
+                  <Button onClick={() => setModal({ type: "learner" })}>
+                    <Plus size={16} />
+                    Add apprentice
+                  </Button>
+                )}
+              </div>
+            </div>
+            {error && <div className="error-banner">{error}</div>}
+            {profile ? <LearnerProfile /> : <Page page={page} />}
+            <footer>
+              <strong>archetype.</strong>
+              <span>Better insight. Better outcomes.</span>
+              <span>
+                {demo?.enabled
+                  ? "Demonstration workspace · fictional learners"
+                  : "Your connected apprenticeship workspace"}
+              </span>
+            </footer>
+          </main>
+        </div>
+        {modal && <ModalHost key={modal.type + (modal.item?.id || "")} />}{" "}
+        {toast && (
+          <div className="toast" role="status">
+            <Check size={17} />
+            {toast}
+          </div>
+        )}
+      </div>
+    </Context.Provider>
+  );
+}
+const descriptions = {
+  Apprentices: "Every apprentice, connected to the support they need.",
+  Alerts: "The right intervention, before a small gap becomes a bigger one.",
+  "Action plans": "Clear ownership. Agreed next steps. Nothing left behind.",
+  "Report Studio": "Turn your portfolio data into a clearer picture.",
+  "Standards & KSBs": "One standard. Clear expectations. Evidence that counts.",
+  Portfolios: "Capture experience. Map evidence. Recognise progress.",
+  "Reviews Hub": "Conversations that move learning forward.",
+  "Compliance Hub": "Keep the essentials visible, current and under control.",
+  "Audit & quality": "A clear record of decisions and the quality behind them.",
+  "Off-the-job learning":
+    "Capture new learning, reflect on it, and track approved hours.",
+};
+function Button({ children, secondary = false, ...props }) {
+  return (
+    <button className={secondary ? "button secondary" : "button"} {...props}>
+      {children}
+    </button>
+  );
+}
+function Tag({ children, tone = "" }) {
+  const t =
+    tone ||
+    {
+      Red: "red",
+      Amber: "amber",
+      Green: "green",
+      Active: "green",
+      Accepted: "green",
+      Approved: "green",
+      Submitted: "blue",
+      Draft: "neutral",
+      "Changes requested": "amber",
+      Pending: "amber",
+      Returned: "amber",
+      Rejected: "red",
+      Complete: "green",
+      Open: "blue",
+      Ready: "green",
+      "Action required": "red",
+      Agreed: "green",
+    }[children] ||
+    "neutral";
+  return (
+    <span className={"tag " + t}>
+      <i />
+      {children}
+    </span>
+  );
+}
+function Panel({ title, subtitle, action, children, className = "" }) {
+  return (
+    <section className={"panel " + className}>
+      {(title || action) && (
+        <div className="panel-header">
+          <div>
+            <h2>{title}</h2>
+            {subtitle && <p>{subtitle}</p>}
+          </div>
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+function Empty({
+  children = "Nothing here yet. Add your first record to get started.",
+}) {
+  return (
+    <div className="empty">
+      <FolderOpen size={28} />
+      <p>{children}</p>
+    </div>
+  );
+}
+function Metric({
+  label,
+  value,
+  detail,
+  icon: Icon = ChartNoAxesCombined,
+  tone = "",
+}) {
+  return (
+    <div className={"metric " + tone}>
+      <div>
+        {label}
+        <Icon size={17} />
+      </div>
+      <strong>{value}</strong>
+      <p>{detail}</p>
+    </div>
+  );
+}
+function Progress({ value = 0 }) {
+  return (
+    <div className="progress-track">
+      <i style={{ width: Math.min(100, Math.max(0, value)) + "%" }} />
+    </div>
+  );
+}
+function nameOf(s, id) {
+  return s.users.find((x) => x.id === id)?.name || "Unknown user";
+}
+function stdOf(s, l) {
+  return s.standards.find((x) => x.id === l.standardId)?.name || "No standard";
+}
+function LearnerLink({ id }) {
+  const { s, openLearner } = useApp();
+  return (
+    <button className="text-link" onClick={() => openLearner(id)}>
+      {s.learners.find((l) => l.id === id)?.name || "Learner"}
+    </button>
+  );
+}
+function Table({ headers, children }) {
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            {headers.map((x) => (
+              <th key={x}>{x}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
+  );
+}
+function Page({ page }) {
+  switch (page) {
+    case "Command centre":
+      return <Dashboard />;
+    case "Apprentices":
+      return <Learners />;
+    case "Alerts":
+    case "Interventions":
+      return <Alerts interventions={page === "Interventions"} />;
+    case "Action plans":
+      return <Tasks />;
+    case "Analytics":
+      return <Analytics />;
+    case "Report Studio":
+      return <Reports />;
+    case "Portfolios":
+      return <PortfolioHub />;
+    case "Standards & KSBs":
+      return <Standards />;
+    case "Off-the-job learning":
+      return <OTJ />;
+    case "Resources":
+      return <Resources />;
+    case "Messages":
+      return <Messages />;
+    case "Reviews Hub":
+      return <Reviews />;
+    case "Compliance Hub":
+      return <Compliance />;
+    case "Gateway & EPA":
+      return <Gateway />;
+    case "Calendar":
+      return <Calendar />;
+    case "Employers":
+      return <Employers />;
+    case "Forecasting":
+      return <Forecast />;
+    case "Team & caseloads":
+      return <Team />;
+    case "Audit & quality":
+      return <Quality />;
+    default:
+      return <SettingsPage />;
+  }
+}
+function Dashboard() {
+  const { s, user, go, openLearner, setModal } = useApp(),
+    ls = s.learners,
+    active = ls.filter((l) => l.status === "Active"),
+    reds = ls.filter((l) => l.rag === "Red"),
+    pending = s.evidence.filter((e) => e.status === "Submitted"),
+    overdue = ls.filter((l) => l.exceptions.some((x) => x.type === "review")),
+    average = ls.length
+      ? Math.round(ls.reduce((n, l) => n + l.progress, 0) / ls.length)
+      : 0,
+    staff = !["Apprentice", "Employer"].includes(user.role);
+  return (
+    <>
+      <section className="hero">
+        <div>
+          <span className="hero-kicker">
+            <i />
+            YOUR PORTFOLIO, IN FOCUS
+          </span>
+          <h2>
+            {staff ? (
+              <>
+                See the whole picture.
+                <br />
+                Shape the next chapter.
+              </>
+            ) : (
+              <>
+                Your ambition.
+                <br />
+                Taking shape.
+              </>
+            )}
+          </h2>
+          <p>
+            {staff
+              ? "A connected view of progress, evidence and delivery risk."
+              : "Keep learning, capture your experience, and celebrate your progress."}
+            <br />
+            {staff
+              ? "Turn insight into the support that makes a difference."
+              : "Your next step starts with what you do today."}
+          </p>
+          <button onClick={() => go(staff ? "Apprentices" : "Portfolios")}>
+            {staff ? "Explore your learners" : "Open your portfolio"}
+            <ArrowRight size={16} />
+          </button>
+        </div>
+        <div className="hero-art" aria-hidden="true">
+          <div className="orbit" />
+          <div className="orbit second" />
+          <div className="arch one" />
+          <div className="arch two" />
+          <span>✳</span>
+          <small>PROGRESS WITH PURPOSE</small>
+        </div>
+        <div className="hero-stamp">
+          <ShieldCheck size={13} /> LEARNING & DELIVERY INTELLIGENCE
+        </div>
+      </section>
+      <div className="metrics">
+        <Metric
+          label="Active apprentices"
+          value={active.length}
+          detail={`${ls.length} learners in your workspace`}
+          icon={Users}
+        />
+        <Metric
+          label="Verified KSB coverage"
+          value={average + "%"}
+          detail="Accepted evidence against assigned criteria"
+          icon={Target}
+        />
+        <Metric
+          label="Evidence awaiting review"
+          value={pending.length}
+          detail="Submitted and ready for assessment"
+          icon={Layers}
+        />
+        <Metric
+          label={staff ? "Learners at risk" : "Approved learning hours"}
+          value={staff ? reds.length : ls.reduce((n, l) => n + l.hours, 0)}
+          detail={
+            staff
+              ? `${overdue.length} with overdue progress reviews`
+              : "Across your visible learning records"
+          }
+          icon={staff ? TriangleAlert : Clock}
+          tone={staff ? "risk" : ""}
+        />
+      </div>
+      <div className="grid dashboard-grid">
+        <Panel
+          title="Portfolio health"
+          subtitle="A live view of progress and delivery risk"
+          action={
+            <button className="text-link" onClick={() => go("Analytics")}>
+              Explore insights <ArrowUpRight size={14} />
+            </button>
+          }
+        >
+          <div className="health-layout">
+            <div
+              className="donut"
+              style={{
+                background: `conic-gradient(#dc786e 0 ${ls.length ? (reds.length / ls.length) * 100 : 0}%,#e2b762 0 ${ls.length ? ((reds.length + ls.filter((l) => l.rag === "Amber").length) / ls.length) * 100 : 0}%,#74a58b 0 100%)`,
+              }}
+            >
+              <div>
+                <strong>{ls.length}</strong>
+                <span>apprentices</span>
+              </div>
+            </div>
+            <div className="health-legend">
+              {["Green", "Amber", "Red"].map((r) => (
+                <button
+                  key={r}
+                  onClick={() => go(staff ? "Alerts" : "Portfolios")}
+                >
+                  <Tag>{r}</Tag>
+                  <strong>{ls.filter((l) => l.rag === r).length}</strong>
+                  <small>
+                    {r === "Green"
+                      ? "On track"
+                      : r === "Amber"
+                        ? "Needs attention"
+                        : "Priority support"}
+                  </small>
+                </button>
+              ))}
+            </div>
+          </div>
+        </Panel>
+        <Panel
+          title="Your next move"
+          subtitle="Small actions. Meaningful progress."
+          className="next-move"
+        >
+          <span className="focus-icon">
+            <Target size={24} />
+          </span>
+          <h3>
+            {staff
+              ? "Close the loop on learning."
+              : "Turn experience into evidence."}
+          </h3>
+          <p>
+            {staff
+              ? `${pending.length} evidence items are waiting for a decision. Your feedback helps learners move forward.`
+              : "Reflect on a challenge you solved at work. What did you learn, and how will you use it?"}
+          </p>
+          <button className="text-link" onClick={() => go("Portfolios")}>
+            {staff ? "Open assessment queue" : "Build your portfolio"}
+            <ArrowRight size={16} />
+          </button>
+        </Panel>
+      </div>
+      <div className="grid two">
+        <Panel
+          title="Priority queue"
+          subtitle="The learners who need your attention"
+          action={
+            <button
+              className="text-link"
+              onClick={() => go(staff ? "Interventions" : "Reviews Hub")}
+            >
+              View all <ArrowUpRight size={14} />
+            </button>
+          }
+        >
+          {[...ls]
+            .filter((l) => l.exceptions.length)
+            .sort((a, b) => b.exceptions.length - a.exceptions.length)
+            .slice(0, 4)
+            .map((l) => (
+              <button
+                className="priority-row"
+                key={l.id}
+                onClick={() => openLearner(l.id)}
+              >
+                <span className="avatar">{initials(l.name)}</span>
+                <div>
+                  <strong>{l.name}</strong>
+                  <small>{l.exceptions[0].text}</small>
+                </div>
+                <Tag>{l.rag}</Tag>
+                <ChevronRight size={15} />
+              </button>
+            ))}
+          {!ls.some((l) => l.exceptions.length) && (
+            <Empty>No urgent exceptions. Keep up the progress.</Empty>
+          )}
+        </Panel>
+        <Panel
+          title="Team & caseload pulse"
+          subtitle="Connected people. Clear ownership."
+        >
+          {s.users
+            .filter((u) => ["Assessor", "IQA"].includes(u.role))
+            .map((u) => {
+              const assigned = ls.filter(
+                (l) => l.assessorId === u.id || l.iqaId === u.id,
+              );
+              return (
+                <div className="team-row" key={u.id}>
+                  <div className="avatar cool">{initials(u.name)}</div>
+                  <div>
+                    <strong>{u.name}</strong>
+                    <small>
+                      {u.role} · {assigned.length} apprentices
+                    </small>
+                  </div>
+                  <span>
+                    {assigned.filter((l) => l.rag === "Red").length}
+                    <small>at risk</small>
+                  </span>
+                </div>
+              );
+            })}
+          {staff && (
+            <div className="quick-actions">
+              <button onClick={() => go("Reviews Hub")}>
+                <CalendarDays size={15} />
+                Reviews
+              </button>
+              <button onClick={() => go("Compliance Hub")}>
+                <ShieldCheck size={15} />
+                Compliance
+              </button>
+              <button onClick={() => go("Report Studio")}>
+                <FileBarChart size={15} />
+                Reports
+              </button>
+            </div>
+          )}
+        </Panel>
+      </div>
+      <div className="insight-note">
+        <ShieldCheck size={19} />
+        <div>
+          <strong>Progress you can trace.</strong>
+          <p>
+            Risk is calculated from review dates, compliance dates and verified
+            KSB progress. Every saved decision is recorded in the audit trail.
+          </p>
+        </div>
+        <span>CONNECTED BY DESIGN ↗</span>
+      </div>
+    </>
+  );
+}
+function FilterBar({ query, setQuery, filters = [], children }) {
+  return (
+    <div className="filterbar">
+      <div className="searchbox">
+        <Search size={17} />
+        <input
+          aria-label="Search records"
+          placeholder="Search learners, employers, references…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+      {filters.map((f) => (
+        <select
+          key={f.label}
+          aria-label={f.label}
+          value={f.value}
+          onChange={(e) => f.set(e.target.value)}
+        >
+          <option value="">{f.label}</option>
+          {f.options.map((o) => (
+            <option
+              key={typeof o === "string" ? o : o.value}
+              value={typeof o === "string" ? o : o.value}
+            >
+              {typeof o === "string" ? o : o.label}
+            </option>
+          ))}
+        </select>
+      ))}
+      {children}
+    </div>
+  );
+}
+function Learners() {
+  const { s, openLearner, setModal, user, notify } = useApp(),
+    [q, Q] = useState(""),
+    [status, S] = useState(""),
+    [rag, R] = useState(""),
+    [assessor, A] = useState(""),
+    [sort, SS] = useState("name"),
+    [p, SP] = useState(1);
+  let ls = s.learners
+    .filter(
+      (l) =>
+        (!status || l.status === status) &&
+        (!rag || l.rag === rag) &&
+        (!assessor || l.assessorId === assessor) &&
+        `${l.name} ${l.employer} ${l.ref}`
+          .toLowerCase()
+          .includes(q.toLowerCase()),
+    )
+    .sort((a, b) =>
+      sort === "progress"
+        ? a.progress - b.progress
+        : sort === "risk"
+          ? ["Red", "Amber", "Green"].indexOf(a.rag) -
+            ["Red", "Amber", "Green"].indexOf(b.rag)
+          : a.name.localeCompare(b.name),
+    );
+  const pages = Math.max(1, Math.ceil(ls.length / 12)),
+    current = Math.min(p, pages);
+  return (
+    <>
+      <Panel
+        title="Apprentice directory"
+        subtitle={`${ls.length} learners · select a learner to open their complete record`}
+        action={
+          <div className="button-row">
+            {user.role === "Manager" && (
+              <Button secondary onClick={() => setModal({ type: "import" })}>
+                <Upload size={14} />
+                Import spreadsheet
+              </Button>
+            )}
+            <Button
+              secondary
+              onClick={() =>
+                download("apprentices.csv", csv(reportRows(ls, s)), "text/csv")
+              }
+            >
+              <Download size={14} />
+              Export CSV
+            </Button>
+          </div>
+        }
+      >
+        <FilterBar
+          query={q}
+          setQuery={(x) => {
+            Q(x);
+            SP(1);
+          }}
+          filters={[
+            {
+              label: "All statuses",
+              value: status,
+              set: S,
+              options: ["Active", "Paused", "Withdrawn", "Completed"],
+            },
+            {
+              label: "All RAG",
+              value: rag,
+              set: R,
+              options: ["Green", "Amber", "Red"],
+            },
+            {
+              label: "All assessors",
+              value: assessor,
+              set: A,
+              options: s.users
+                .filter((u) => u.role === "Assessor")
+                .map((u) => ({ value: u.id, label: u.name })),
+            },
+          ]}
+        >
+          <select
+            aria-label="Sort learners"
+            value={sort}
+            onChange={(e) => SS(e.target.value)}
+          >
+            <option value="name">Learner A–Z</option>
+            <option value="risk">Risk priority</option>
+            <option value="progress">Progress low–high</option>
+          </select>
+        </FilterBar>
+        <Table
+          headers={[
+            "Learner",
+            "Employer / programme",
+            "Assessor",
+            "Progress / target",
+            "Next review",
+            "Risk",
+            "",
+          ]}
+        >
+          {ls.slice((current - 1) * 12, current * 12).map((l) => (
+            <tr key={l.id}>
+              <td>
+                <button
+                  className="learner-cell"
+                  onClick={() => openLearner(l.id)}
+                >
+                  <span className="avatar">{initials(l.name)}</span>
+                  <div>
+                    <strong>{l.name}</strong>
+                    <small>
+                      {l.ref} · {l.status}
+                    </small>
+                  </div>
+                </button>
+              </td>
+              <td>
+                <strong>{l.employer}</strong>
+                <small>
+                  {stdOf(s, l)} · L{l.level}
+                </small>
+              </td>
+              <td>{nameOf(s, l.assessorId)}</td>
+              <td>
+                <div className="progress-value">
+                  <b>{l.progress}%</b>
+                  <span> / {l.target}%</span>
+                </div>
+                <Progress value={l.progress} />
+              </td>
+              <td
+                className={
+                  l.nextReview && l.nextReview < localDate()
+                    ? "danger-text"
+                    : ""
+                }
+              >
+                {fmt(l.nextReview)}
+              </td>
+              <td>
+                <Tag>{l.rag}</Tag>
+              </td>
+              <td>
+                <button
+                  className="icon-button"
+                  aria-label={"Open " + l.name}
+                  onClick={() => openLearner(l.id)}
+                >
+                  <ArrowUpRight size={17} />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </Table>
+        {!ls.length && <Empty>No learners match your filters.</Empty>}
+        <div className="pagination">
+          <span>
+            {ls.length} records · page {current} of {pages}
+          </span>
+          <button disabled={current === 1} onClick={() => SP(current - 1)}>
+            <ChevronLeft size={14} />
+            Previous
+          </button>
+          <button disabled={current >= pages} onClick={() => SP(current + 1)}>
+            Next
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      </Panel>
+    </>
+  );
+}
+function LearnerPicker() {
+  const { s, learnerId, setLearnerId } = useApp();
+  return (
+    <label className="learner-picker">
+      Apprentice
+      <select
+        aria-label="Select apprentice"
+        value={learnerId}
+        onChange={(e) => setLearnerId(e.target.value)}
+      >
+        <option value="">Choose an apprentice</option>
+        {s.learners.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.name} · {l.ref}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+function LearnerProfile() {
+  const { s, profile, setProfile, go, setModal, user } = useApp(),
+    l = s.learners.find((x) => x.id === profile.id);
+  if (!l) return <Empty>Learner record unavailable.</Empty>;
+  const tabs =
+    user.role === "Employer"
+      ? ["Overview", "Reviews", "Actions", "Gateway"]
+      : [
+          "Overview",
+          "Evidence",
+          "KSB coverage",
+          "Learning hours",
+          "Reviews",
+          "Actions",
+          "Compliance",
+          "Gateway",
+        ];
+  return (
+    <>
+      <div className="profile-top">
+        <button className="text-link" onClick={() => go("Apprentices")}>
+          <ChevronLeft size={15} />
+          Back to directory
+        </button>
+        {["Manager", "Assessor"].includes(user.role) && (
+          <Button
+            secondary
+            onClick={() => setModal({ type: "learner", item: l })}
+          >
+            Edit apprentice
+          </Button>
+        )}
+      </div>
+      <div className="learner-banner">
+        <div className="avatar large">{initials(l.name)}</div>
+        <div>
+          <h2>{l.name}</h2>
+          <p>
+            {l.ref} · {l.employer} · {stdOf(s, l)} · Level {l.level}
+          </p>
+        </div>
+        <Tag>{l.rag}</Tag>
+        <Tag>{l.status}</Tag>
+      </div>
+      <div className="tabs">
+        {tabs.map((t) => (
+          <button
+            className={profile.tab === t ? "selected" : ""}
+            key={t}
+            onClick={() => setProfile({ ...profile, tab: t })}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+      {profile.tab === "Overview" ? (
+        <>
+          <div className="metrics">
+            <Metric
+              label="Verified KSB coverage"
+              value={l.progress + "%"}
+              detail={`${l.coverage.filter((c) => c.achieved).length} of ${l.coverage.length} criteria achieved`}
+            />
+            <Metric
+              label="Progress variance"
+              value={(l.variance > 0 ? "+" : "") + l.variance + "%"}
+              detail={`Against a target of ${l.target}%`}
+            />
+            <Metric
+              label="Approved learning"
+              value={l.hours + "h"}
+              detail={`Of ${l.otjTarget} planned hours`}
+              icon={Clock}
+            />
+            <Metric
+              label="Next review"
+              value={
+                l.nextReview
+                  ? new Date(l.nextReview + "T12:00:00").toLocaleDateString(
+                      "en-GB",
+                      { day: "numeric", month: "short" },
+                    )
+                  : "Not set"
+              }
+              detail={nameOf(s, l.assessorId)}
+              icon={CalendarDays}
+            />
+          </div>
+          <div className="grid two">
+            <Panel title="Learning & support">
+              <Detail label="Assessor" value={nameOf(s, l.assessorId)} />
+              <Detail label="Quality assurer" value={nameOf(s, l.iqaId)} />
+              <Detail label="Planned end" value={fmt(l.plannedEnd)} />
+              <Detail label="Predicted end" value={fmt(l.predictedEnd)} />
+              <Detail
+                label="English / maths"
+                value={`${l.english} / ${l.maths}`}
+              />
+              <Detail label="Notes" value={l.notes || "No additional notes"} />
+            </Panel>
+            <Panel title="Attention & interventions">
+              {l.exceptions.map((x, i) => (
+                <div className="exception" key={i}>
+                  <TriangleAlert size={16} />
+                  <div>
+                    <strong>{x.text}</strong>
+                    <small>
+                      {x.date ? fmt(x.date) : "Calculated from learner record"}
+                    </small>
+                  </div>
+                  <Tag>{x.severity}</Tag>
+                </div>
+              ))}
+              {!l.exceptions.length && (
+                <Empty>No current delivery exceptions.</Empty>
+              )}
+            </Panel>
+          </div>
+        </>
+      ) : profile.tab === "Evidence" ? (
+        <Evidence learner={l} />
+      ) : profile.tab === "KSB coverage" ? (
+        <Coverage learner={l} />
+      ) : profile.tab === "Learning hours" ? (
+        <OTJ learner={l} />
+      ) : profile.tab === "Reviews" ? (
+        <Reviews learner={l} />
+      ) : profile.tab === "Actions" ? (
+        <Tasks learner={l} />
+      ) : profile.tab === "Compliance" ? (
+        <Compliance learner={l} />
+      ) : (
+        <Gateway learner={l} />
+      )}
+    </>
+  );
+}
+function Detail({ label, value }) {
+  return (
+    <div className="detail-row">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+function PortfolioHub() {
+  const { s, learnerId, user } = useApp(),
+    l = s.learners.find((x) => x.id === learnerId);
+  return (
+    <>
+      <LearnerPicker />
+      {l ? (
+        <>
+          <div className="metrics three">
+            <Metric
+              label="Verified coverage"
+              value={l.progress + "%"}
+              detail={stdOf(s, l)}
+              icon={Target}
+            />
+            <Metric
+              label="Evidence items"
+              value={s.evidence.filter((x) => x.learnerId === l.id).length}
+              detail="Across this learner’s portfolio"
+              icon={Layers}
+            />
+            <Metric
+              label="Awaiting assessment"
+              value={
+                s.evidence.filter(
+                  (x) => x.learnerId === l.id && x.status === "Submitted",
+                ).length
+              }
+              detail="Only accepted evidence counts towards coverage"
+              icon={ClipboardCheck}
+            />
+          </div>
+          <Evidence learner={l} />
+          <Coverage learner={l} />
+        </>
+      ) : (
+        <Empty>Add an apprentice before opening a portfolio.</Empty>
+      )}
+    </>
+  );
+}
+function Evidence({ learner }) {
+  const { s, user, setModal } = useApp(),
+    [q, Q] = useState(""),
+    [status, S] = useState("");
+  const items = s.evidence.filter(
+    (x) =>
+      x.learnerId === learner.id &&
+      (!status || x.status === status) &&
+      `${x.title} ${x.description}`.toLowerCase().includes(q.toLowerCase()),
+  );
+  return (
+    <Panel
+      title="Evidence & assessment"
+      subtitle="Draft → Submitted → Assessed · only accepted evidence verifies KSBs"
+      action={
+        ["Manager", "Assessor", "Apprentice"].includes(user.role) && (
+          <Button onClick={() => setModal({ type: "evidence", learner })}>
+            <Plus size={15} />
+            Add evidence
+          </Button>
+        )
+      }
+    >
+      <div className="filterbar">
+        <div className="searchbox">
+          <Search size={16} />
+          <input
+            aria-label="Search evidence"
+            placeholder="Search evidence…"
+            value={q}
+            onChange={(e) => Q(e.target.value)}
+          />
+        </div>
+        <select
+          aria-label="Evidence status"
+          value={status}
+          onChange={(e) => S(e.target.value)}
+        >
+          <option value="">All statuses</option>
+          {[
+            "Draft",
+            "Submitted",
+            "Accepted",
+            "Changes requested",
+            "Rejected",
+          ].map((x) => (
+            <option key={x}>{x}</option>
+          ))}
+        </select>
+      </div>
+      <Table headers={["Evidence", "KSB mapping", "Status", "Feedback", ""]}>
+        {items.map((e) => (
+          <tr key={e.id}>
+            <td>
+              <button
+                className="text-link"
+                onClick={() =>
+                  setModal({ type: "evidenceDetail", item: e, learner })
+                }
+              >
+                <FileText size={16} />
+                {e.title}
+              </button>
+              <small>
+                {e.type} · {fmt(e.date)} · {e.files.length} files
+              </small>
+            </td>
+            <td>
+              <div className="code-list">
+                {e.criteria.map((c) => (
+                  <span key={c}>{c}</span>
+                ))}
+              </div>
+            </td>
+            <td>
+              <Tag>{e.status}</Tag>
+            </td>
+            <td className="feedback-preview">
+              {e.feedback || "Awaiting feedback"}
+            </td>
+            <td>
+              <button
+                className="text-link"
+                onClick={() =>
+                  setModal({ type: "evidenceDetail", item: e, learner })
+                }
+              >
+                {e.status === "Submitted" &&
+                ["Manager", "Assessor"].includes(user.role)
+                  ? "Assess"
+                  : "Open"}
+                <ArrowUpRight size={14} />
+              </button>
+            </td>
+          </tr>
+        ))}
+      </Table>
+      {!items.length && (
+        <Empty>No evidence matches. Add evidence or change the filters.</Empty>
+      )}
+    </Panel>
+  );
+}
+function Coverage({ learner }) {
+  const { s } = useApp(),
+    st = s.standards.find((x) => x.id === learner.standardId);
+  return (
+    <Panel
+      title="Standards & verified coverage"
+      subtitle={`${st?.reference || ""} · ${st?.version || ""}`}
+    >
+      <div className="coverage-summary">
+        <strong>
+          {learner.progress}% <span>verified</span>
+        </strong>
+        <Progress value={learner.progress} />
+        <small>
+          {learner.coverage.filter((c) => c.achieved).length} of{" "}
+          {learner.coverage.length} criteria achieved through accepted evidence
+        </small>
+      </div>
+      <Table
+        headers={["Code", "Type", "Criterion", "Accepted evidence", "Coverage"]}
+      >
+        {learner.coverage.map((c) => (
+          <tr key={c.code}>
+            <td>
+              <strong className="code">{c.code}</strong>
+            </td>
+            <td>{c.type}</td>
+            <td className="wide-cell">{c.text}</td>
+            <td>{c.count}</td>
+            <td>
+              <Tag tone={c.achieved ? "green" : "neutral"}>
+                {c.achieved ? "Achieved" : "Not yet verified"}
+              </Tag>
+            </td>
+          </tr>
+        ))}
+      </Table>
+      {!learner.coverage.length && (
+        <Empty>
+          This standard needs criteria before progress can be calculated.
+        </Empty>
+      )}
+    </Panel>
+  );
+}
+function Alerts({ interventions = false }) {
+  const { s, openLearner, setModal, user } = useApp(),
+    [severity, S] = useState(""),
+    [type, T] = useState("");
+  const alerts = s.learners
+    .flatMap((l) =>
+      l.exceptions.map((e, i) => ({ ...e, id: l.id + "-" + i, l })),
+    )
+    .filter(
+      (e) =>
+        (!severity || e.severity === severity) && (!type || e.type === type),
+    );
+  return (
+    <>
+      <div className="metrics three">
+        <Metric
+          label="High priority exceptions"
+          value={alerts.filter((e) => e.severity === "Red").length}
+          detail="Requires timely support"
+          icon={TriangleAlert}
+        />
+        <Metric
+          label="Review pressure"
+          value={alerts.filter((e) => e.type === "review").length}
+          detail="Overdue learner reviews"
+          icon={CalendarDays}
+        />
+        <Metric
+          label="Compliance exceptions"
+          value={alerts.filter((e) => e.type === "compliance").length}
+          detail="Insurance, risk or employer assessment"
+          icon={ShieldCheck}
+        />
+      </div>
+      <Panel
+        title={interventions ? "Intervention cohorts" : "Delivery alerts"}
+        subtitle="Calculated from the current learner records; resolve the underlying issue to clear an alert"
+        action={
+          <Button
+            secondary
+            onClick={() =>
+              download(
+                "interventions.csv",
+                csv(
+                  alerts.map((e) => ({
+                    learner: e.l.name,
+                    employer: e.l.employer,
+                    severity: e.severity,
+                    issue: e.text,
+                    due: e.date || "",
+                  })),
+                ),
+                "text/csv",
+              )
+            }
+          >
+            <Download size={14} />
+            Export cohort
+          </Button>
+        }
+      >
+        <div className="filterbar">
+          <select
+            aria-label="Alert severity"
+            value={severity}
+            onChange={(e) => S(e.target.value)}
+          >
+            <option value="">All severities</option>
+            <option>Red</option>
+            <option>Amber</option>
+          </select>
+          <select
+            aria-label="Alert type"
+            value={type}
+            onChange={(e) => T(e.target.value)}
+          >
+            <option value="">All exception types</option>
+            {["review", "compliance", "progress", "data", "end", "skills"].map(
+              (x) => (
+                <option key={x}>{x}</option>
+              ),
+            )}
+          </select>
+        </div>
+        <Table
+          headers={[
+            "Priority",
+            "Learner",
+            "Exception",
+            "Due",
+            "Owner",
+            "Action",
+          ]}
+        >
+          {alerts.map((e) => (
+            <tr key={e.id}>
+              <td>
+                <Tag>{e.severity}</Tag>
+              </td>
+              <td>
+                <LearnerLink id={e.l.id} />
+                <small>{e.l.employer}</small>
+              </td>
+              <td>{e.text}</td>
+              <td>{fmt(e.date)}</td>
+              <td>{nameOf(s, e.l.assessorId)}</td>
+              <td>
+                {["Manager", "Assessor"].includes(user.role) ? (
+                  <button
+                    className="text-link"
+                    onClick={() =>
+                      setModal({ type: "task", learner: e.l, prefill: e.text })
+                    }
+                  >
+                    Create action <Plus size={14} />
+                  </button>
+                ) : (
+                  <button
+                    className="text-link"
+                    onClick={() => openLearner(e.l.id)}
+                  >
+                    Open learner
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </Table>
+        {!alerts.length && <Empty>No exceptions in this cohort.</Empty>}
+      </Panel>
+    </>
+  );
+}
+function Tasks({ learner }) {
+  const { s, user, act, setModal } = useApp(),
+    [filter, F] = useState("Open");
+  const items = s.tasks.filter(
+    (x) =>
+      (!learner || x.learnerId === learner.id) &&
+      (filter === "All" || filter === "Overdue"
+        ? filter !== "Overdue" || (x.status === "Open" && x.due < localDate())
+        : x.status === filter),
+  );
+  return (
+    <Panel
+      title="Action plans"
+      subtitle="Owned actions linked to each apprentice"
+      action={
+        ["Manager", "Assessor"].includes(user.role) && (
+          <Button onClick={() => setModal({ type: "task", learner })}>
+            <Plus size={15} />
+            Create action
+          </Button>
+        )
+      }
+    >
+      <div className="segmented">
+        {["Open", "Overdue", "Complete", "All"].map((x) => (
+          <button
+            className={filter === x ? "selected" : ""}
+            key={x}
+            onClick={() => F(x)}
+          >
+            {x}
+          </button>
+        ))}
+      </div>
+      <Table headers={["Action", "Learner", "Owner", "Due", "Status", ""]}>
+        {items.map((t) => (
+          <tr key={t.id}>
+            <td className="wide-cell">
+              <strong>{t.title}</strong>
+            </td>
+            <td>
+              <LearnerLink id={t.learnerId} />
+            </td>
+            <td>{nameOf(s, t.owner)}</td>
+            <td
+              className={
+                t.status === "Open" && t.due < localDate() ? "danger-text" : ""
+              }
+            >
+              {fmt(t.due)}
+            </td>
+            <td>
+              <Tag>{t.status}</Tag>
+            </td>
+            <td>
+              {(["Manager", "Assessor"].includes(user.role) ||
+                t.owner === user.id) && (
+                <button
+                  className="text-link"
+                  onClick={() =>
+                    act("task.toggle", { id: t.id, learnerId: t.learnerId })
+                  }
+                >
+                  {t.status === "Open" ? "Complete" : "Reopen"}
+                  <Check size={14} />
+                </button>
+              )}
+            </td>
+          </tr>
+        ))}
+      </Table>
+      {!items.length && <Empty>No actions in this view.</Empty>}
+    </Panel>
+  );
+}
+function OTJ({ learner }) {
+  const { s, user, setModal, act } = useApp(),
+    [filter, F] = useState("");
+  const ls = learner ? [learner] : s.learners,
+    ids = new Set(ls.map((l) => l.id)),
+    items = s.otj.filter(
+      (x) => ids.has(x.learnerId) && (!filter || x.status === filter),
+    );
+  return (
+    <>
+      <div className="metrics three">
+        <Metric
+          label="Approved learning hours"
+          value={ls.reduce((n, l) => n + l.hours, 0)}
+          detail="Approved logs contribute to the learning target"
+          icon={Clock}
+        />
+        <Metric
+          label="Pending logs"
+          value={
+            s.otj.filter((x) => ids.has(x.learnerId) && x.status === "Pending")
+              .length
+          }
+          detail="Awaiting assessor verification"
+          icon={ClipboardCheck}
+        />
+        <Metric
+          label="Planned hours"
+          value={ls.reduce((n, l) => n + l.otjTarget, 0)}
+          detail="Configured per learner’s training plan"
+          icon={Target}
+        />
+      </div>
+      <Panel
+        title="Off-the-job learning logs"
+        subtitle="Capture learning, not routine work. Provider must verify eligibility against the applicable funding rules."
+        action={
+          ["Manager", "Assessor", "Apprentice"].includes(user.role) && (
+            <Button onClick={() => setModal({ type: "otj", learner })}>
+              <Plus size={15} />
+              Log learning
+            </Button>
+          )
+        }
+      >
+        <div className="filterbar">
+          <select
+            aria-label="Learning log status"
+            value={filter}
+            onChange={(e) => F(e.target.value)}
+          >
+            <option value="">All statuses</option>
+            <option>Pending</option>
+            <option>Approved</option>
+            <option>Returned</option>
+          </select>
+        </div>
+        <Table
+          headers={[
+            "Activity / reflection",
+            "Learner",
+            "Date",
+            "Hours",
+            "Status",
+            "Review",
+          ]}
+        >
+          {items
+            .slice()
+            .reverse()
+            .map((x) => (
+              <tr key={x.id}>
+                <td className="wide-cell">
+                  <strong>{x.activity}</strong>
+                  <small>{x.reflection}</small>
+                  {x.feedback && <small>Feedback: {x.feedback}</small>}
+                </td>
+                <td>
+                  <LearnerLink id={x.learnerId} />
+                </td>
+                <td>{fmt(x.date)}</td>
+                <td>{x.hours}h</td>
+                <td>
+                  <Tag>{x.status}</Tag>
+                </td>
+                <td>
+                  {x.status === "Pending" &&
+                    ["Manager", "Assessor"].includes(user.role) && (
+                      <div className="button-row">
+                        <button
+                          className="text-link"
+                          onClick={() =>
+                            act("otj.decide", {
+                              id: x.id,
+                              learnerId: x.learnerId,
+                              status: "Approved",
+                            })
+                          }
+                        >
+                          Approve
+                        </button>
+                        <button
+                          className="text-link danger-text"
+                          onClick={() =>
+                            setModal({ type: "otjDecision", item: x })
+                          }
+                        >
+                          Return
+                        </button>
+                      </div>
+                    )}
+                </td>
+              </tr>
+            ))}
+        </Table>
+        {!items.length && <Empty>No learning logs in this view.</Empty>}
+      </Panel>
+    </>
+  );
+}
+function Reviews({ learner }) {
+  const { s, user, setModal, act } = useApp(),
+    items = s.reviews
+      .filter((x) => !learner || x.learnerId === learner.id)
+      .slice()
+      .sort((a, b) => b.date.localeCompare(a.date));
+  return (
+    <Panel
+      title="Progress reviews"
+      subtitle="Discussion, agreed actions, and separate participant acknowledgements"
+      action={
+        ["Manager", "Assessor"].includes(user.role) && (
+          <Button onClick={() => setModal({ type: "review", learner })}>
+            <Plus size={15} />
+            Record review
+          </Button>
+        )
+      }
+    >
+      {items.map((r) => (
+        <article className="review-record" key={r.id}>
+          <div className="review-heading">
+            <div className="calendar-tile">
+              <span>
+                {new Date(r.date + "T12:00:00").toLocaleDateString("en-GB", {
+                  month: "short",
+                })}
+              </span>
+              <strong>{Number(r.date.slice(-2))}</strong>
+            </div>
+            <div>
+              <h3>{r.type}</h3>
+              <p>
+                <LearnerLink id={r.learnerId} /> · Recorded by {nameOf(s, r.by)}
+              </p>
+            </div>
+            <span className="next-date">Next: {fmt(r.nextDate)}</span>
+          </div>
+          <p className="preserve-text">{r.text}</p>
+          <div className="agreed-actions">
+            <strong>Agreed next steps</strong>
+            <p>{r.actions}</p>
+          </div>
+          <div className="ack-row">
+            {r.acknowledgements.map((a) => (
+              <Tag key={a.by} tone="green">
+                {nameOf(s, a.by)} acknowledged · {fmt(a.date)}
+              </Tag>
+            ))}
+            {!r.acknowledgements.some((a) => a.by === user.id) && (
+              <button
+                className="text-link"
+                onClick={() =>
+                  act("review.ack", { id: r.id, learnerId: r.learnerId })
+                }
+              >
+                <CheckCheck size={15} />
+                Acknowledge review
+              </button>
+            )}
+          </div>
+        </article>
+      ))}
+      {!items.length && <Empty>No reviews recorded yet.</Empty>}
+      <p className="caption">
+        Acknowledgements record the signed-in participant and time. They are not
+        qualified electronic signatures.
+      </p>
+    </Panel>
+  );
+}
+function Compliance({ learner }) {
+  const { s, user, setModal } = useApp(),
+    ls = learner ? [learner] : s.learners;
+  return (
+    <Panel
+      title="Compliance radar"
+      subtitle="Track insurance, workplace risk assessments and employer reviews. These checks support delivery oversight; they do not certify legal compliance."
+    >
+      <Table
+        headers={[
+          "Learner / employer",
+          "ELI expiry",
+          "Risk assessment",
+          "Employer assessment",
+          "Review due",
+          "Data health",
+          "",
+        ]}
+      >
+        {ls.map((l) => (
+          <tr key={l.id}>
+            <td>
+              <LearnerLink id={l.id} />
+              <small>{l.employer}</small>
+            </td>
+            {["eliDue", "riskDue", "employerDue", "nextReview"].map((k) => (
+              <td key={k}>
+                <span
+                  className={l[k] && l[k] < localDate() ? "danger-text" : ""}
+                >
+                  {fmt(l[k])}
+                </span>
+                {l[k] && l[k] < localDate() && (
+                  <small className="danger-text">Overdue</small>
+                )}
+              </td>
+            ))}
+            <td>
+              <Tag
+                tone={
+                  l.exceptions.some((e) => e.type === "data")
+                    ? "amber"
+                    : "green"
+                }
+              >
+                {l.exceptions.some((e) => e.type === "data")
+                  ? "Missing dates"
+                  : "Dates recorded"}
+              </Tag>
+            </td>
+            <td>
+              {["Manager", "Assessor"].includes(user.role) && (
+                <button
+                  className="text-link"
+                  onClick={() => setModal({ type: "learner", item: l })}
+                >
+                  Update <ArrowUpRight size={14} />
+                </button>
+              )}
+            </td>
+          </tr>
+        ))}
+      </Table>
+      {!ls.length && <Empty />}
+    </Panel>
+  );
+}
+function Gateway({ learner }) {
+  const { s, user, setModal } = useApp(),
+    ls = learner ? [learner] : s.learners;
+  return (
+    <Panel
+      title="Gateway & end-point assessment"
+      subtitle="Readiness is calculated from verified evidence, learning hours, functional skills and review/compliance dates. Final EPA eligibility requires provider checks."
+    >
+      <Table
+        headers={[
+          "Learner",
+          "KSBs",
+          "Learning hours",
+          "Functional skills",
+          "Readiness",
+          "Gateway / EPA",
+          "",
+        ]}
+      >
+        {ls.map((l) => {
+          const ready = l.gatewayChecks.every((x) => x[1]);
+          return (
+            <tr key={l.id}>
+              <td>
+                <LearnerLink id={l.id} />
+                <small>{stdOf(s, l)}</small>
+              </td>
+              <td>
+                {l.progress}%<Progress value={l.progress} />
+              </td>
+              <td>
+                {l.hours} / {l.otjTarget}h
+              </td>
+              <td>
+                <small>English: {l.english}</small>
+                <small>Maths: {l.maths}</small>
+              </td>
+              <td>
+                <Tag tone={ready ? "green" : "amber"}>
+                  {ready ? "Checks passed" : "Not ready"}
+                </Tag>
+                <small>
+                  {l.gatewayChecks.filter((x) => x[1]).length} /{" "}
+                  {l.gatewayChecks.length} checks
+                </small>
+              </td>
+              <td>
+                <small>Gateway: {fmt(l.gatewayDate)}</small>
+                <small>EPA: {fmt(l.epaDate)}</small>
+              </td>
+              <td>
+                <button
+                  className="text-link"
+                  onClick={() => setModal({ type: "gateway", learner: l })}
+                >
+                  View checklist <ArrowUpRight size={14} />
+                </button>
+              </td>
+            </tr>
+          );
+        })}
+      </Table>
+      {!ls.length && <Empty />}
+    </Panel>
+  );
+}
+function Analytics() {
+  const { s, go } = useApp();
+  const groups = ["Green", "Amber", "Red"].map((name) => ({
+    name,
+    count: s.learners.filter((l) => l.rag === name).length,
+  }));
+  return (
+    <>
+      <div className="metrics">
+        <Metric
+          label="Portfolio size"
+          value={s.learners.length}
+          detail="Visible apprentices"
+          icon={Users}
+        />
+        <Metric
+          label="Average coverage"
+          value={
+            (s.learners.length
+              ? Math.round(
+                  s.learners.reduce((n, l) => n + l.progress, 0) /
+                    s.learners.length,
+                )
+              : 0) + "%"
+          }
+          detail="Verified KSB achievement"
+          icon={Target}
+        />
+        <Metric
+          label="Open actions"
+          value={s.tasks.filter((x) => x.status === "Open").length}
+          detail={`${s.tasks.filter((x) => x.status === "Open" && x.due < localDate()).length} overdue`}
+          icon={ListChecks}
+        />
+        <Metric
+          label="Learning approvals"
+          value={s.otj.filter((x) => x.status === "Pending").length}
+          detail="Pending off-the-job logs"
+          icon={Clock}
+        />
+      </div>
+      <div className="grid two">
+        <Panel
+          title="Risk distribution"
+          subtitle="Calculated from today’s portfolio"
+        >
+          <BarChart items={groups} total={s.learners.length} />
+        </Panel>
+        <Panel
+          title="Assessor caseload"
+          subtitle="Learners allocated to each active assessor"
+        >
+          <BarChart
+            items={s.users
+              .filter((u) => u.role === "Assessor")
+              .map((u) => ({
+                name: u.name,
+                count: s.learners.filter((l) => l.assessorId === u.id).length,
+              }))}
+            total={s.learners.length}
+          />
+        </Panel>
+        <Panel
+          title="Employer risk"
+          subtitle="Number of learners requiring priority support"
+        >
+          <BarChart
+            items={[...new Set(s.learners.map((l) => l.employer))].map(
+              (name) => ({
+                name,
+                count: s.learners.filter(
+                  (l) => l.employer === name && l.rag === "Red",
+                ).length,
+              }),
+            )}
+            total={s.learners.length}
+          />
+        </Panel>
+        <Panel
+          title="Delivery exceptions"
+          subtitle="Count of active issues, rather than unique learners"
+        >
+          <BarChart
+            items={[
+              "review",
+              "compliance",
+              "progress",
+              "data",
+              "end",
+              "skills",
+            ].map((name) => ({
+              name,
+              count: s.learners
+                .flatMap((l) => l.exceptions)
+                .filter((e) => e.type === name).length,
+            }))}
+            total={Math.max(1, s.learners.flatMap((l) => l.exceptions).length)}
+          />
+        </Panel>
+      </div>
+      <div className="insight-note">
+        <FileBarChart size={22} />
+        <div>
+          <strong>Take the detail with you.</strong>
+          <p>
+            Build filtered, grouped reports with a complete learner-level
+            export.
+          </p>
+        </div>
+        <Button secondary onClick={() => go("Report Studio")}>
+          Open Report Studio <ArrowRight size={15} />
+        </Button>
+      </div>
+    </>
+  );
+}
+function BarChart({ items, total }) {
+  return (
+    <div className="bar-chart">
+      {items.map((x) => (
+        <div key={x.name}>
+          <div>
+            <span>{x.name}</span>
+            <strong>{x.count}</strong>
+          </div>
+          <div className="bar-track">
+            <i
+              className={x.name.toLowerCase()}
+              style={{
+                width:
+                  Math.max(
+                    x.count ? 2 : 0,
+                    (x.count / Math.max(1, total)) * 100,
+                  ) + "%",
+              }}
+            />
+          </div>
+        </div>
+      ))}
+      {!items.length && <Empty />}
+    </div>
+  );
+}
+function Reports() {
+  const { s, notify } = useApp(),
+    [title, T] = useState("Apprenticeship portfolio report"),
+    [q, Q] = useState(""),
+    [rag, R] = useState(""),
+    [status, S] = useState(""),
+    [assessor, A] = useState(""),
+    [employer, E] = useState(""),
+    [standard, ST] = useState(""),
+    [exception, EX] = useState(""),
+    [group, G] = useState("assessor"),
+    [min, MIN] = useState(""),
+    [max, MAX] = useState(""),
+    [from, F] = useState(""),
+    [to, TO] = useState(""),
+    [dateField, DF] = useState("nextReview"),
+    [sort, SS] = useState("risk");
+  let ls = s.learners.filter(
+    (l) =>
+      (!rag || l.rag === rag) &&
+      (!status || l.status === status) &&
+      (!assessor || l.assessorId === assessor) &&
+      (!employer || l.employer === employer) &&
+      (!standard || l.standardId === standard) &&
+      (min === "" || l.progress >= Number(min)) &&
+      (max === "" || l.progress <= Number(max)) &&
+      (!from || (l[dateField] && l[dateField] >= from)) &&
+      (!to || (l[dateField] && l[dateField] <= to)) &&
+      (!exception || exception === "behind"
+        ? !exception || l.variance < 0
+        : exception === "gateway"
+          ? l.gatewayStatus === "Ready"
+          : l.exceptions.some((e) => e.type === exception)) &&
+      `${l.name} ${l.employer} ${l.ref}`
+        .toLowerCase()
+        .includes(q.toLowerCase()),
+  );
+  ls.sort((a, b) =>
+    sort === "risk"
+      ? ["Red", "Amber", "Green"].indexOf(a.rag) -
+        ["Red", "Amber", "Green"].indexOf(b.rag)
+      : sort === "progress"
+        ? a.progress - b.progress
+        : a.name.localeCompare(b.name),
+  );
+  const rows = reportRows(ls, s),
+    allFields = rows.length
+      ? Object.keys(rows[0])
+      : Object.keys(
+          reportRows([{ ...s.learners[0], ref: "", name: "" }], s)[0],
+        ),
+    [fields, FIELDS] = useState([
+      "ref",
+      "name",
+      "employer",
+      "assessor",
+      "progress",
+      "target",
+      "variance",
+      "rag",
+      "nextReview",
+    ]);
+  const selectedRows = rows.map((r) =>
+      Object.fromEntries(fields.map((f) => [f, r[f]])),
+    ),
+    groups = {};
+  for (const r of rows) {
+    const key = r[group] || "Unassigned";
+    groups[key] = (groups[key] || 0) + 1;
+  }
+  async function excel() {
+    try {
+      const ExcelJS = await import("exceljs");
+      const wb = new (ExcelJS.default || ExcelJS).Workbook(),
+        ws = wb.addWorksheet("Portfolio");
+      ws.columns = fields.map((f) => ({ header: f, key: f, width: 24 }));
+      ws.addRows(selectedRows);
+      download(
+        "portfolio-report.xlsx",
+        await wb.xlsx.writeBuffer(),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+    } catch (e) {
+      notify(e.message);
+    }
+  }
+  return (
+    <>
+      <Panel
+        title="Report controls"
+        subtitle="Choose your cohort, date range and fields. The report updates as you filter."
+        action={
+          <div className="button-row">
+            <Button
+              secondary
+              disabled={!fields.length}
+              onClick={() =>
+                download("portfolio-report.csv", csv(selectedRows), "text/csv")
+              }
+            >
+              <Download size={14} />
+              CSV
+            </Button>
+            <Button secondary disabled={!fields.length} onClick={excel}>
+              Excel
+            </Button>
+            <Button secondary onClick={() => window.print()}>
+              Print / PDF
+            </Button>
+          </div>
+        }
+      >
+        <div className="report-title-input">
+          <label>
+            Report title
+            <input value={title} onChange={(e) => T(e.target.value)} />
+          </label>
+        </div>
+        <FilterBar
+          query={q}
+          setQuery={Q}
+          filters={[
+            {
+              label: "All RAG",
+              value: rag,
+              set: R,
+              options: ["Red", "Amber", "Green"],
+            },
+            {
+              label: "All statuses",
+              value: status,
+              set: S,
+              options: ["Active", "Paused", "Withdrawn", "Completed"],
+            },
+            {
+              label: "All assessors",
+              value: assessor,
+              set: A,
+              options: s.users
+                .filter((u) => u.role === "Assessor")
+                .map((u) => ({ value: u.id, label: u.name })),
+            },
+          ]}
+        />
+        <div className="report-controls">
+          <label>
+            Employer
+            <select value={employer} onChange={(e) => E(e.target.value)}>
+              <option value="">All employers</option>
+              {[...new Set(s.learners.map((l) => l.employer))].map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Standard
+            <select value={standard} onChange={(e) => ST(e.target.value)}>
+              <option value="">All standards</option>
+              {s.standards.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Exception filter
+            <select value={exception} onChange={(e) => EX(e.target.value)}>
+              <option value="">No exception filter</option>
+              <option value="review">Overdue reviews</option>
+              <option value="compliance">Compliance exceptions</option>
+              <option value="behind">Behind target</option>
+              <option value="gateway">Gateway ready</option>
+            </select>
+          </label>
+          <label>
+            Min progress %
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={min}
+              onChange={(e) => MIN(e.target.value)}
+            />
+          </label>
+          <label>
+            Max progress %
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={max}
+              onChange={(e) => MAX(e.target.value)}
+            />
+          </label>
+          <label>
+            Date field
+            <select value={dateField} onChange={(e) => DF(e.target.value)}>
+              <option value="nextReview">Next review</option>
+              <option value="plannedEnd">Planned end</option>
+              <option value="predictedEnd">Predicted end</option>
+              <option value="eliDue">Insurance expiry</option>
+              <option value="riskDue">Risk assessment</option>
+            </select>
+          </label>
+          <label>
+            From
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => F(e.target.value)}
+            />
+          </label>
+          <label>
+            To
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => TO(e.target.value)}
+            />
+          </label>
+          <label>
+            Group by
+            <select value={group} onChange={(e) => G(e.target.value)}>
+              {[
+                "assessor",
+                "employer",
+                "standard",
+                "rag",
+                "status",
+                "level",
+              ].map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Sort
+            <select value={sort} onChange={(e) => SS(e.target.value)}>
+              <option value="risk">Risk priority</option>
+              <option value="progress">Progress low–high</option>
+              <option value="name">Learner A–Z</option>
+            </select>
+          </label>
+        </div>
+        <details className="field-picker">
+          <summary>Report fields · {fields.length} selected</summary>
+          <div>
+            {allFields.map((f) => (
+              <label key={f}>
+                <input
+                  type="checkbox"
+                  checked={fields.includes(f)}
+                  onChange={(e) =>
+                    FIELDS(
+                      e.target.checked
+                        ? [...fields, f]
+                        : fields.filter((x) => x !== f),
+                    )
+                  }
+                />
+                {f}
+              </label>
+            ))}
+          </div>
+        </details>
+      </Panel>
+      <div className="print-report">
+        <div className="report-heading">
+          <span className="eyebrow">PORTFOLIO INTELLIGENCE</span>
+          <h2>{title}</h2>
+          <p>
+            Generated {fmt(localDate())} · {ls.length} records · {demoLabel(s)}
+          </p>
+        </div>
+        <div className="metrics three">
+          <Metric
+            label="Records"
+            value={ls.length}
+            detail="Matching selected filters"
+          />
+          <Metric
+            label="Average progress"
+            value={
+              (ls.length
+                ? Math.round(ls.reduce((n, l) => n + l.progress, 0) / ls.length)
+                : 0) + "%"
+            }
+            detail="Verified standard coverage"
+          />
+          <Metric
+            label="Red risk"
+            value={ls.filter((l) => l.rag === "Red").length}
+            detail="Priority support in this cohort"
+          />
+        </div>
+        <Panel title="Portfolio breakdown" subtitle={"Grouped by " + group}>
+          <BarChart
+            items={Object.entries(groups).map(([name, count]) => ({
+              name,
+              count,
+            }))}
+            total={ls.length}
+          />
+        </Panel>
+        <Panel
+          title="Detailed learner data"
+          subtitle="Underlying records supporting this report"
+        >
+          <Table headers={fields}>
+            {selectedRows.map((r, i) => (
+              <tr key={ls[i].id}>
+                {fields.map((f) => (
+                  <td key={f}>{String(r[f] ?? "")}</td>
+                ))}
+              </tr>
+            ))}
+          </Table>
+          {!ls.length && <Empty>No learners match the report filters.</Empty>}
+        </Panel>
+      </div>
+    </>
+  );
+}
+function demoLabel() {
+  return "current workspace data";
+}
+function Standards() {
+  const { s, user, setModal, learnerId } = useApp(),
+    [selected, S] = useState(s.standards[0]?.id || ""),
+    st = s.standards.find((x) => x.id === selected) || s.standards[0];
+  return (
+    <>
+      <Panel
+        title="Standard library"
+        subtitle="Use the exact official wording and version. Sample criteria are illustrative, not an authoritative standard."
+        action={
+          ["Manager", "IQA"].includes(user.role) && (
+            <Button onClick={() => setModal({ type: "standard" })}>
+              <Plus size={15} />
+              Create standard
+            </Button>
+          )
+        }
+      >
+        <div className="standard-cards">
+          {s.standards.map((x) => (
+            <button
+              key={x.id}
+              className={"standard-card " + (st?.id === x.id ? "selected" : "")}
+              onClick={() => S(x.id)}
+            >
+              <div className="icon-tile">
+                <BookOpen size={21} />
+              </div>
+              <span>LEVEL {x.level}</span>
+              <h3>{x.name}</h3>
+              <p>{x.reference}</p>
+              <small>
+                {x.criteria.length} KSB criteria · {x.version}
+              </small>
+              <ArrowUpRight size={18} />
+            </button>
+          ))}
+        </div>
+        {!s.standards.length && (
+          <Empty>Create a standard, then add learners to it.</Empty>
+        )}
+      </Panel>
+      {st && (
+        <Panel title={st.name + " · criteria"} subtitle={st.version}>
+          <Table headers={["Code", "Type", "Full criterion wording"]}>
+            {st.criteria.map((c) => (
+              <tr key={c.code}>
+                <td>
+                  <b className="code">{c.code}</b>
+                </td>
+                <td>{c.type}</td>
+                <td>{c.text}</td>
+              </tr>
+            ))}
+          </Table>
+        </Panel>
+      )}
+    </>
+  );
+}
+function Resources() {
+  const { s, user, setModal } = useApp(),
+    [q, Q] = useState(""),
+    items = s.resources.filter((r) =>
+      `${r.title} ${r.description} ${r.category}`
+        .toLowerCase()
+        .includes(q.toLowerCase()),
+    );
+  return (
+    <Panel
+      title="Learning resource library"
+      subtitle="Guidance, learning materials, policies and EPA preparation"
+      action={
+        ["Manager", "Assessor", "IQA"].includes(user.role) && (
+          <Button onClick={() => setModal({ type: "resource" })}>
+            <Plus size={15} />
+            Add resource
+          </Button>
+        )
+      }
+    >
+      <div className="searchbox resource-search">
+        <Search size={17} />
+        <input
+          aria-label="Search resources"
+          placeholder="Search your resources…"
+          value={q}
+          onChange={(e) => Q(e.target.value)}
+        />
+      </div>
+      <div className="resource-grid">
+        {items.map((r) => (
+          <article className="resource-card" key={r.id}>
+            <div className="icon-tile">
+              <FileText size={23} />
+            </div>
+            <span className="eyebrow">{r.category}</span>
+            <h3>{r.title}</h3>
+            <p>{r.description}</p>
+            <small>
+              {s.standards.find((x) => x.id === r.standardId)?.name ||
+                "All standards"}
+            </small>
+            {r.url && (
+              <a
+                className="text-link"
+                href={r.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open resource <ExternalLink size={13} />
+              </a>
+            )}
+            <Files files={r.files} />
+          </article>
+        ))}
+      </div>
+      {!items.length && (
+        <Empty>
+          Add the resources that help your learners take their next step.
+        </Empty>
+      )}
+    </Panel>
+  );
+}
+function Files({ files = [] }) {
+  return (
+    <div className="attachment-list">
+      {files.map((f) => (
+        <a key={f.id} href={"/api/files/" + f.id} className="attachment">
+          <FileText size={15} />
+          <span>{f.name}</span>
+          <small>{Math.ceil(f.size / 1024)} KB</small>
+          <Download size={14} />
+        </a>
+      ))}
+    </div>
+  );
+}
+function Calendar() {
+  const { s, user, setModal, openLearner } = useApp(),
+    [month, M] = useState(() => new Date().toISOString().slice(0, 7)),
+    [selected, S] = useState("");
+  const first = new Date(month + "-01T12:00:00"),
+    days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate(),
+    offset = (first.getDay() + 6) % 7;
+  function move(n) {
+    const d = new Date(first);
+    d.setMonth(d.getMonth() + n);
+    M(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    S("");
+  }
+  const events = [
+      ...s.appointments.map((a) => ({ ...a, source: "appointment" })),
+      ...s.learners
+        .filter((l) => l.nextReview)
+        .map((l) => ({
+          id: l.id,
+          learnerId: l.id,
+          title: "Progress review due",
+          date: l.nextReview,
+          time: "",
+          source: "review",
+        })),
+    ],
+    shown = events
+      .filter((a) =>
+        selected ? a.date === selected : a.date.startsWith(month),
+      )
+      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  return (
+    <>
+      <Panel
+        title="Calendar & appointments"
+        subtitle="Review deadlines and scheduled appointments · times are Europe/London"
+        action={
+          ["Manager", "Assessor"].includes(user.role) && (
+            <Button onClick={() => setModal({ type: "appointment" })}>
+              <Plus size={15} />
+              Schedule appointment
+            </Button>
+          )
+        }
+      >
+        <div className="calendar-controls">
+          <Button secondary onClick={() => move(-1)}>
+            <ChevronLeft size={16} />
+            Previous
+          </Button>
+          <h3>
+            {first.toLocaleDateString("en-GB", {
+              month: "long",
+              year: "numeric",
+            })}
+          </h3>
+          <Button secondary onClick={() => move(1)}>
+            Next
+            <ChevronRight size={16} />
+          </Button>
+        </div>
+        <div className="calendar-grid labels">
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((x) => (
+            <div key={x}>{x}</div>
+          ))}
+        </div>
+        <div className="calendar-grid">
+          {Array.from({ length: offset }, (_, i) => (
+            <div className="calendar-blank" key={"b" + i} />
+          ))}
+          {Array.from({ length: days }, (_, i) => {
+            const d = month + "-" + String(i + 1).padStart(2, "0");
+            return (
+              <button
+                className={
+                  "calendar-day " +
+                  (d === localDate() ? "today " : "") +
+                  (selected === d ? "selected" : "")
+                }
+                key={d}
+                onClick={() => S(selected === d ? "" : d)}
+              >
+                <strong>{i + 1}</strong>
+                {events
+                  .filter((a) => a.date === d)
+                  .slice(0, 3)
+                  .map((a) => (
+                    <span
+                      className={
+                        "calendar-event " +
+                        (a.source === "review" ? "review" : "")
+                      }
+                      key={a.source + a.id}
+                    >
+                      {a.time} {a.title}
+                    </span>
+                  ))}
+              </button>
+            );
+          })}
+        </div>
+      </Panel>
+      <Panel
+        title={
+          selected ? "Appointments · " + fmt(selected) : "This month’s schedule"
+        }
+      >
+        {shown.map((a) => (
+          <div className="schedule-row" key={a.source + a.id}>
+            <div className="icon-tile">
+              <CalendarDays size={19} />
+            </div>
+            <div>
+              <h3>{a.title}</h3>
+              <p>
+                {fmt(a.date)} {a.time} · <LearnerLink id={a.learnerId} />
+              </p>
+              {a.location && <small>{a.location}</small>}
+              {a.notes && <p>{a.notes}</p>}
+            </div>
+            <button
+              className="text-link"
+              onClick={() => openLearner(a.learnerId, "Reviews")}
+            >
+              Open learner <ArrowUpRight size={14} />
+            </button>
+          </div>
+        ))}
+        {!shown.length && <Empty>No appointments in this period.</Empty>}
+      </Panel>
+    </>
+  );
+}
+function Messages() {
+  const { s, user, command, notify } = useApp(),
+    [recipient, R] = useState(""),
+    [pending, P] = useState(false);
+  const users = s.users.filter((x) => x.id !== user.id),
+    selected = recipient || users[0]?.id || "",
+    items = s.messages.filter(
+      (m) =>
+        (m.from === user.id && m.to === selected) ||
+        (m.to === user.id && m.from === selected),
+    );
+  return (
+    <Panel
+      title="Workspace messages"
+      subtitle="Messages are delivered to the recipient’s account. Email and SMS notifications are not connected."
+    >
+      <div className="messaging">
+        <div className="contact-list">
+          {users.map((u) => (
+            <button
+              className={selected === u.id ? "selected" : ""}
+              key={u.id}
+              onClick={() => R(u.id)}
+            >
+              <span className="avatar cool">{initials(u.name)}</span>
+              <div>
+                <strong>{u.name}</strong>
+                <small>{u.role}</small>
+              </div>
+            </button>
+          ))}
+        </div>
+        <div className="conversation">
+          <div className="conversation-title">
+            <MessageSquare size={18} />
+            <h3>{nameOf(s, selected)}</h3>
+          </div>
+          <div className="message-history">
+            {items.map((m) => (
+              <div
+                className={
+                  "message " + (m.from === user.id ? "sent" : "received")
+                }
+                key={m.id}
+              >
+                <p>{m.text}</p>
+                <small>
+                  {nameOf(s, m.from)} ·{" "}
+                  {new Date(m.date).toLocaleString("en-GB", {
+                    timeZone: "Europe/London",
+                  })}
+                </small>
+              </div>
+            ))}
+            {!items.length && (
+              <Empty>Start a conversation about learning and progress.</Empty>
+            )}
+          </div>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.currentTarget;
+              P(true);
+              try {
+                await command("message.send", {
+                  to: selected,
+                  text: new FormData(form).get("message"),
+                });
+                form.reset();
+              } catch (e) {
+                notify(e.message);
+              } finally {
+                P(false);
+              }
+            }}
+          >
+            <label htmlFor="message">Your message</label>
+            <textarea
+              id="message"
+              name="message"
+              required
+              maxLength={10000}
+              placeholder="Share an update or ask a question…"
+            />
+            <div className="message-actions">
+              <small>Refresh the workspace to check for replies.</small>
+              <Button disabled={pending || !selected}>
+                <Send size={15} />
+                Send message
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+function Employers() {
+  const { s, go } = useApp();
+  const groups = [...new Set(s.learners.map((l) => l.employer))];
+  return (
+    <Panel
+      title="Employer partnerships"
+      subtitle="A connected view of employer cohorts and delivery health"
+    >
+      <div className="employer-grid">
+        {groups.map((name) => {
+          const ls = s.learners.filter((l) => l.employer === name);
+          return (
+            <article className="employer-card" key={name}>
+              <div className="icon-tile">
+                <Building2 size={23} />
+              </div>
+              <h3>{name}</h3>
+              <p>
+                {ls.length} apprentices ·{" "}
+                {ls.filter((l) => l.rag === "Red").length} at risk
+              </p>
+              <Progress
+                value={ls.reduce((n, l) => n + l.progress, 0) / ls.length}
+              />
+              <small>
+                Average KSB coverage{" "}
+                {Math.round(ls.reduce((n, l) => n + l.progress, 0) / ls.length)}
+                %
+              </small>
+              <details>
+                <summary>View apprentices</summary>
+                {ls.map((l) => (
+                  <div className="employer-learner" key={l.id}>
+                    <LearnerLink id={l.id} />
+                    <Tag>{l.rag}</Tag>
+                  </div>
+                ))}
+              </details>
+            </article>
+          );
+        })}
+      </div>
+      {!groups.length && <Empty />}
+    </Panel>
+  );
+}
+function Forecast() {
+  const { s } = useApp(),
+    ls = s.learners.filter((l) => l.status === "Active");
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    return {
+      name: d.toLocaleDateString("en-GB", { month: "short", year: "numeric" }),
+      key,
+      count: ls.filter((l) => l.predictedEnd?.startsWith(key)).length,
+    };
+  });
+  return (
+    <>
+      <div className="metrics three">
+        <Metric
+          label="Planned completion"
+          value={
+            ls.filter(
+              (l) =>
+                l.plannedEnd &&
+                l.plannedEnd <=
+                  new Date(Date.now() + 90 * 86400000)
+                    .toISOString()
+                    .slice(0, 10),
+            ).length
+          }
+          detail="Active learners ending within 90 days"
+        />
+        <Metric
+          label="Completion slippage"
+          value={ls.filter((l) => l.predictedEnd > l.plannedEnd).length}
+          detail="Predicted end beyond planned end"
+        />
+        <Metric
+          label="Gateway ready"
+          value={ls.filter((l) => l.gatewayChecks.every((x) => x[1])).length}
+          detail="All configured checks passed"
+        />
+      </div>
+      <Panel
+        title="Predicted completions"
+        subtitle="Based on entered predicted end dates; this is a planning view, not an AI prediction"
+      >
+        <BarChart
+          items={months}
+          total={Math.max(1, ...months.map((x) => x.count))}
+        />
+      </Panel>
+      <Panel title="Completion planning">
+        <Table
+          headers={[
+            "Learner",
+            "Planned end",
+            "Predicted end",
+            "Variance",
+            "KSB progress",
+          ]}
+        >
+          {ls.map((l) => (
+            <tr key={l.id}>
+              <td>
+                <LearnerLink id={l.id} />
+              </td>
+              <td>{fmt(l.plannedEnd)}</td>
+              <td>{fmt(l.predictedEnd)}</td>
+              <td>
+                {l.plannedEnd && l.predictedEnd
+                  ? Math.round(
+                      (Date.parse(l.predictedEnd) - Date.parse(l.plannedEnd)) /
+                        86400000,
+                    ) + " days"
+                  : "Not set"}
+              </td>
+              <td>{l.progress}%</td>
+            </tr>
+          ))}
+        </Table>
+      </Panel>
+    </>
+  );
+}
+function Team() {
+  const { s, user, setModal } = useApp();
+  return (
+    <Panel
+      title="Team & caseloads"
+      subtitle="Role-based access is enforced by the server, including learner and employer scoping"
+      action={
+        user.role === "Manager" && (
+          <Button onClick={() => setModal({ type: "user" })}>
+            <Plus size={15} />
+            Add account
+          </Button>
+        )
+      }
+    >
+      <Table
+        headers={[
+          "Team member",
+          "Role",
+          "Caseload",
+          "At-risk learners",
+          "Account",
+        ]}
+      >
+        {s.users.map((u) => {
+          const ls = s.learners.filter(
+            (l) =>
+              u.role === "Manager" ||
+              l.assessorId === u.id ||
+              l.iqaId === u.id ||
+              l.id === u.learnerId ||
+              l.employer === u.employer,
+          );
+          return (
+            <tr key={u.id}>
+              <td>
+                <div className="person-inline">
+                  <span className="avatar cool">{initials(u.name)}</span>
+                  <strong>{u.name}</strong>
+                </div>
+              </td>
+              <td>
+                <Tag tone="blue">{u.role}</Tag>
+              </td>
+              <td>{ls.length}</td>
+              <td>{ls.filter((l) => l.rag === "Red").length}</td>
+              <td>{u.email || "Restricted"}</td>
+            </tr>
+          );
+        })}
+      </Table>
+      <p className="caption">
+        Managers can add accounts and assign assessors/IQAs. User deletion and
+        organisation-level tenancy are not implemented.
+      </p>
+    </Panel>
+  );
+}
+function Quality() {
+  const { s, user, setModal, act } = useApp(),
+    [tab, T] = useState("Quality sampling");
+  const samples = s.quality,
+    eligible = s.evidence.filter((e) => e.status === "Accepted");
+  return (
+    <>
+      <div className="tabs">
+        {[
+          "Quality sampling",
+          "Audit trail",
+          "Data quality",
+          "Recovery snapshots",
+        ].map((t) => (
+          <button
+            className={t === tab ? "selected" : ""}
+            onClick={() => T(t)}
+            key={t}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+      {tab === "Quality sampling" ? (
+        <>
+          <Panel
+            title="Internal quality assurance"
+            subtitle="Sample accepted assessment decisions and record IQA findings"
+            action={
+              ["Manager", "IQA"].includes(user.role) && (
+                <Button onClick={() => setModal({ type: "quality" })}>
+                  <Plus size={15} />
+                  Record sample
+                </Button>
+              )
+            }
+          >
+            <Table
+              headers={[
+                "Learner",
+                "Evidence",
+                "Finding",
+                "IQA notes",
+                "Recorded by",
+              ]}
+            >
+              {samples.map((q) => (
+                <tr key={q.id}>
+                  <td>
+                    <LearnerLink id={q.learnerId} />
+                  </td>
+                  <td>
+                    {s.evidence.find((e) => e.id === q.evidenceId)?.title}
+                  </td>
+                  <td>
+                    <Tag>{q.outcome}</Tag>
+                  </td>
+                  <td className="wide-cell">{q.notes}</td>
+                  <td>
+                    {nameOf(s, q.by)}
+                    <small>{fmt(q.date)}</small>
+                  </td>
+                </tr>
+              ))}
+            </Table>
+            {!samples.length && <Empty>No quality samples recorded yet.</Empty>}
+          </Panel>
+          <Panel title="Accepted evidence available for sampling">
+            <Table
+              headers={["Evidence", "Learner", "Assessor feedback", "Samples"]}
+            >
+              {eligible.map((e) => (
+                <tr key={e.id}>
+                  <td>{e.title}</td>
+                  <td>
+                    <LearnerLink id={e.learnerId} />
+                  </td>
+                  <td className="wide-cell">{e.feedback}</td>
+                  <td>{samples.filter((q) => q.evidenceId === e.id).length}</td>
+                </tr>
+              ))}
+            </Table>
+          </Panel>
+        </>
+      ) : tab === "Audit trail" ? (
+        <Panel
+          title="Workspace audit trail"
+          subtitle="Server-recorded activity, actor, role and timestamp"
+        >
+          <Table headers={["When", "Actor", "Role", "Operation", "Learner"]}>
+            {s.audit.map((a) => (
+              <tr key={a.id}>
+                <td>
+                  {new Date(a.date).toLocaleString("en-GB", {
+                    timeZone: "Europe/London",
+                  })}
+                </td>
+                <td>{a.actor}</td>
+                <td>{a.role}</td>
+                <td>
+                  <code>{a.action}</code>
+                </td>
+                <td>
+                  {a.learnerId ? <LearnerLink id={a.learnerId} /> : "Workspace"}
+                </td>
+              </tr>
+            ))}
+          </Table>
+          {!s.audit.length && (
+            <Empty>New activity will appear here as changes are saved.</Empty>
+          )}
+        </Panel>
+      ) : tab === "Data quality" ? (
+        <Panel
+          title="Data quality checks"
+          subtitle="Missing dates, contact details and programme planning fields"
+        >
+          <Table headers={["Learner", "Missing fields", "Delivery exceptions"]}>
+            {s.learners.map((l) => {
+              const missing = [
+                "email",
+                "nextReview",
+                "plannedEnd",
+                "predictedEnd",
+                "eliDue",
+                "riskDue",
+                "employerDue",
+              ].filter((k) => !l[k]);
+              return (
+                <tr key={l.id}>
+                  <td>
+                    <LearnerLink id={l.id} />
+                  </td>
+                  <td>
+                    {missing.length ? (
+                      missing.join(", ")
+                    ) : (
+                      <Tag tone="green">Core fields complete</Tag>
+                    )}
+                  </td>
+                  <td>{l.exceptions.length}</td>
+                </tr>
+              );
+            })}
+          </Table>
+        </Panel>
+      ) : (
+        <Panel
+          title="Recovery snapshots"
+          subtitle="Manager-only workspace recovery. Keeps the latest five snapshots in the same database; this is not an external backup."
+          action={
+            user.role === "Manager" && (
+              <Button onClick={() => act("snapshot.create", {})}>
+                <Plus size={15} />
+                Create snapshot
+              </Button>
+            )
+          }
+        >
+          {s.snapshots.map((x) => (
+            <div className="snapshot-row" key={x.id}>
+              <History size={20} />
+              <div>
+                <strong>{new Date(x.date).toLocaleString("en-GB")}</strong>
+                <small>Created by {nameOf(s, x.by)}</small>
+              </div>
+              <Button
+                secondary
+                onClick={() => setModal({ type: "restore", item: x })}
+              >
+                Restore snapshot
+              </Button>
+            </div>
+          ))}
+          {!s.snapshots.length && (
+            <Empty>
+              {user.role === "Manager"
+                ? "Create a snapshot before a bulk import or major update."
+                : "Only managers can view and restore snapshots."}
+            </Empty>
+          )}
+        </Panel>
+      )}
+    </>
+  );
+}
+function SettingsPage() {
+  const { s, user, demo, setModal, notify } = useApp();
+  return (
+    <>
+      <div className="grid two">
+        <Panel
+          title="Your workspace"
+          subtitle="Connected apprenticeship delivery"
+        >
+          <Detail label="Signed in" value={user.name} />
+          <Detail label="Role" value={user.role} />
+          <Detail label="Database" value="SQLite · server-side storage" />
+          <Detail
+            label="Environment"
+            value={
+              demo?.enabled ? "Fictional demonstration" : "Production mode"
+            }
+          />
+          <Detail label="Workspace revision" value={s.revision} />
+          <Button secondary onClick={() => setModal({ type: "password" })}>
+            <LockKeyhole size={15} />
+            Change password
+          </Button>
+        </Panel>
+        <Panel
+          title="Export your visible data"
+          subtitle="Includes records visible to your role; attachments are downloaded separately"
+        >
+          <p className="body-copy">
+            Export your workspace records as JSON or download a learner-level
+            CSV for analysis. Server-held files remain protected by the
+            account’s access permissions.
+          </p>
+          <div className="button-row">
+            <Button
+              secondary
+              onClick={() =>
+                download("archetype-workspace.json", JSON.stringify(s, null, 2))
+              }
+            >
+              <Download size={15} />
+              Export JSON
+            </Button>
+            <Button
+              secondary
+              onClick={() =>
+                download(
+                  "archetype-learners.csv",
+                  csv(reportRows(s.learners, s)),
+                  "text/csv",
+                )
+              }
+            >
+              Export CSV
+            </Button>
+          </div>
+          <button
+            className="text-link legacy-export"
+            onClick={() => {
+              const evidence = localStorage.getItem("archetype-evidence"),
+                messages = localStorage.getItem("archetype-messages");
+              if (!evidence && !messages)
+                return notify(
+                  "No legacy prototype data found in this browser.",
+                );
+              download(
+                "archetype-legacy-browser-data.json",
+                JSON.stringify({
+                  evidence: evidence ? JSON.parse(evidence) : [],
+                  messages: messages ? JSON.parse(messages) : [],
+                }),
+              );
+            }}
+          >
+            Export older prototype data from this browser
+          </button>
+        </Panel>
+      </div>
+      <Panel title="Platform capabilities & boundaries">
+        <div className="capability-grid">
+          <div>
+            <h3>Connected workflows</h3>
+            <p>
+              Learner records, portfolio evidence, KSB mapping, assessment
+              decisions, verified coverage, learning logs, review
+              acknowledgements, action plans, compliance dates, gateway
+              checklists, resources, appointments, messages, reporting, IQA,
+              audit and recovery snapshots.
+            </p>
+          </div>
+          <div>
+            <h3>Before live delivery</h3>
+            <p>
+              Complete organisational security and accessibility review,
+              configure HTTPS and secure cookies, arrange external backups,
+              verify your standards and funding rules, and add malware scanning.
+              Email/SMS, SSO, ILR/MIS integrations, EPA-provider integrations,
+              video capture and qualified e-signatures are not included.
+            </p>
+          </div>
+        </div>
+      </Panel>
+    </>
+  );
+}
+function Login({ demo, onLogin, error }) {
+  const [err, E] = useState(""),
+    [busy, B] = useState(false),
+    [email, EM] = useState(""),
+    [pw, PW] = useState("");
+  return (
+    <div className="login">
+      <div className="login-story">
+        <a className="brand" href="#">
+          archetype<span>.</span>
+        </a>
+        <div className="login-story-content">
+          <span className="eyebrow">WORK-BASED LEARNING INTELLIGENCE</span>
+          <h1>
+            Great futures.
+            <br />
+            Built together.
+          </h1>
+          <p>
+            Connect every learner, every moment of progress,
+            <br />
+            and every person who helps make it happen.
+          </p>
+          <div className="login-features">
+            <span>
+              <ShieldCheck size={17} />
+              Confident delivery
+            </span>
+            <span>
+              <Layers size={17} />
+              Connected portfolios
+            </span>
+            <span>
+              <Target size={17} />
+              Meaningful progress
+            </span>
+          </div>
+        </div>
+        <div className="login-shapes" aria-hidden="true">
+          <div />
+          <div />
+        </div>
+        <small>YOUR NEXT CHAPTER STARTS HERE ↗</small>
+      </div>
+      <div className="login-form-wrap">
+        <div className="login-box">
+          <span className="eyebrow">YOUR CONNECTED WORKSPACE</span>
+          <h2>
+            Welcome back<span>.</span>
+          </h2>
+          <p>Sign in to your apprenticeship workspace.</p>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              B(true);
+              E("");
+              try {
+                await onLogin(email, pw);
+              } catch (e) {
+                E(e.message);
+              } finally {
+                B(false);
+              }
+            }}
+          >
+            <label>
+              Email address
+              <input
+                type="email"
+                required
+                autoComplete="username"
+                placeholder="you@yourorganisation.co.uk"
+                value={email}
+                onChange={(e) => EM(e.target.value)}
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={pw}
+                onChange={(e) => PW(e.target.value)}
+              />
+            </label>
+            {(err || error) && (
+              <div className="form-error" role="alert">
+                {err || error}
+              </div>
+            )}
+            <Button disabled={busy}>
+              {busy ? "Signing in…" : "Sign in"}
+              <ArrowRight size={16} />
+            </Button>
+          </form>
+          {demo?.enabled && (
+            <div className="demo-accounts">
+              <span className="eyebrow">EXPLORE A DEMO ACCOUNT</span>
+              <p>
+                Fictional data. Select an account, then sign in.
+                <br />
+                Demo password: <code>ArchetypeDemo2026!</code>
+              </p>
+              <div>
+                {demo.accounts?.map((a) => (
+                  <button
+                    key={a.email}
+                    type="button"
+                    onClick={() => {
+                      EM(a.email);
+                      PW("ArchetypeDemo2026!");
+                    }}
+                  >
+                    <span>{a.role}</span>
+                    <small>{a.name}</small>
+                    <ArrowUpRight size={14} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="login-security">
+            <LockKeyhole size={13} />
+            Role-based access · encrypted password hashes
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+function Field({
+  label,
+  name,
+  type = "text",
+  options,
+  defaultValue,
+  required = false,
+  wide = false,
+  ...props
+}) {
+  return (
+    <label className={wide ? "wide" : ""}>
+      {label}
+      {required && <span className="required"> *</span>}
+      {type === "textarea" ? (
+        <textarea
+          name={name}
+          defaultValue={defaultValue || ""}
+          required={required}
+          {...props}
+        />
+      ) : type === "select" ? (
+        <select
+          name={name}
+          defaultValue={defaultValue ?? ""}
+          required={required}
+          {...props}
+        >
+          {options.map((o) =>
+            typeof o === "string" ? (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ) : (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ),
+          )}
+        </select>
+      ) : (
+        <input
+          name={name}
+          type={type}
+          defaultValue={defaultValue ?? ""}
+          required={required}
+          {...props}
+        />
+      )}
+    </label>
+  );
+}
+function ModalHost() {
+  const { s, user, modal, setModal, command, notify, busy, learnerId } =
+      useApp(),
+    [error, E] = useState(""),
+    [pending, P] = useState(false),
+    [criteria, C] = useState(modal.item?.criteria || []),
+    [raw, RAW] = useState(""),
+    [parsed, PARSED] = useState([]),
+    [importRows, IR] = useState(null),
+    [importError, IE] = useState("");
+  const ref = useRef(null);
+  const { type, item } = modal;
+  const learner = modal.learner || s.learners.find((l) => l.id === learnerId);
+  const title = {
+    learner: item ? "Edit apprentice" : "Add apprentice",
+    evidence: item ? "Edit & resubmit evidence" : "Add portfolio evidence",
+    evidenceDetail: "Evidence & assessment",
+    otj: "Record off-the-job learning",
+    otjDecision: "Return learning log",
+    review: "Record progress review",
+    task: "Create an action",
+    standard: "Create apprenticeship standard",
+    resource: "Add learning resource",
+    appointment: "Schedule appointment",
+    quality: "Record IQA sample",
+    gateway: "Gateway readiness",
+    user: "Add workspace account",
+    password: "Change your password",
+    import: "Import apprentice records",
+    restore: "Restore recovery snapshot",
+  }[type];
+  useEffect(() => {
+    const previous = document.activeElement,
+      el = ref.current;
+    el?.querySelector("input,select,textarea,button")?.focus();
+    const key = (e) => {
+      if (e.key === "Escape") setModal(null);
+      if (e.key === "Tab") {
+        const nodes = [
+          ...el.querySelectorAll("button,input,select,textarea,a[href]"),
+        ].filter((x) => !x.disabled && x.offsetParent !== null);
+        if (!nodes.length) return;
+        const first = nodes[0],
+          last = nodes.at(-1);
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", key);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", key);
+      document.body.style.overflow = overflow;
+      previous?.focus();
+    };
+  }, []);
+  const userOptions = (role) =>
+    s.users
+      .filter((u) => u.role === role)
+      .map((u) => ({ value: u.id, label: u.name }));
+  const standards = s.standards.map((x) => ({
+    value: x.id,
+    label: x.name + " · L" + x.level,
+  }));
+  const learners = s.learners.map((x) => ({ value: x.id, label: x.name }));
+  const learnerField = !modal.learner && (
+    <Field
+      label="Apprentice"
+      name="learnerId"
+      type="select"
+      defaultValue={learner?.id}
+      options={[{ value: "", label: "Select apprentice" }, ...learners]}
+      required
+      wide
+    />
+  );
+  const st = s.standards.find((x) => x.id === learner?.standardId);
+  async function submit(e) {
+    e.preventDefault();
+    E("");
+    P(true);
+    try {
+      const form = new FormData(e.currentTarget),
+        p = Object.fromEntries(form);
+      if (modal.learner) p.learnerId = modal.learner.id;
+      let kind;
+      if (type === "learner") {
+        kind = "learner.save";
+        if (item) p.id = item.id;
+      } else if (type === "evidence") {
+        kind = "evidence.save";
+        p.learnerId = learner.id;
+        p.criteria = criteria;
+        if (item) p.id = item.id;
+        p.files = await filePayload(form.getAll("files").filter((f) => f.size));
+      } else if (type === "evidenceDetail") {
+        kind = "evidence.assess";
+        p.id = item.id;
+        p.learnerId = item.learnerId;
+      } else if (type === "standard") {
+        kind = "standard.save";
+        p.criteria = parsed;
+      } else if (type === "otj") kind = "otj.add";
+      else if (type === "otjDecision") {
+        kind = "otj.decide";
+        p.id = item.id;
+        p.learnerId = item.learnerId;
+        p.status = "Returned";
+      } else if (type === "review") kind = "review.add";
+      else if (type === "task") kind = "task.add";
+      else if (type === "resource") {
+        kind = "resource.add";
+        p.files = await filePayload(form.getAll("files").filter((f) => f.size));
+      } else if (type === "appointment") kind = "appointment.add";
+      else if (type === "quality") kind = "quality.add";
+      else if (type === "gateway") {
+        kind = "gateway.record";
+        p.learnerId = learner.id;
+      } else if (type === "user") kind = "user.add";
+      else if (type === "password") kind = "password.change";
+      else if (type === "import") {
+        kind = "learners.import";
+        p.rows = importRows;
+      } else if (type === "restore") {
+        kind = "snapshot.restore";
+        p.id = item.id;
+      }
+      await command(kind, p);
+      setModal(null);
+      if (type === "password") window.location.reload();
+    } catch (e) {
+      E(e.message);
+    } finally {
+      P(false);
+    }
+  }
+  async function readImport(file) {
+    IE("");
+    IR(null);
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      IE("Import files must be smaller than 10 MB.");
+      return;
+    }
+    try {
+      const ExcelJS = await import("exceljs");
+      const wb = new (ExcelJS.default || ExcelJS).Workbook();
+      if (file.name.toLowerCase().endsWith(".csv")) {
+        const sheet = wb.addWorksheet("Import");
+        for (const row of parseCSV((await file.text()).replace(/^\uFEFF/, "")))
+          sheet.addRow(row);
+      } else await wb.xlsx.load(await file.arrayBuffer());
+      const sheets = wb.worksheets;
+      if (!sheets.length) throw Error("No worksheet found.");
+      if (sheets.length > 1)
+        notify("Importing the first worksheet: " + sheets[0].name);
+      const rows = [];
+      let headers = [];
+      const value = (v) =>
+        v && typeof v === "object"
+          ? (v.text ??
+            v.result ??
+            (v.richText ? v.richText.map((x) => x.text).join("") : "") ??
+            "")
+          : v;
+      sheets[0].eachRow((row, n) => {
+        const cells = row.values.slice(1).map(value);
+        if (n === 1) headers = cells.map((x) => String(x || "").trim());
+        else if (cells.some((x) => x !== null && x !== undefined && x !== ""))
+          rows.push(
+            Object.fromEntries(headers.map((k, i) => [k, cells[i] ?? ""])),
+          );
+      });
+      if (!rows.length) throw Error("The sheet has no records.");
+      if (rows.length > 1000) throw Error("Maximum 1,000 records per import.");
+      const mapped = rows.map((row) => {
+        const pick = (...keys) => {
+          for (const k of keys)
+            if (row[k] !== undefined && row[k] !== "") return row[k];
+          return "";
+        };
+        const standardValue = pick(
+            "standardId",
+            "standard",
+            "Apprenticeship Title",
+          ),
+          standard = s.standards.find(
+            (x) =>
+              x.id === standardValue ||
+              x.name.toLowerCase() === String(standardValue).toLowerCase(),
+          );
+        const person = (role, ...keys) => {
+          const v = pick(...keys);
+          return (
+            s.users.find(
+              (u) =>
+                u.role === role &&
+                (u.id === v ||
+                  u.name.toLowerCase() === String(v).toLowerCase()),
+            )?.id || v
+          );
+        };
+        const dt = (...keys) => {
+          const v = pick(...keys);
+          if (v instanceof Date) return v.toISOString().slice(0, 10);
+          if (typeof v === "number")
+            return new Date((v - 25569) * 86400000).toISOString().slice(0, 10);
+          return String(v).slice(0, 10);
+        };
+        return {
+          ref: String(pick("ref", "Pro Ref No")),
+          name: String(
+            pick("name", "Learner") ||
+              `${pick("First Name")} ${pick("Last Name")}`.trim(),
+          ),
+          email: String(pick("email", "Email")),
+          employer: String(pick("employer", "Employer")),
+          standardId: standard?.id || "",
+          assessorId: person("Assessor", "assessorId", "assessor", "Assessor"),
+          iqaId: person("IQA", "iqaId", "IQA"),
+          status: pick("status", "Status") || "Active",
+          target: pick("target", "Target Progress %") || 0,
+          otjTarget: pick("otjTarget", "OTJ Target Hours") || 278,
+          startDate: dt("startDate", "Start Date"),
+          plannedEnd: dt("plannedEnd", "Planned End Date"),
+          predictedEnd: dt("predictedEnd", "Predicted End Date"),
+          nextReview: dt("nextReview", "Next Review Due"),
+          eliDue: dt("eliDue", "ELI DUE"),
+          riskDue: dt("riskDue", "Risk Assessment Due"),
+          employerDue: dt("employerDue", "Employer Assessment Due"),
+          english: pick("english", "Functional Skills English") || "Pending",
+          maths: pick("maths", "Functional Skills Maths") || "Pending",
+          epaDate: dt("epaDate", "EPA Date"),
+          notes: String(pick("notes", "RAG Reason")),
+        };
+      });
+      IR(mapped);
+    } catch (e) {
+      IE("Could not read import: " + e.message);
+    }
+  }
+  return (
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !pending) setModal(null);
+      }}
+    >
+      <section
+        ref={ref}
+        className={
+          "modal " +
+          (["standard", "import", "evidenceDetail"].includes(type)
+            ? "modal-wide"
+            : "")
+        }
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
+        <div className="modal-heading">
+          <div>
+            <span className="eyebrow">YOUR CONNECTED WORKSPACE</span>
+            <h2 id="modal-title">{title}</h2>
+          </div>
+          <button
+            className="icon-button"
+            aria-label="Close dialog"
+            disabled={pending}
+            onClick={() => setModal(null)}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <form onSubmit={submit}>
+          <div className="form-grid">
+            {type === "learner" && (
+              <>
+                <Field
+                  label="Reference"
+                  name="ref"
+                  defaultValue={item?.ref}
+                  required
+                />
+                <Field
+                  label="Learner name"
+                  name="name"
+                  defaultValue={item?.name}
+                  required
+                />
+                <Field
+                  label="Email"
+                  name="email"
+                  type="email"
+                  defaultValue={item?.email}
+                />
+                <Field
+                  label="Employer"
+                  name="employer"
+                  defaultValue={item?.employer}
+                  required
+                />
+                <Field
+                  label="Apprenticeship standard"
+                  name="standardId"
+                  type="select"
+                  options={[
+                    { value: "", label: "Choose standard" },
+                    ...standards,
+                  ]}
+                  defaultValue={item?.standardId}
+                  required
+                />
+                <Field
+                  label="Status"
+                  name="status"
+                  type="select"
+                  options={["Active", "Paused", "Withdrawn", "Completed"]}
+                  defaultValue={item?.status || "Active"}
+                />
+                <Field
+                  label="Assessor"
+                  name="assessorId"
+                  type="select"
+                  options={userOptions("Assessor")}
+                  defaultValue={item?.assessorId || user.id}
+                />
+                <Field
+                  label="IQA"
+                  name="iqaId"
+                  type="select"
+                  options={userOptions("IQA")}
+                  defaultValue={item?.iqaId}
+                />
+                <Field
+                  label="Target progress %"
+                  name="target"
+                  type="number"
+                  min="0"
+                  max="100"
+                  defaultValue={item?.target ?? 0}
+                  required
+                />
+                <Field
+                  label="OTJ target hours"
+                  name="otjTarget"
+                  type="number"
+                  min="1"
+                  max="10000"
+                  defaultValue={item?.otjTarget ?? 278}
+                  required
+                />
+                {[
+                  ["startDate", "Start date"],
+                  ["plannedEnd", "Planned end date"],
+                  ["predictedEnd", "Predicted end date"],
+                  ["nextReview", "Next review due"],
+                  ["eliDue", "ELI expiry"],
+                  ["riskDue", "Risk assessment due"],
+                  ["employerDue", "Employer assessment due"],
+                  ["epaDate", "EPA date"],
+                ].map(([k, label]) => (
+                  <Field
+                    key={k}
+                    label={label}
+                    name={k}
+                    type="date"
+                    defaultValue={item?.[k]}
+                  />
+                ))}
+                <Field
+                  label="English"
+                  name="english"
+                  type="select"
+                  options={["Pending", "Achieved", "Exempt"]}
+                  defaultValue={item?.english}
+                />
+                <Field
+                  label="Maths"
+                  name="maths"
+                  type="select"
+                  options={["Pending", "Achieved", "Exempt"]}
+                  defaultValue={item?.maths}
+                />
+                <Field
+                  label="Learner notes"
+                  name="notes"
+                  type="textarea"
+                  defaultValue={item?.notes}
+                  wide
+                />
+                <p className="caption wide">
+                  Progress is calculated from accepted evidence, not an editable
+                  percentage. Changing a standard is blocked once evidence
+                  exists.
+                </p>
+              </>
+            )}
+            {type === "evidence" && (
+              <>
+                <Field
+                  label="Evidence title"
+                  name="title"
+                  defaultValue={item?.title}
+                  required
+                  wide
+                />
+                <Field
+                  label="Evidence type"
+                  name="type"
+                  type="select"
+                  options={[
+                    "Work product",
+                    "Observation",
+                    "Witness testimony",
+                    "Reflective account",
+                    "Professional discussion",
+                    "Assignment",
+                    "Project",
+                    "Photographic evidence",
+                    "Other",
+                  ]}
+                  defaultValue={item?.type || "Reflective account"}
+                />
+                <Field
+                  label="Evidence date"
+                  name="date"
+                  type="date"
+                  defaultValue={item?.date || localDate()}
+                  required
+                />
+                <Field
+                  label="Reflection / commentary"
+                  name="description"
+                  type="textarea"
+                  rows={4}
+                  defaultValue={item?.description}
+                  required
+                  wide
+                />
+                <fieldset className="criteria-picker wide">
+                  <legend>Map to knowledge, skills & behaviours</legend>
+                  {st?.criteria.map((c) => (
+                    <label key={c.code}>
+                      <input
+                        type="checkbox"
+                        checked={criteria.includes(c.code)}
+                        onChange={(e) =>
+                          C(
+                            e.target.checked
+                              ? [...criteria, c.code]
+                              : criteria.filter((x) => x !== c.code),
+                          )
+                        }
+                      />
+                      <strong>{c.code}</strong>
+                      <span>{c.text}</span>
+                    </label>
+                  ))}
+                </fieldset>
+                <Field
+                  label="Evidence attachments"
+                  name="files"
+                  type="file"
+                  multiple
+                  wide
+                />
+                <p className="caption wide">
+                  Up to 5 new files, maximum 5 MB each. Files are stored on the
+                  server and downloaded through authenticated access.
+                </p>
+                {item && (
+                  <div className="wide">
+                    <Files files={item.files} />
+                  </div>
+                )}
+                <Field
+                  label="Save as"
+                  name="status"
+                  type="select"
+                  options={["Draft", "Submitted"]}
+                  defaultValue={
+                    item?.status === "Draft" ? "Draft" : "Submitted"
+                  }
+                />
+              </>
+            )}
+            {type === "evidenceDetail" && (
+              <div className="wide evidence-detail">
+                <Tag>{item.status}</Tag>
+                <h3>{item.title}</h3>
+                <p>
+                  {item.type} · {fmt(item.date)} · {nameOf(s, item.by)}
+                </p>
+                <div className="code-list">
+                  {item.criteria.map((c) => (
+                    <span key={c}>{c}</span>
+                  ))}
+                </div>
+                <p className="preserve-text">{item.description}</p>
+                <Files files={item.files} />
+                {item.feedback && (
+                  <div className="feedback-box">
+                    <strong>Assessor feedback</strong>
+                    <p>{item.feedback}</p>
+                  </div>
+                )}
+                {item.decisions?.length > 0 && (
+                  <details>
+                    <summary>Assessment history</summary>
+                    {item.decisions.map((d, i) => (
+                      <div className="decision-entry" key={i}>
+                        <strong>
+                          {d.status} · {nameOf(s, d.by)} · {fmt(d.date)}
+                        </strong>
+                        <p>{d.feedback}</p>
+                      </div>
+                    ))}
+                  </details>
+                )}
+                {["Draft", "Changes requested"].includes(item.status) &&
+                  ["Manager", "Assessor", "Apprentice"].includes(user.role) && (
+                    <div className="button-row">
+                      <Button
+                        secondary
+                        type="button"
+                        onClick={() =>
+                          setModal({ type: "evidence", item, learner })
+                        }
+                      >
+                        Edit evidence & mapping
+                      </Button>
+                      {item.criteria.length > 0 && (
+                        <Button
+                          type="button"
+                          disabled={pending}
+                          onClick={async () => {
+                            P(true);
+                            try {
+                              await command("evidence.submit", {
+                                id: item.id,
+                                learnerId: item.learnerId,
+                              });
+                              setModal(null);
+                            } catch (e) {
+                              E(e.message);
+                            } finally {
+                              P(false);
+                            }
+                          }}
+                        >
+                          Submit evidence <Send size={15} />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                {item.status === "Submitted" &&
+                  ["Manager", "Assessor"].includes(user.role) && (
+                    <div className="assessment-form">
+                      <Field
+                        label="Assessment decision"
+                        name="status"
+                        type="select"
+                        options={["Accepted", "Changes requested", "Rejected"]}
+                      />
+                      <Field
+                        label="Assessor feedback"
+                        name="feedback"
+                        type="textarea"
+                        rows={4}
+                        required
+                      />
+                    </div>
+                  )}
+              </div>
+            )}
+            {type === "otj" && (
+              <>
+                {learnerField}
+                <Field
+                  label="Learning activity"
+                  name="activity"
+                  required
+                  wide
+                />
+                <Field
+                  label="Learning date"
+                  name="date"
+                  type="date"
+                  defaultValue={localDate()}
+                  max={localDate()}
+                  required
+                />
+                <Field
+                  label="Duration (hours)"
+                  name="hours"
+                  type="number"
+                  min="0.25"
+                  max="24"
+                  step="0.25"
+                  required
+                />
+                <Field
+                  label="What new learning took place?"
+                  name="reflection"
+                  type="textarea"
+                  required
+                  rows={4}
+                  wide
+                />
+                <p className="caption wide">
+                  New logs are submitted for approval. Only approved hours
+                  contribute to the learner’s target.
+                </p>
+              </>
+            )}
+            {type === "otjDecision" && (
+              <>
+                <p className="body-copy wide">
+                  Return “{item.activity}” to the learner with useful feedback.
+                </p>
+                <Field
+                  label="Feedback"
+                  name="feedback"
+                  type="textarea"
+                  required
+                  wide
+                />
+              </>
+            )}
+            {type === "review" && (
+              <>
+                {learnerField}
+                <Field
+                  label="Review type"
+                  name="type"
+                  type="select"
+                  options={[
+                    "Progress review",
+                    "Tripartite review",
+                    "Assessment feedback",
+                    "Gateway review",
+                    "One-to-one",
+                    "Workplace visit",
+                  ]}
+                />
+                <Field
+                  label="Review date"
+                  name="date"
+                  type="date"
+                  defaultValue={localDate()}
+                  required
+                />
+                <Field
+                  label="Discussion, progress & wellbeing"
+                  name="text"
+                  type="textarea"
+                  rows={4}
+                  required
+                  wide
+                />
+                <Field
+                  label="Agreed actions / next steps"
+                  name="actions"
+                  type="textarea"
+                  rows={3}
+                  required
+                  wide
+                />
+                <Field
+                  label="Next review due"
+                  name="nextDate"
+                  type="date"
+                  required
+                />
+                <p className="caption wide">
+                  Saving updates the learner’s last and next review dates. Each
+                  participant can acknowledge the record from their own account.
+                </p>
+              </>
+            )}
+            {type === "task" && (
+              <>
+                {learnerField}
+                <Field
+                  label="Agreed action"
+                  name="title"
+                  type="textarea"
+                  defaultValue={modal.prefill}
+                  required
+                  wide
+                />
+                <Field
+                  label="Action owner"
+                  name="owner"
+                  type="select"
+                  options={s.users.map((u) => ({
+                    value: u.id,
+                    label: u.name + " · " + u.role,
+                  }))}
+                  defaultValue={learner?.assessorId || user.id}
+                />
+                <Field label="Due date" name="due" type="date" required />
+              </>
+            )}
+            {type === "standard" && (
+              <>
+                <Field label="Standard title" name="name" required />
+                <Field
+                  label="Reference"
+                  name="reference"
+                  placeholder="ST reference"
+                  required
+                />
+                <Field
+                  label="Version"
+                  name="version"
+                  placeholder="Version / effective date"
+                  required
+                />
+                <Field
+                  label="Level"
+                  name="level"
+                  type="select"
+                  options={["2", "3", "4", "5", "6", "7"]}
+                  defaultValue="3"
+                />
+                <label className="wide">
+                  Paste official KSB criteria
+                  <textarea
+                    rows={10}
+                    value={raw}
+                    onChange={(e) => RAW(e.target.value)}
+                    placeholder={
+                      "K1: Full knowledge criterion wording\nS1: Full skill criterion wording\nB1: Full behaviour criterion wording"
+                    }
+                  />
+                </label>
+                <Button
+                  secondary
+                  type="button"
+                  onClick={() => {
+                    const p = parseStandard(raw);
+                    PARSED(p);
+                    if (!p.length)
+                      E(
+                        "No criteria detected. Use K1:, S1: or B1: at the beginning of each criterion.",
+                      );
+                    else E("");
+                  }}
+                >
+                  Parse & preview criteria
+                </Button>
+                <p className="caption wide">
+                  Review every extracted criterion before saving. The parser is
+                  a formatting aid; it does not validate an official standard.
+                </p>
+                {parsed.length > 0 && (
+                  <div className="wide parsed-criteria">
+                    {parsed.map((c, i) => (
+                      <div key={i}>
+                        <b>{c.code}</b>
+                        <textarea
+                          aria-label={c.code + " wording"}
+                          value={c.text}
+                          onChange={(e) =>
+                            PARSED(
+                              parsed.map((x, j) =>
+                                i === j ? { ...x, text: e.target.value } : x,
+                              ),
+                            )
+                          }
+                        />
+                        <button
+                          type="button"
+                          aria-label={"Remove " + c.code}
+                          onClick={() =>
+                            PARSED(parsed.filter((_, j) => j !== i))
+                          }
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            {type === "resource" && (
+              <>
+                <Field label="Resource title" name="title" required />
+                <Field
+                  label="Category"
+                  name="category"
+                  type="select"
+                  options={[
+                    "Learning material",
+                    "Template",
+                    "Assessment guidance",
+                    "EPA preparation",
+                    "Policy & compliance",
+                    "Video",
+                    "Website",
+                    "Other",
+                  ]}
+                />
+                <Field
+                  label="Standard"
+                  name="standardId"
+                  type="select"
+                  options={[
+                    { value: "", label: "All standards" },
+                    ...standards,
+                  ]}
+                />
+                <Field
+                  label="HTTPS link"
+                  name="url"
+                  type="url"
+                  placeholder="https://…"
+                />
+                <Field
+                  label="Description"
+                  name="description"
+                  type="textarea"
+                  wide
+                />
+                <Field
+                  label="Resource attachments"
+                  name="files"
+                  type="file"
+                  multiple
+                  wide
+                />
+              </>
+            )}
+            {type === "appointment" && (
+              <>
+                {learnerField}
+                <Field label="Appointment title" name="title" required wide />
+                <Field
+                  label="Date"
+                  name="date"
+                  type="date"
+                  defaultValue={localDate()}
+                  required
+                />
+                <Field
+                  label="Time (Europe/London)"
+                  name="time"
+                  type="time"
+                  defaultValue="10:00"
+                  required
+                />
+                <Field label="Location / meeting link" name="location" wide />
+                <Field
+                  label="Agenda / notes"
+                  name="notes"
+                  type="textarea"
+                  wide
+                />
+              </>
+            )}
+            {type === "quality" && (
+              <>
+                <Field
+                  label="Accepted evidence to sample"
+                  name="evidenceId"
+                  type="select"
+                  options={[
+                    { value: "", label: "Select accepted evidence" },
+                    ...s.evidence
+                      .filter((e) => e.status === "Accepted")
+                      .map((e) => ({
+                        value: e.id,
+                        label:
+                          s.learners.find((l) => l.id === e.learnerId)?.name +
+                          " · " +
+                          e.title,
+                      })),
+                  ]}
+                  required
+                  wide
+                />
+                <Field
+                  label="Quality outcome"
+                  name="outcome"
+                  type="select"
+                  options={["Agreed", "Action required"]}
+                />
+                <Field
+                  label="IQA findings & required actions"
+                  name="notes"
+                  type="textarea"
+                  rows={4}
+                  required
+                  wide
+                />
+              </>
+            )}
+            {type === "gateway" && (
+              <>
+                <p className="body-copy wide">
+                  {learner?.name} · {stdOf(s, learner)}
+                </p>
+                <div className="gateway-checklist wide">
+                  {learner?.gatewayChecks.map(([label, ok]) => (
+                    <div key={label}>
+                      <span className={ok ? "passed" : "not-passed"}>
+                        {ok ? <Check size={17} /> : <X size={17} />}
+                      </span>
+                      <strong>{label}</strong>
+                      <Tag tone={ok ? "green" : "amber"}>
+                        {ok ? "Passed" : "Outstanding"}
+                      </Tag>
+                    </div>
+                  ))}
+                </div>
+                <p className="caption wide">
+                  These are configured readiness checks. Confirm the applicable
+                  assessment plan, provider requirements and employer agreement
+                  separately.
+                </p>
+                {learner.gatewayNotes && (
+                  <p className="body-copy wide">
+                    Recorded declaration: {learner.gatewayNotes}
+                  </p>
+                )}
+                {["Manager", "Assessor"].includes(user.role) &&
+                  learner?.gatewayChecks.every((x) => x[1]) && (
+                    <>
+                      <Field
+                        label="Gateway date"
+                        name="date"
+                        type="date"
+                        defaultValue={localDate()}
+                        required
+                      />
+                      <Field label="EPA date" name="epaDate" type="date" />
+                      <Field
+                        label="Provider declaration / agreement notes"
+                        name="notes"
+                        type="textarea"
+                        required
+                        wide
+                      />
+                    </>
+                  )}
+              </>
+            )}
+            {type === "user" && (
+              <>
+                <Field label="Full name" name="name" required />
+                <Field
+                  label="Email address"
+                  name="email"
+                  type="email"
+                  required
+                />
+                <Field
+                  label="Role"
+                  name="role"
+                  type="select"
+                  options={[
+                    "Manager",
+                    "Assessor",
+                    "IQA",
+                    "Apprentice",
+                    "Employer",
+                  ]}
+                />
+                <Field
+                  label="Initial password"
+                  name="password"
+                  type="password"
+                  minLength="12"
+                  autoComplete="new-password"
+                  required
+                />
+                <Field
+                  label="Linked apprentice (apprentice role only)"
+                  name="learnerId"
+                  type="select"
+                  options={[{ value: "", label: "Not linked" }, ...learners]}
+                />
+                <Field
+                  label="Employer organisation (employer role only)"
+                  name="employer"
+                  type="select"
+                  options={[
+                    { value: "", label: "Not linked" },
+                    ...[...new Set(s.learners.map((l) => l.employer))],
+                  ]}
+                />
+                <p className="caption wide">
+                  Use a unique initial password of at least 12 characters. Share
+                  it securely. The account owner can change it in Settings.
+                </p>
+              </>
+            )}
+            {type === "password" && (
+              <>
+                <Field
+                  label="Current password"
+                  name="current"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  wide
+                />
+                <Field
+                  label="New password"
+                  name="password"
+                  type="password"
+                  minLength="12"
+                  autoComplete="new-password"
+                  required
+                  wide
+                />
+                <p className="caption wide">
+                  Changing your password signs out all your sessions. Sign in
+                  again with your new password.
+                </p>
+              </>
+            )}
+            {type === "restore" && (
+              <>
+                <div className="form-error wide">
+                  This replaces learner and learning records with the snapshot
+                  from {fmt(item.date)}. Accounts and audit history are
+                  retained. Create a new snapshot first if you need to preserve
+                  current records.
+                </div>
+                <label className="checkbox-label wide">
+                  <input type="checkbox" required />I understand and want to
+                  restore this snapshot.
+                </label>
+              </>
+            )}
+            {type === "import" && (
+              <>
+                <p className="body-copy wide">
+                  Import CSV or XLSX apprentice records. Existing references are
+                  updated; new references are added. The entire import is
+                  validated before anything is saved. Evidence and hours must be
+                  recorded through their workflows.
+                </p>
+                <Button
+                  type="button"
+                  secondary
+                  onClick={() =>
+                    download(
+                      "apprentice-import-template.csv",
+                      csv([
+                        {
+                          ref: "NEW-001",
+                          name: "Example Learner",
+                          email: "learner@example.test",
+                          employer: "Example Employer",
+                          standardId: s.standards[0]?.id || "",
+                          assessorId:
+                            s.users.find((u) => u.role === "Assessor")?.id ||
+                            "",
+                          iqaId:
+                            s.users.find((u) => u.role === "IQA")?.id || "",
+                          status: "Active",
+                          target: 0,
+                          otjTarget: 278,
+                          nextReview: localDate(),
+                          eliDue: "",
+                          riskDue: "",
+                          employerDue: "",
+                          plannedEnd: "",
+                          predictedEnd: "",
+                          english: "Pending",
+                          maths: "Pending",
+                        },
+                      ]),
+                      "text/csv",
+                    )
+                  }
+                >
+                  <Download size={14} />
+                  Download template
+                </Button>
+                <label className="wide">
+                  Choose spreadsheet
+                  <input
+                    type="file"
+                    accept=".xlsx,.csv"
+                    onChange={(e) => readImport(e.target.files[0])}
+                  />
+                </label>
+                <p className="caption wide">
+                  Column names may use the template format or the uploaded
+                  model’s headings. Standard title, assessor name and IQA name
+                  must match existing records. XLSX imports use the first
+                  worksheet.
+                </p>
+                {importError && (
+                  <p className="form-error wide">{importError}</p>
+                )}
+                {importRows && (
+                  <div className="wide">
+                    <h3>
+                      {importRows.length} records ready for server validation
+                    </h3>
+                    <Table
+                      headers={["Ref", "Learner", "Employer", "Standard match"]}
+                    >
+                      {importRows.slice(0, 10).map((r, i) => (
+                        <tr key={i}>
+                          <td>{r.ref}</td>
+                          <td>{r.name}</td>
+                          <td>{r.employer}</td>
+                          <td>
+                            {r.standardId
+                              ? "Matched"
+                              : "Not found — fix before import"}
+                          </td>
+                        </tr>
+                      ))}
+                    </Table>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          {error && (
+            <div className="form-error" role="alert">
+              {error}
+            </div>
+          )}
+          <div className="modal-actions">
+            <Button
+              secondary
+              type="button"
+              disabled={pending}
+              onClick={() => setModal(null)}
+            >
+              Close
+            </Button>
+            {!(
+              type === "evidenceDetail" &&
+              !(
+                item.status === "Submitted" &&
+                ["Manager", "Assessor"].includes(user.role)
+              )
+            ) &&
+              !(
+                type === "gateway" &&
+                (!["Manager", "Assessor"].includes(user.role) ||
+                  !learner?.gatewayChecks.every((x) => x[1]))
+              ) && (
+                <Button
+                  type="submit"
+                  disabled={
+                    pending ||
+                    busy ||
+                    (type === "standard" && !parsed.length) ||
+                    (type === "import" && !importRows)
+                  }
+                >
+                  {pending
+                    ? "Saving…"
+                    : type === "evidenceDetail"
+                      ? "Save assessment"
+                      : type === "restore"
+                        ? "Restore snapshot"
+                        : type === "import"
+                          ? "Validate & import"
+                          : type === "gateway"
+                            ? "Record gateway readiness"
+                            : "Save changes"}
+                  <ArrowRight size={15} />
+                </Button>
+              )}
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+// ExcelJS CSV streaming is Node-specific; browser CSV parsing uses a small RFC 4180 parser below.
+function parseCSV(text) {
+  const rows = [];
+  let row = [],
+    field = "",
+    quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      if (quoted && text[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else quoted = !quoted;
+    } else if (c === "," && !quoted) {
+      row.push(field);
+      field = "";
+    } else if ((c === "\n" || c === "\r") && !quoted) {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(field);
+      if (row.some((x) => x !== "")) rows.push(row);
+      row = [];
+      field = "";
+    } else field += c;
+  }
+  if (quoted) throw Error("Unclosed quote in CSV.");
+  if (field || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+createRoot(document.getElementById("root")).render(<App />);

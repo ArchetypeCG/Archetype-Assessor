@@ -1,30 +1,96 @@
-# Archetype Assessor
+# Archetype · WBL Intelligence
 
-A responsive apprenticeship portfolio prototype built with React and Vite.
+A connected apprenticeship portfolio and delivery workspace, modelled on the supplied **WBL Intelligence / Uploads / AutoTracking / Standards** HTML reference. The application keeps Archetype branding and introduces a React interface, a Node.js API, real account permissions, authenticated file downloads and a persistent SQLite database.
 
-## Development
+![Archetype delivery command centre with fictional demo data](docs/dashboard.png)
 
-Use Node.js 24 and npm 11.
+## Preview in GitHub Codespaces
+
+1. Open this repository on GitHub → **Code → Codespaces → Create codespace on main**.
+2. Wait for the Node 24 development container to install dependencies.
+3. In the terminal run `npm run dev`.
+4. Open the browser for **port 5173** from the Ports tab. Keep the port private.
+
+Outside Codespaces, install **Node.js 24 or newer**, then run:
 
 ```sh
-npm ci --cache /workspace/.npm-cache
-npm run dev -- --port 5173
+npm ci
+npm run dev
 ```
 
-Create production assets with `npm run build`. Serve them with `npm run preview`.
+Open the Local address printed by Vite. The command starts both the frontend and API; do not run just Vite. API port 3001 is internal and does not need to be forwarded. The development workspace uses fictional demonstration learners and accounts.
 
-## Available workflows
+### Demo accounts
 
-- Apprentice dashboard with illustrative progress, review dates and learning milestones.
-- Create evidence, add a reflection, link it to a learning outcome, and attach a file up to 5 MB.
-- Search and filter evidence; open evidence and download saved attachments.
-- Move draft evidence to a local “In review” state.
-- View a sample learning plan, review preparation and assessor feedback.
-- Save demo messages and export portfolio data as JSON from Settings.
-- Responsive desktop and mobile layouts.
+On the sign-in screen, select a role then click **Sign in**. The password for the five original demo accounts is `ArchetypeDemo2026!`.
 
-## Data and limitations
+| Role       | Account                   | Scope                                                               |
+| ---------- | ------------------------- | ------------------------------------------------------------------- |
+| Manager    | manager@archetype.demo    | All records, account creation, import and recovery                  |
+| Assessor   | assessor@archetype.demo   | Assigned learners, evidence decisions, reviews and hours            |
+| IQA        | iqa@archetype.demo        | Assigned learners, standards and quality sampling                   |
+| Apprentice | apprentice@archetype.demo | Jamie Davies's own evidence, learning logs, reviews and actions     |
+| Employer   | employer@archetype.demo   | Northstar Digital learners, reviews and actions; no portfolio files |
 
-This is a local prototype, not a deployed learning management system. Evidence, attachments and demo messages persist in this browser's localStorage. Browser storage is limited and can be cleared. Export important work before clearing browser data. Do not use sensitive learner data.
+These are public demo credentials. Do not use the demo database for real learner information. Account scope is checked by the API, not just hidden in the interface.
 
-There is no authentication, server database, real assessor delivery or multi-user access. Dashboard progress, existing evidence, assessor feedback, notifications and appointments are sample data. A production version needs secure learner/assessor/provider roles, server storage, file scanning, permission checks, audit history, backups and a configurable apprenticeship standard before use with real apprentices.
+## Implemented workflows
+
+- **Command centre:** live portfolio health, risk distribution, priority queue and caseload oversight.
+- **Apprentices:** add/edit records, assign assessor/IQA/standard, search, status/RAG filters, sorting and pagination.
+- **Portfolios:** evidence files and reflections; multiple KSB mappings; draft, submit, return, revise, accept or reject; feedback and decision history.
+- **Automatic tracking:** only accepted evidence contributes to KSB coverage. Approved logs calculate OTJ totals. Date and progress exceptions calculate RAG dynamically.
+- **Standards:** versioned standard library, pasted K/S/B text parsing, editable extraction preview and duplicate-code validation. Example criteria are explicitly illustrative. New standard versions are separate records. To protect mapping integrity, a learner with evidence cannot switch standard in place.
+- **Learning logs:** dated reflections and hours, assessor approval or return. New logs are capped at 24 hours/day per entry; historic sample logs are clearly identified.
+- **Reviews:** discussion, agreed actions, automatic last/next-review updates and separate authenticated participant acknowledgements.
+- **Actions and interventions:** owners, deadlines, overdue cohorts and completion/reopening.
+- **Compliance:** insurance, workplace risk, employer assessments, review dates and missing-field checks.
+- **Gateway/EPA:** calculated readiness checks, declaration notes, gateway/EPA dates; gateway recording is blocked until configured checks pass.
+- **Resources and calendar:** protected resource uploads, HTTPS links, standard-specific resources, appointments and monthly view.
+- **Messaging:** persistent account-to-account conversations; refresh to retrieve replies.
+- **Reporting:** live filters, progress/date ranges, exceptions, grouping, selectable fields, CSV/XLSX exports and print/PDF.
+- **Imports:** CSV/XLSX learner import with preview, reference-based upsert, name/ID mapping and atomic server validation. The first XLSX worksheet is used. Download a template inside the import dialog. The reference HTML's column names are also supported.
+- **Quality and recovery:** IQA samples, actor/timestamp audit records, data-quality checks and five manager-controlled snapshots.
+- **Accounts:** role-scoped sessions, password hashing, account creation and self-service password changes that invalidate existing sessions.
+
+Spreadsheet import updates learner records. It deliberately does not convert arbitrary spreadsheet percentages into verified evidence or import passwords. Files are limited to 5 new attachments per save and 5 MB each.
+
+## Build and validate
+
+```sh
+npm test
+npm run build
+npm run preview
+```
+
+`npm run preview` explicitly serves the built frontend and demo API on port 3000. It needs `npm run build` first. The test suite uses an isolated temporary database and covers permissions, evidence and files, assessment transitions, hours, review acknowledgements, messaging, IQA, imports, snapshots, concurrency, gateway and restart persistence.
+
+## Storage and production startup
+
+Database and attachment bytes are stored in `data/archetype.sqlite` (ignored by Git). They persist across process restarts. Deploy on a server with a persistent volume; ephemeral hosting will lose data. **GitHub Pages cannot host the API.** The old browser-only prototype's localStorage keys remain untouched; Settings can export those older records separately.
+
+A separate, empty production directory and an initial administrator password are required for first startup. In a Bash shell:
+
+```sh
+npm ci
+npm run build
+export DATA_DIR=/absolute/persistent/path/archetype
+export ADMIN_EMAIL=admin@yourorganisation.example
+read -rs -p 'Initial administrator password (12+ characters): ' ADMIN_PASSWORD
+export ADMIN_PASSWORD
+printf '\n'
+export COOKIE_SECURE=1
+npm start
+```
+
+Use a unique secret password supplied by your deployment's secret manager in a hosted environment. Production startup creates one manager and no sample learners. A manager then creates assessor/IQA accounts, standards and learners, followed by linked apprentice and employer accounts. Subsequent startups use stored password hashes. Do not point production at a demo database: the server refuses to run a database containing public demo accounts without explicit demo mode. `COOKIE_SECURE=1` requires an HTTPS reverse proxy (do not set it for plain HTTP local development).
+
+Use an HTTPS reverse proxy and restrict network access to the application port. The API uses HttpOnly/SameSite cookies, validates request origins, limits request sizes and login attempts, and records successful workspace changes. Sessions expire after eight hours. Back up SQLite using its supported backup mechanism or stop the app and preserve the database with its WAL/SHM files together. In-app snapshots are in the same database and are not external backups. Files remain in the database after snapshot recovery so recovered evidence links still work.
+
+## Scope and next work
+
+This is a substantial working foundation, **not a certified or complete Smart Assessor replacement**. The supplied HTML is a design/workflow reference, not a production security specification. No original staff passwords or institutional branding from the file were adopted.
+
+Before real learner use, complete provider-specific requirements and a security/accessibility review, implement malware scanning, operational backups and retention policies, configure official versioned standards and applicable funding rules, and test the deployment. There is no multi-organisation tenancy, SSO/MFA, account invitation/reset email, ILR/MIS/LMS integration, EPA-provider integration, email/SMS/push notifications, live video capture, plagiarism service, or qualified electronic signature. Review acknowledgements are recorded attestations, not qualified signatures. Gateway checks support provider judgement and do not certify funding or assessment eligibility. Automated risk uses configured rules; forecasting uses entered dates, not AI.
+
+See [docs/FEATURES.md](docs/FEATURES.md) for the functional map and remaining parity work.

@@ -1,0 +1,10 @@
+{
+  "name": "Archetype WBL Intelligence",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm",
+  "postCreateCommand": "npm ci",
+  "forwardPorts": [5173],
+  "portsAttributes": {
+    "5173": { "label": "Archetype workspace", "onAutoForward": "openBrowser" },
+    "3001": { "label": "Internal API", "onAutoForward": "ignore" }
+  }
+}
