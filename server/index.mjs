@@ -1,4 +1,5 @@
 import http from "node:http";
+import { importTracker } from "./tracker-import.mjs";
 import { installUploadedStarter } from "./uploaded-starter.mjs";
 import { validateNewPassword } from "./passwords.mjs";
 import { applicationOrigins } from "./origins.mjs";
@@ -182,9 +183,7 @@ if (!demo) {
     const result = installUploadedStarter(s);
     if (result) {
       put(s);
-      console.log(
-        "Uploaded standards and fictional practice learners installed.",
-      );
+      console.log("Uploaded standards catalogue installed.");
     }
     db.exec("COMMIT");
   } catch (e) {
@@ -232,6 +231,7 @@ function visible(s, u) {
       })),
     learners: ls.map((l) => ({
       ...derive(l, s),
+      ...(!staff.includes(u.role) ? { tracker: undefined } : {}),
       participantIds: s.users
         .filter((account) => account.active && canSee(account, l))
         .map((account) => account.id),
@@ -315,21 +315,23 @@ function normalizeLearner(p, s, old) {
   return {
     id: old?.id || id(),
     ...(old?.fictional ? { fictional: true } : {}),
+    ...(old?.tracker ? { tracker: old.tracker } : {}),
     ref,
     name: text(p.name, "Learner name", 160),
     email: optional(p.email, 200),
     employer: text(p.employer, "Employer", 200),
     standardId: standard.id,
     level: standard.level,
-    assessorId: userBy(s, p.assessorId, "Assessor"),
-    iqaId: userBy(s, p.iqaId, "IQA"),
+    assessorId:
+      old?.tracker && !p.assessorId ? "" : userBy(s, p.assessorId, "Assessor"),
+    iqaId: old?.tracker && !p.iqaId ? "" : userBy(s, p.iqaId, "IQA"),
     status: choice(
       p.status,
       ["Active", "Paused", "Withdrawn", "Completed"],
       "learner status",
     ),
     target: number(p.target, "Progress target"),
-    otjTarget: number(p.otjTarget, "OTJ target", 1, 10000),
+    otjTarget: number(p.otjTarget, "OTJ target", old?.tracker ? 0 : 1, 10000),
     startDate: date(p.startDate, "start date"),
     plannedEnd: date(p.plannedEnd, "planned end"),
     predictedEnd: date(p.predictedEnd, "predicted end"),
@@ -431,6 +433,28 @@ function command(s, u, kind, p) {
       if (old) Object.assign(old, item);
       else s.learners.push(item);
       return { learnerId: item.id };
+    }
+    case "learners.importTracker": {
+      requireRole(u, ["Manager"]);
+      let result;
+      try {
+        result = importTracker(s, p.sheetRows, {
+          makeId: id,
+          actorId: u.id,
+          importedAt: new Date().toISOString(),
+          replaceFictional: true,
+        });
+      } catch (error) {
+        fail(error.message);
+      }
+      for (const learnerId of result.removedIds)
+        db.prepare("DELETE FROM files WHERE learner_id=?").run(learnerId);
+      syncReviewParticipants(s);
+      return {
+        ...result,
+        removedFictional: result.removedIds.length,
+        removedIds: undefined,
+      };
     }
     case "learners.import": {
       requireRole(u, ["Manager"]);

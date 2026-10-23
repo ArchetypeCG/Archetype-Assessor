@@ -1,3 +1,7 @@
+import {
+  parseTrackerSheet,
+  trackerCourseKey,
+} from "../server/tracker-import.mjs";
 import { SamplingPlanner, SamplingDialog } from "./iqa";
 import { ReviewDialog, ReviewDetails } from "./reviews";
 import { EmailSettings, PasswordRecovery } from "./email";
@@ -1105,6 +1109,34 @@ function LearnerProfile() {
         <Tag>{l.rag}</Tag>
         <Tag>{l.status}</Tag>
       </div>
+      {l.tracker && ["Manager", "Assessor", "IQA"].includes(user.role) && (
+        <Panel
+          title="Imported WBL tracker"
+          subtitle="Staff-only source details. Reported progress is separate from verified evidence coverage."
+        >
+          <p>
+            Tracker progress:{" "}
+            {l.tracker.reportedProgress == null
+              ? "Not supplied"
+              : `${Math.round(l.tracker.reportedProgress * 100) / 100}%`}{" "}
+            · Tracker target:{" "}
+            {l.tracker.reportedTarget == null
+              ? "Not supplied"
+              : `${Math.round(l.tracker.reportedTarget * 100) / 100}%`}
+          </p>
+          <details>
+            <summary>View relevant imported tracker fields</summary>
+            <Table headers={["Tracker field", "Imported value"]}>
+              {Object.entries(l.tracker.fields).map(([field, value]) => (
+                <tr key={field}>
+                  <td>{field}</td>
+                  <td className="preserve-text">{String(value)}</td>
+                </tr>
+              ))}
+            </Table>
+          </details>
+        </Panel>
+      )}
       <div className="tabs">
         {tabs.map((t) => (
           <button
@@ -3538,6 +3570,8 @@ function ModalHost() {
       modal.type === "standard" ? modal.item?.criteria || [] : [],
     ),
     [importRows, IR] = useState(null),
+    [trackerSheetRows, TSR] = useState(null),
+    [trackerPreview, TP] = useState(null),
     [importError, IE] = useState("");
   const ref = useRef(null);
   const { type, item } = modal;
@@ -3665,8 +3699,9 @@ function ModalHost() {
           throw Error("The new passwords do not match.");
         kind = "password.change";
       } else if (type === "import") {
-        kind = "learners.import";
-        p.rows = importRows;
+        kind = trackerSheetRows ? "learners.importTracker" : "learners.import";
+        if (trackerSheetRows) p.sheetRows = trackerSheetRows;
+        else p.rows = importRows;
       } else if (type === "restore") {
         kind = "snapshot.restore";
         p.id = item.id;
@@ -3683,6 +3718,8 @@ function ModalHost() {
   async function readImport(file) {
     IE("");
     IR(null);
+    TSR(null);
+    TP(null);
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
       IE("Import files must be smaller than 10 MB.");
@@ -3700,6 +3737,48 @@ function ModalHost() {
       if (!sheets.length) throw Error("No worksheet found.");
       if (sheets.length > 1)
         notify("Importing the first worksheet: " + sheets[0].name);
+      if (sheets[0].rowCount > 1100)
+        throw Error("Maximum 1,000 learner rows per import.");
+      const trackerCells = [];
+      for (let n = 1; n <= sheets[0].rowCount; n++) {
+        const row = sheets[0].getRow(n);
+        trackerCells.push(
+          Array.from({ length: 64 }, (_, i) => {
+            const cell = row.getCell(i + 1);
+            let value = cell.value;
+            if (value && typeof value === "object" && !(value instanceof Date))
+              value =
+                value.result ??
+                value.text ??
+                (value.richText
+                  ? value.richText.map((t) => t.text).join("")
+                  : "");
+            if (value instanceof Date) return value.toISOString().slice(0, 10);
+            if (typeof value === "number" && cell.numFmt?.includes("%"))
+              return String(value * 100) + "%";
+            return ["string", "number", "boolean"].includes(typeof value)
+              ? value
+              : "";
+          }),
+        );
+      }
+      const tracker = parseTrackerSheet(trackerCells);
+      if (tracker) {
+        TSR(trackerCells);
+        TP(tracker);
+        IR(
+          tracker.records.map((row) => ({
+            ...row,
+            standardId:
+              s.standards.find(
+                (st) =>
+                  trackerCourseKey(st.name) === row.courseKey &&
+                  Number(st.level) === row.level,
+              )?.id || "",
+          })),
+        );
+        return;
+      }
       const rows = [];
       let headers = [];
       const value = (v) =>
@@ -4755,13 +4834,42 @@ function ModalHost() {
                   />
                 </label>
                 <p className="caption wide">
-                  Column names may use the template format or the uploaded
-                  model’s headings. Standard title, assessor name and IQA name
-                  must match existing records. XLSX imports use the first
-                  worksheet.
+                  The WBL tracker is detected automatically, including headings
+                  below the title and legend. Other spreadsheets should use the
+                  template and match existing standards and staff. XLSX imports
+                  use the first worksheet.
                 </p>
                 {importError && (
                   <p className="form-error wide">{importError}</p>
+                )}
+                {trackerPreview && (
+                  <div className="wide">
+                    <h3>WBL tracker replacement preview</h3>
+                    <p>
+                      {trackerPreview.records.length} records ·{" "}
+                      {trackerPreview.missingNames} without names ·{" "}
+                      {trackerPreview.duplicateReferences} rows with repeated
+                      references.
+                    </p>
+                    <p>
+                      Blank names use learner references. Repeated references
+                      receive a worksheet row suffix so records are kept
+                      separate. Unmatched staff stay unassigned; missing courses
+                      are created with no KSB criteria until their schedules are
+                      supplied.
+                    </p>
+                    <p>
+                      Saving replaces fictional practice learners and their
+                      linked records. Existing real learners are retained or
+                      updated by reference. Tracker progress is kept separately
+                      from verified portfolio progress. No accounts or passwords
+                      are created.
+                    </p>
+                    <p>
+                      Existing records should be backed up under Settings &
+                      export before importing.
+                    </p>
+                  </div>
                 )}
                 {importRows && (
                   <div className="wide">
@@ -4779,7 +4887,9 @@ function ModalHost() {
                           <td>
                             {r.standardId
                               ? "Matched"
-                              : "Not found — fix before import"}
+                              : trackerPreview
+                                ? "Programme will be created; KSBs needed"
+                                : "Not found — fix before import"}
                           </td>
                         </tr>
                       ))}

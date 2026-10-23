@@ -57,7 +57,10 @@ test("uploaded KSB schedules contain every extracted unique criterion, with cont
 test("live starter adds six fictional learners and linked workflows, creates no credentials/accounts and runs only once", () => {
   const s = blank();
   const users = structuredClone(s.users);
-  const result = installUploadedStarter(s, { day: "2026-10-23" });
+  const result = installUploadedStarter(s, {
+    day: "2026-10-23",
+    includeLearners: true,
+  });
   assert.equal(result.addedStandards, 3);
   assert.equal(result.addedLearners, 6);
   assert.equal(s.standards.length, 3);
@@ -131,7 +134,7 @@ test("import preserves existing standard IDs, wording, learner data and collidin
   });
   const learner = structuredClone(s.learners[0]),
     evidence = structuredClone(s.evidence[0]);
-  installUploadedStarter(s, { day: "2026-10-23" });
+  installUploadedStarter(s, { day: "2026-10-23", includeLearners: true });
   assert.equal(s.standards.length, 3);
   assert.equal(s.standards[0].id, "existing-ba");
   assert.equal(

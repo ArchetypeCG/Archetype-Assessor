@@ -1408,3 +1408,62 @@ test("standard edits retain identity and evidence mappings and reject duplicates
     400,
   );
 });
+
+test("WBL imports require a manager, retain real learners and keep staff tracker notes private", async () => {
+  const r = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: "NewLearnerPassword123!",
+    }),
+  });
+  assert.equal(r.status, 200);
+  const apprentice = r.cookie;
+  const before = await state();
+  const learnerId = (await state(apprentice)).learners[0].id;
+  const learner = before.learners.find((l) => l.id === learnerId);
+  const standard = before.standards.find((st) => st.id === learner.standardId);
+  const sheetRows = [
+    [
+      "Pro Ref No",
+      "First Name",
+      "Last Name",
+      "Apprenticeship Title",
+      "Level",
+      "Employer",
+      "Comments/1:1 Notes",
+      "DAS COHORT REFERENCE",
+    ],
+    [
+      learner.ref,
+      "",
+      "",
+      standard.name,
+      standard.level,
+      learner.employer,
+      "Synthetic confidential tracker note",
+      "Leave this administrative value out",
+    ],
+  ];
+  assert.equal(
+    (await command("learners.importTracker", { sheetRows }, apprentice)).status,
+    403,
+  );
+  assert.equal(
+    (await command("learners.importTracker", { sheetRows: [] })).status,
+    400,
+  );
+  assert.equal((await state()).learners.length, before.learners.length);
+  const imported = await command("learners.importTracker", { sheetRows });
+  assert.equal(imported.status, 200);
+  assert.equal(imported.data.result.updated, 1);
+  assert.equal(imported.data.state.learners.length, before.learners.length);
+  const updated = imported.data.state.learners.find((l) => l.id === learner.id);
+  assert.equal(updated.name, learner.name);
+  assert.equal(
+    updated.tracker.fields["Comments/1:1 Notes"],
+    "Synthetic confidential tracker note",
+  );
+  assert.equal(updated.tracker.fields["DAS COHORT REFERENCE"], undefined);
+  assert.equal((await state(apprentice)).learners[0].tracker, undefined);
+});

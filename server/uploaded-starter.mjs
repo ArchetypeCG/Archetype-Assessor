@@ -20,7 +20,10 @@ const dayAfter = (day, days) =>
     .slice(0, 10);
 
 // One-time, additive installation. No credential writes and no resetting existing records.
-export function installUploadedStarter(s, { day = today(), makeId = id } = {}) {
+export function installUploadedStarter(
+  s,
+  { day = today(), makeId = id, includeLearners = false } = {},
+) {
   s.migrations ||= [];
   if (s.migrations.includes(UPLOADED_STARTER_VERSION)) return null;
   for (const key of [
@@ -83,7 +86,7 @@ export function installUploadedStarter(s, { day = today(), makeId = id } = {}) {
       }
       standard.uploadedSource = source.source;
     }
-    for (let n = 0; n < 2; n++) {
+    for (let n = 0; includeLearners && n < 2; n++) {
       let ref = `EXAMPLE-${index + 1}-${n + 1}`;
       // A pre-existing user reference belongs to them, even if it has the same spelling.
       if (s.learners.some((l) => l.ref === ref)) ref += "-" + makeId();
