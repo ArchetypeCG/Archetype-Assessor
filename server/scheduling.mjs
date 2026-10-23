@@ -1,3 +1,8 @@
+import {
+  addDays,
+  REVIEW_SERIES_SOURCE,
+  nextSeriesReview,
+} from "./review-series.mjs";
 export const sessionTypes = [
   "Teaching session",
   "Progress review",
@@ -88,8 +93,16 @@ export function calendarICS(state) {
       `DTSTAMP:${now}`,
       `LAST-MODIFIED:${stamp(Date.parse(a.updated || a.created || new Date().toISOString()))}`,
       `SEQUENCE:${a.sequence || 0}`,
-      `DTSTART:${stamp(londonTimestamp(a.date, a.time))}`,
-      `DTEND:${stamp(londonTimestamp(a.date, a.endTime || a.time) + (!a.endTime ? 3600000 : 0))}`,
+      ...(a.allDay
+        ? [
+            `DTSTART;VALUE=DATE:${a.date.replaceAll("-", "")}`,
+            `DTEND;VALUE=DATE:${addDays(a.date, 1).replaceAll("-", "")}`,
+            "TRANSP:TRANSPARENT",
+          ]
+        : [
+            `DTSTART:${stamp(londonTimestamp(a.date, a.time))}`,
+            `DTEND:${stamp(londonTimestamp(a.date, a.endTime || a.time) + (!a.endTime ? 3600000 : 0))}`,
+          ]),
       `SUMMARY:${escape(a.title)}`,
       `DESCRIPTION:${escape([learner?.name, a.description, a.notes, a.objectives, a.preparation, a.meetingUrl].filter(Boolean).join("\n\n"))}`,
       `LOCATION:${escape(a.location || a.meetingUrl || "")}`,
@@ -153,6 +166,14 @@ export function schedulingCommand({
     const d = date(p.date, "session date", true),
       start = text(p.time, "Start time", 5),
       end = optional(p.endTime, 5);
+    if (
+      old?.source === REVIEW_SERIES_SOURCE &&
+      l.predictedEnd &&
+      d > l.predictedEnd
+    )
+      fail(
+        "A scheduled review must be on or before the predicted course end date.",
+      );
     const pattern = /^([01]\d|2[0-3]):[0-5]\d$/;
     if (!pattern.test(start) || (end && !pattern.test(end)))
       fail("Enter a valid session time.");
@@ -187,6 +208,16 @@ export function schedulingCommand({
       id: old?.id || id(),
       learnerId: l.id,
       standardId: l.standardId,
+      ...(old?.source === REVIEW_SERIES_SOURCE
+        ? {
+            source: old.source,
+            seriesDate: old.seriesDate,
+            seriesAnchor: old.seriesAnchor,
+            seriesOverride: true,
+            seriesRetired: false,
+            allDay: false,
+          }
+        : {}),
       title: text(p.title, "Session title", 200),
       type: choice(p.type || "Teaching session", sessionTypes, "session type"),
       date: d,
@@ -252,6 +283,7 @@ export function schedulingCommand({
       p.updateReviewDue !== false
     )
       l.nextReview = d;
+    if (l.initialReviewDate) l.nextReview = nextSeriesReview(s, l);
     return { sessionId: item.id };
   }
   if (kind === "plan.save") {

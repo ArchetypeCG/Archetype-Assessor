@@ -1791,6 +1791,15 @@ function Reviews({ learner }) {
           b.date.localeCompare(a.date) ||
           String(b.createdAt || "").localeCompare(a.createdAt || ""),
       );
+  const scheduled = s.appointments
+    .filter(
+      (a) =>
+        a.source === "ten-week-review" &&
+        a.status === "Planned" &&
+        (!learner || a.learnerId === learner.id),
+    )
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 6);
   return (
     <Panel
       title="Progress reviews"
@@ -1804,6 +1813,39 @@ function Reviews({ learner }) {
         )
       }
     >
+      {scheduled.length > 0 && (
+        <div className="review-series-upcoming">
+          <h3>Scheduled 10-week reviews</h3>
+          <p>
+            The next reviews in the shared calendar. Open a review for its
+            agenda and booking details.
+          </p>
+          {scheduled.map((a) => (
+            <button
+              className="review-planned-row"
+              key={a.id}
+              onClick={() =>
+                setModal({
+                  type: "sessionDetail",
+                  item: a,
+                  learner: s.learners.find((l) => l.id === a.learnerId),
+                })
+              }
+            >
+              <CalendarDays size={19} />
+              <span>
+                <strong>
+                  {s.learners.find((l) => l.id === a.learnerId)?.name}
+                </strong>
+                <small>
+                  {fmt(a.date)} · {a.allDay ? "Time to be confirmed" : a.time}
+                </small>
+              </span>
+              <ChevronRight size={17} />
+            </button>
+          ))}
+        </div>
+      )}
       {items.map((r) => (
         <article className="review-record" data-review-id={r.id} key={r.id}>
           <div className="review-heading">
@@ -3663,6 +3705,15 @@ function ModalHost() {
           startDate: dt("startDate", "Start Date"),
           plannedEnd: dt("plannedEnd", "Planned End Date"),
           predictedEnd: dt("predictedEnd", "Predicted End Date"),
+          ...(Object.hasOwn(row, "initialReviewDate") ||
+          Object.hasOwn(row, "Initial Review Date")
+            ? {
+                initialReviewDate: dt(
+                  "initialReviewDate",
+                  "Initial Review Date",
+                ),
+              }
+            : {}),
           nextReview: dt("nextReview", "Next Review Due"),
           eliDue: dt("eliDue", "ELI DUE"),
           riskDue: dt("riskDue", "Risk Assessment Due"),
@@ -3849,6 +3900,33 @@ function ModalHost() {
                   defaultValue={item?.otjTarget ?? 278}
                   required
                 />
+                {user.role === "Manager" && (
+                  <div className="wide review-series-setup">
+                    <h3>Automatic 10-week reviews</h3>
+                    <Field
+                      label="Initial 10-week review date"
+                      name="initialReviewDate"
+                      type="date"
+                      defaultValue={
+                        item?.initialReviewDate ??
+                        (item?.nextReview &&
+                        item?.predictedEnd &&
+                        item.nextReview <= item.predictedEnd
+                          ? item.nextReview
+                          : "")
+                      }
+                    />
+                    <p className="caption">
+                      Creates a shared review on this date and every 70 days
+                      through the predicted end date. The assessor, apprentice
+                      and employer see the same calendar entries. Times and
+                      locations remain to be confirmed. Changing the initial
+                      date or predicted end updates the schedule; completed
+                      reviews are kept. Clear the initial date to stop the
+                      automatic series.
+                    </p>
+                  </div>
+                )}
                 {[
                   ["startDate", "Start date"],
                   ["plannedEnd", "Planned end date"],
@@ -4529,6 +4607,7 @@ function ModalHost() {
                           target: 0,
                           otjTarget: 278,
                           nextReview: localDate(),
+                          initialReviewDate: "",
                           eliDue: "",
                           riskDue: "",
                           employerDue: "",

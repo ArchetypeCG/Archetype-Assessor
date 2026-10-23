@@ -103,6 +103,7 @@ export const reportRows = (ls, s) =>
     otjHours: l.hours,
     otjTarget: l.otjTarget,
     nextReview: l.nextReview,
+    initialReviewDate: l.initialReviewDate || "",
     eliDue: l.eliDue,
     riskDue: l.riskDue,
     employerDue: l.employerDue,

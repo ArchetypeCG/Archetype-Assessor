@@ -94,7 +94,7 @@ function SessionCard({ a, s, setModal }) {
         <CalendarDays size={21} />
         <b>{fmt(a.date)}</b>
         <small>
-          {a.time}
+          {a.allDay ? "Time to be confirmed" : a.time}
           {a.endTime ? " – " + a.endTime : ""}
         </small>
       </span>
@@ -301,7 +301,7 @@ export function SchedulingWorkspace({ s, user, setModal, openLearner }) {
                         (a.status === "Cancelled" ? " cancelled" : "")
                       }
                     >
-                      {a.time} {a.title}
+                      {a.allDay ? "TBC" : a.time} {a.title}
                     </span>
                   ))}
               </button>
@@ -881,7 +881,8 @@ export function ScheduleDialog({
               </span>
               <h3>{item.title}</h3>
               <p>
-                {l?.name} · {fmt(item.date)} · {item.time}
+                {l?.name} · {fmt(item.date)} ·{" "}
+                {item.allDay ? "Time to be confirmed" : item.time}
                 {item.endTime ? " – " + item.endTime : ""} · Europe/London
               </p>
               <Tag>{item.status || "Planned"}</Tag>
@@ -968,6 +969,13 @@ export function ScheduleDialog({
           </>
         ) : (
           <form onSubmit={save}>
+            {item?.source === "ten-week-review" && (
+              <p className="caption">
+                This is one occurrence of the administrator’s 10-week review
+                schedule. Confirm its time and location below. Editing this
+                occurrence keeps the remaining dates unchanged.
+              </p>
+            )}
             <div className="form-grid">
               {!modal.learner && !item && (
                 <label className="wide">
@@ -1067,7 +1075,11 @@ export function ScheduleDialog({
                         label="Delivery method"
                         name="delivery"
                         type="select"
-                        value={prefill.delivery || "In person"}
+                        value={
+                          prefill.delivery === "To be confirmed"
+                            ? "In person"
+                            : prefill.delivery || "In person"
+                        }
                         options={["In person", "Online", "Hybrid"]}
                       />
                       <F
@@ -1088,14 +1100,16 @@ export function ScheduleDialog({
                         label="Start time (Europe/London)"
                         name="time"
                         type="time"
-                        value={prefill.time || "10:00"}
+                        value={prefill.time || (prefill.allDay ? "" : "10:00")}
                         required
                       />
                       <F
                         label="End time (Europe/London)"
                         name="endTime"
                         type="time"
-                        value={prefill.endTime || "11:00"}
+                        value={
+                          prefill.endTime || (prefill.allDay ? "" : "11:00")
+                        }
                         required
                       />
                       <F

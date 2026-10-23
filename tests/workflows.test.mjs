@@ -1,3 +1,4 @@
+import { addDays } from "../server/review-series.mjs";
 import { reviewPayload } from "./support/review-fixture.mjs";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -1117,5 +1118,171 @@ test("review completion rejects missing coverage, unexplained concerns, invalid 
   assert.equal(
     after.learners.find((x) => x.id === l.id).nextReview,
     before.learners.find((x) => x.id === l.id).nextReview,
+  );
+});
+
+test("administrator review dates create one shared 10-week calendar series, with scoped visibility and protected history", async () => {
+  const original = (await state()).learners[0],
+    start = addDays(today(), -1),
+    end = addDays(start, 210);
+  let r = await command("learner.save", {
+    ...original,
+    initialReviewDate: start,
+    predictedEnd: end,
+    status: "Active",
+  });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  let series = r.data.state.appointments.filter(
+    (a) =>
+      a.learnerId === original.id &&
+      a.source === "ten-week-review" &&
+      a.status === "Planned",
+  );
+  assert.equal(series.length, 4);
+  assert.equal(series.at(-1).date, end);
+  assert(
+    series.every(
+      (a) =>
+        a.participants.includes("assessor") &&
+        a.participants.includes("apprentice") &&
+        a.participants.includes("employer"),
+    ),
+  );
+  const ids = series.map((a) => a.id);
+  let l = r.data.state.learners.find((x) => x.id === original.id);
+  r = await command("learner.save", { ...l, notes: "Unrelated notes update" });
+  assert.equal(r.status, 200);
+  assert.deepEqual(
+    r.data.state.appointments
+      .filter((a) => ids.includes(a.id))
+      .map((a) => a.id),
+    ids,
+  );
+  const assessor = await login("assessor@archetype.demo"),
+    employer = await login("employer@archetype.demo");
+  const apprentice = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: "NewLearnerPassword123!",
+    }),
+  });
+  assert.equal(apprentice.status, 200);
+  for (const cookie of [assessor, employer, apprentice.cookie])
+    assert.equal(
+      (await state(cookie)).appointments.filter((a) => ids.includes(a.id))
+        .length,
+      4,
+    );
+  assert.equal(
+    (
+      await command(
+        "learner.save",
+        { ...l, initialReviewDate: series[1].date },
+        assessor,
+      )
+    ).status,
+    403,
+  );
+  const ics = await fetch(base + "/api/calendar.ics", {
+    headers: { cookie: apprentice.cookie },
+  });
+  assert.equal(ics.status, 200);
+  assert.match(await ics.text(), /DTSTART;VALUE=DATE:/);
+  r = await command("review.add", reviewPayload(l, start, series[1].date));
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(
+    r.data.state.appointments.find((a) => a.id === ids[0]).status,
+    "Completed",
+  );
+  assert.equal(
+    r.data.state.learners.find((x) => x.id === l.id).nextReview,
+    series[1].date,
+  );
+  const extended = addDays(start, 280);
+  l = (await state()).learners.find((x) => x.id === l.id);
+  r = await command("learner.save", { ...l, predictedEnd: extended });
+  assert.equal(r.status, 200);
+  assert.equal(
+    r.data.state.appointments.filter(
+      (a) => a.learnerId === l.id && a.source === "ten-week-review",
+    ).length,
+    5,
+  );
+  assert.equal(
+    r.data.state.appointments.find((a) => a.id === ids[0]).status,
+    "Completed",
+  );
+  r = await command("user.add", {
+    name: "Additional employer contact",
+    email: "series-employer@example.test",
+    role: "Employer",
+    employer: l.employer,
+    password: "EmployerTemporaryPassword2026!",
+  });
+  assert.equal(r.status, 200);
+  const addedContact = r.data.state.users.find(
+    (u) => u.email === "series-employer@example.test",
+  );
+  assert(addedContact);
+  assert(
+    r.data.state.appointments
+      .filter(
+        (a) =>
+          a.learnerId === l.id &&
+          a.source === "ten-week-review" &&
+          a.status === "Planned",
+      )
+      .every((a) => a.participants.includes(addedContact.id)),
+  );
+  assert(
+    !r.data.state.appointments
+      .find((a) => a.id === ids[0])
+      .participants.includes(addedContact.id),
+  );
+  const upcoming = r.data.state.appointments.find((a) => a.id === ids[1]);
+  assert.equal(
+    (
+      await command("session.save", {
+        ...upcoming,
+        learnerId: l.id,
+        date: addDays(extended, 1),
+        time: "10:00",
+        endTime: "11:00",
+      })
+    ).status,
+    400,
+  );
+  const before = await state();
+  r = await command("learner.save", {
+    ...l,
+    initialReviewDate: extended,
+    predictedEnd: start,
+  });
+  assert.equal(r.status, 400);
+  assert.equal((await state()).appointments.length, before.appointments.length);
+  const current = (await state()).learners.find((x) => x.id === l.id);
+  const cleared = await command("learner.save", {
+    ...current,
+    initialReviewDate: "",
+  });
+  assert.equal(cleared.status, 200);
+  assert.equal(
+    cleared.data.state.learners.find((x) => x.id === l.id).nextReview,
+    "",
+  );
+  assert(
+    cleared.data.state.appointments
+      .filter(
+        (a) =>
+          a.learnerId === l.id &&
+          a.source === "ten-week-review" &&
+          a.id !== ids[0],
+      )
+      .every((a) => a.status === "Cancelled"),
+  );
+  assert.equal(
+    cleared.data.state.appointments.find((a) => a.id === ids[0]).status,
+    "Completed",
   );
 });

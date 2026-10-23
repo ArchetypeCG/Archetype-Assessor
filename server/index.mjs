@@ -1,4 +1,10 @@
 import http from "node:http";
+import {
+  setReviewSeries,
+  syncReviewSeries,
+  syncReviewParticipants,
+  nextSeriesReview,
+} from "./review-series.mjs";
 import { normalizeReview } from "./reviews.mjs";
 import { samplingCommand } from "./sampling.mjs";
 import { createMailService } from "./mail.mjs";
@@ -385,6 +391,7 @@ function command(s, u, kind, p) {
       const item = normalizeLearner(p, s, old);
       if (u.role === "Assessor" && item.assessorId !== u.id)
         fail("Assessors can only create or retain their own caseload.", 403);
+      setReviewSeries(s, item, old, p, u, { date, fail });
       if (old) Object.assign(old, item);
       else s.learners.push(item);
       return { learnerId: item.id };
@@ -400,6 +407,7 @@ function command(s, u, kind, p) {
             "Use Assign standard for programme changes so existing records retain their history.",
           );
         const item = normalizeLearner(row, s, old);
+        setReviewSeries(s, item, old, row, u, { date, fail });
         if (old) Object.assign(old, item);
         else s.learners.push(item);
       }
@@ -442,6 +450,7 @@ function command(s, u, kind, p) {
       l.epaDate = "";
       l.gatewayNotes = "";
       l.gatewayBy = "";
+      if (l.initialReviewDate) syncReviewSeries(s, l);
       return { learnerId: l.id };
     }
     case "standard.save": {
@@ -650,12 +659,33 @@ function command(s, u, kind, p) {
         fail(
           "Completed reviews cannot be dated in the future. Schedule a review in the calendar instead.",
         );
+      if (
+        !r.appointmentId &&
+        l.initialReviewDate &&
+        ["Progress review", "Tripartite review", "Gateway review"].includes(
+          r.type,
+        )
+      ) {
+        const occurrence = s.appointments.find(
+          (a) =>
+            a.learnerId === l.id &&
+            a.standardId === l.standardId &&
+            a.source === "ten-week-review" &&
+            a.status === "Planned" &&
+            a.date === r.template.dueDate,
+        );
+        if (occurrence) r.appointmentId = occurrence.id;
+      }
       if (r.appointmentId) {
         const appointment = s.appointments.find(
           (a) => a.id === r.appointmentId && a.learnerId === l.id,
         );
-        if (!appointment || appointment.status === "Cancelled")
-          fail("Scheduled review not found or cancelled.");
+        if (
+          !appointment ||
+          appointment.status === "Cancelled" ||
+          appointment.reviewId
+        )
+          fail("Scheduled review not found, cancelled or already recorded.");
         appointment.status = "Completed";
         appointment.reviewId = r.id;
         appointment.updated = new Date().toISOString();
@@ -682,7 +712,7 @@ function command(s, u, kind, p) {
       });
       s.reviews.push(r);
       l.lastReview = r.date;
-      l.nextReview = r.nextDate;
+      l.nextReview = l.initialReviewDate ? nextSeriesReview(s, l) : r.nextDate;
       break;
     }
     case "review.ack": {
@@ -853,6 +883,7 @@ function command(s, u, kind, p) {
       };
       s.users.push(user);
       password(user.id, pw, true);
+      syncReviewParticipants(s);
       break;
     }
     case "user.resetPassword": {
@@ -878,6 +909,7 @@ function command(s, u, kind, p) {
       if (account.id === u.id && !p.active)
         fail("You cannot deactivate your own account.");
       account.active = p.active;
+      syncReviewParticipants(s);
       if (!p.active) {
         db.prepare("DELETE FROM sessions WHERE user_id=?").run(account.id);
         db.prepare("DELETE FROM password_resets WHERE user_id=?").run(

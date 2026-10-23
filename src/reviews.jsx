@@ -94,7 +94,21 @@ function ReviewForm({ s, user, learner, modal, command, setModal, busy }) {
     })),
   );
   const [date, D] = useState(localDate()),
-    [nextDate, N] = useState("");
+    [nextDate, N] = useState(() =>
+      learner.initialReviewDate
+        ? s.appointments
+            .filter(
+              (a) =>
+                a.learnerId === learner.id &&
+                a.source === "ten-week-review" &&
+                a.status === "Planned" &&
+                a.id !== modal.appointment?.id &&
+                a.date > (modal.appointment?.date || localDate()),
+            )
+            .map((a) => a.date)
+            .sort()[0] || ""
+        : "",
+    );
   const standard = s.standards.find((st) => st.id === learner.standardId),
     assessor = s.users.find((u) => u.id === learner.assessorId);
   const owners = s.users.filter(

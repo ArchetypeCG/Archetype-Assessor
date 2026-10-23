@@ -33,3 +33,17 @@ Saved records expose **View the complete review**, including all answers, target
 ## Shared information
 
 The review follows existing learner access permissions. Employer and apprentice accounts can see reviews for their authorised learner scope. The form explicitly asks for shared support summaries and reporting/follow-up arrangements; confidential disclosures should go through the organisation's safeguarding process. The platform does not automatically send an accident report, ALS referral or safeguarding notification to another organisation or system when a status is selected.
+
+## Automatic reviews every 10 weeks
+
+An administrator opens **Apprentices → select apprentice → Edit apprentice** and sets **Initial 10-week review date** and **Predicted end date**, then saves. The initial date is the first review, followed by one every **70 calendar days**, up to and including the predicted end date. No review is added after the predicted end; an extra review at the course end is not added unless it falls on the 70-day cycle.
+
+One persistent calendar entry is shared by the assigned assessor, linked apprentice accounts and employer accounts for that apprentice's employer. The next six planned automatic reviews also appear in **Reviews Hub**. Participant links are updated when accounts are added/reactivated, disabled, or a learner's assessor/employer changes. Existing learner access checks still apply; another employer cannot access the series.
+
+Initially the date is scheduled with **time and location to be confirmed**. Open the entry in **Calendar** and use **Edit session** to book the time, location, meeting link, agenda and other details. Editing or cancelling an individual occurrence does not move the remaining 10-week dates. Reviews cannot be moved past the predicted course end. Calendar downloads export unbooked entries as transparent date-only events, avoiding an invented meeting time or blocking an entire day.
+
+Changing the initial date or predicted end synchronises the series without duplicating entries. Extending the end adds the additional cycles; shortening it cancels automatic plans outside the new period. Completed reviews and their contents are preserved. An existing review booked on a generated date is reused. Individually cancelled reviews are not silently reopened; cancelled entries are retained as history. Clearing the initial date stops the automatic series, and pausing/completing/withdrawing the learner cancels its open automatic plans. Resuming the active programme restores eligible plans that were automatically retired.
+
+Recording a completed progress/tripartite review from the calendar links it directly. If recording from **Reviews Hub**, the matching scheduled due date is linked automatically. The next-review date advances to the earliest remaining automatic review. Existing reminder emails include due/overdue scheduled reviews when email delivery is configured. This does not send external meeting invitations.
+
+Spreadsheet imports support `initialReviewDate` / `Initial Review Date`. Legacy imports with a new or changed next-review date within the predicted course end can establish the initial series when no initial date is supplied. An explicit blank initial date stops automatic scheduling. The normal initial-date control is restricted to administrators; assessors can book and reschedule individual entries.
