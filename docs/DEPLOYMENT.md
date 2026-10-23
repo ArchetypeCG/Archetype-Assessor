@@ -38,7 +38,7 @@ The persistent disk survives process restarts and normal deployments. Browser vi
 
 Use **one service instance**. SQLite on a persistent disk is a single-instance design. Do not enable multiple replicas or mount the database on several hosts. Larger-scale multi-instance operation requires a separately planned database/object-storage migration and load testing.
 
-If you use a custom domain, configure it in Render, then add `APP_ORIGIN=https://your-domain.example` to the service settings. Otherwise Render's supplied `RENDER_EXTERNAL_URL` is used for request-origin validation. Keep HTTPS and `COOKIE_SECURE=1` enabled.
+If you use a custom domain, configure it in Render, then add `APP_ORIGIN=https://your-domain.example` to the service settings. The configured custom origin and Render's supplied `RENDER_EXTERNAL_URL` are both accepted for sign-in. Keep HTTPS and `COOKIE_SECURE=1` enabled.
 
 ## 4. Calendar and individual learning plans
 
@@ -104,3 +104,17 @@ Open **Audit & quality → Sampling plan** as an IQA or master user. Select an a
 The Render blueprint enables daily email scheduling at 08:00 Europe/London. It uses the same always-on service and persistent database; there is no separate cron-service subscription. Provider credentials and a verified sender are required before email can be sent. Delivery and configuration status appear in master-user Settings. Each user can opt out of morning reminders. [Email settings, delivery checks and recovery behaviour](EMAIL.md).
 
 Fictional learner records remain available in the local training workspace as requested. No migration deletes or rewrites learner evidence. Public training credentials must remain separate from a live database containing real learner information. Removing the on-screen demo banners does not change the security properties of those training accounts.
+
+## Login reports an address / cross-origin error
+
+Open the **same Render web service → Environment → Edit** and add an **environment variable** (not a secret file):
+
+| Key          | Value                                                           |
+| ------------ | --------------------------------------------------------------- |
+| `APP_ORIGIN` | Your complete public URL, for example `https://www.example.org` |
+
+`www.example.org` and `example.org` are separate origins. Use the address actually shown in the browser after any redirect. Do not put `APP_ORIGIN=` into the Value box, and do not enter a password here. Save, rebuild and deploy, and confirm the new deployment is Live before retrying login.
+
+The application accepts both `APP_ORIGIN` and Render's automatically supplied `RENDER_EXTERNAL_URL`; the original Render URL remains available for login while a custom domain is being configured. Password recovery links use the canonical `APP_ORIGIN`. If both your root and `www` addresses must work directly, add the other verified URL to `ADDITIONAL_APP_ORIGINS` (comma-separated HTTPS origins for more than one). Only add addresses you own and have connected to this service; wildcards are rejected. The app does not trust arbitrary forwarded Host headers.
+
+If the error persists, check that the domain is attached under **Settings → Custom Domains** on this same service, that the newest deployment completed successfully, and that the edited variable is present in that service's runtime environment. The error message identifies the browser origin being rejected. Avoid embedding the platform in a Wix iframe; open its dedicated HTTPS address directly.

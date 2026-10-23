@@ -1,4 +1,5 @@
 import http from "node:http";
+import { applicationOrigins } from "./origins.mjs";
 import {
   setReviewSeries,
   syncReviewSeries,
@@ -20,6 +21,7 @@ import {
   createHash,
 } from "node:crypto";
 import { seed, id, derive, roles, today } from "./model.mjs";
+const origins = applicationOrigins();
 const PORT = Number(process.env.PORT || 3000),
   demo = process.env.DEMO_MODE === "1",
   root = resolve("dist"),
@@ -1022,23 +1024,11 @@ const server = http.createServer(async (req, res) => {
           )
         )
           fail("JSON requests required.", 415);
-        if (req.headers.origin) {
-          let origin;
-          try {
-            origin = new URL(req.headers.origin);
-          } catch {
-            fail("Invalid request origin.", 403);
-          }
-          if (
-            process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL
-              ? origin.origin !==
-                new URL(
-                  process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL,
-                ).origin
-              : origin.host !== req.headers.host
-          )
-            fail("Cross-origin requests are not allowed.", 403);
-        }
+        if (
+          req.headers.origin &&
+          !origins.allows(req.headers.origin, req.headers.host)
+        )
+          fail(origins.rejection(req.headers.origin), 403);
       }
       if (path === "/api/health") {
         db.prepare("SELECT 1").get();

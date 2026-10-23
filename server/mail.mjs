@@ -1,5 +1,6 @@
 import { randomBytes, createHash } from "node:crypto";
 import { today, derive } from "./model.mjs";
+import { applicationOrigins } from "./origins.mjs";
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 export function urgentItems(s, u, canSee, day = today()) {
   const learners = s.learners.filter((l) => canSee(u, l)),
@@ -71,7 +72,7 @@ export function createMailService({
   const digestHour = Number(env.MORNING_DIGEST_HOUR ?? 8);
   if (!Number.isInteger(digestHour) || digestHour < 0 || digestHour > 23)
     throw Error("MORNING_DIGEST_HOUR must be an integer from 0 to 23.");
-  const origin = env.APP_ORIGIN || env.RENDER_EXTERNAL_URL;
+  const origin = applicationOrigins(env).primary;
   const configured = !!(
     env.RESEND_API_KEY &&
     env.MAIL_FROM &&
