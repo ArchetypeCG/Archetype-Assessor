@@ -3867,3 +3867,648 @@ footer > span:last-child {
     max-width: 280px;
   }
 }
+/* Shared learning-plan and session detail screens. */
+.learning-plan-banner {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  padding: 24px 26px;
+  background: linear-gradient(130deg, #eff6ff, #fff);
+  border: 1px solid #dbeafe;
+  border-radius: 22px;
+  margin-bottom: 23px;
+}
+.learning-plan-banner > div {
+  flex: 1;
+}
+.learning-plan-banner h2 {
+  font-size: 21px;
+  letter-spacing: -0.6px;
+  color: #172238;
+  margin: 6px 0;
+}
+.learning-plan-banner p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #64748b;
+}
+.learning-plan-banner .programme-icon {
+  width: 49px;
+  height: 49px;
+}
+.session-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 19px;
+  width: 100%;
+  text-align: left;
+  padding: 20px 0;
+  border-bottom: 1px solid #edf2f7;
+}
+.session-card:last-child {
+  border: 0;
+}
+.session-card.cancelled {
+  opacity: 0.65;
+}
+.session-date {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 13px;
+  padding: 13px;
+  min-width: 110px;
+  color: #0071e3;
+}
+.session-date > b {
+  font-size: 11px;
+}
+.session-date > small {
+  font-size: 10px;
+  color: #475569;
+}
+.session-date > svg {
+  margin-bottom: 3px;
+}
+.session-card > div {
+  flex: 1;
+  min-width: 0;
+}
+.session-card .eyebrow {
+  font-size: 8px;
+  line-height: 1.8;
+}
+.session-card h3 {
+  font-size: 16px;
+  color: #172238;
+  line-height: 1.6;
+  margin: 7px 0;
+}
+.session-card p {
+  font-size: 11px;
+  line-height: 1.9;
+  color: #64748b;
+}
+.session-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.session-card-end {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.session-card-end > svg {
+  color: #0071e3;
+}
+.session-codes {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.session-codes > span {
+  font-size: 10px;
+  color: #1e40af;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 7px;
+  padding: 4px 7px;
+}
+.review-deadline {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 19px 0;
+  border-bottom: 1px solid #edf2f7;
+}
+.review-deadline > svg {
+  color: #ca8a04;
+  flex-shrink: 0;
+}
+.review-deadline > div {
+  flex: 1;
+}
+.review-deadline h3 {
+  font-size: 14px;
+  color: #475569;
+}
+.review-deadline p {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 7px;
+}
+.learning-activity {
+  border: 1px solid #e6ecf4;
+  border-radius: 17px;
+  padding: 22px;
+  margin: 18px 0;
+  background: #fdfefe;
+}
+.learning-activity-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 17px;
+  margin-bottom: 18px;
+}
+.learning-activity h3 {
+  font-size: 19px;
+  color: #172238;
+  margin-top: 9px;
+  line-height: 1.5;
+}
+.learning-activity .eyebrow {
+  font-size: 8px;
+}
+.learning-activity > p {
+  font-size: 12px;
+  color: #475569;
+  line-height: 2;
+  margin: 10px 0 19px;
+}
+.learning-activity h4 {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e40af;
+}
+.learning-activity > .button-row {
+  margin-top: 21px;
+}
+.session-resources {
+  display: grid;
+  gap: 9px;
+  margin: 14px 0;
+}
+.session-resources > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: #f4f8ff;
+  border: 1px solid #e0ecff;
+  border-radius: 10px;
+  padding: 13px;
+  font-size: 11px;
+  color: #1e40af;
+}
+.session-resources strong {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+}
+.session-resources a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #0071e3;
+}
+.plan-reflection {
+  border: 1px solid #dbeafe;
+  background: #f4f8ff;
+  padding: 17px;
+  border-radius: 13px;
+  margin: 15px 0;
+}
+.plan-reflection strong {
+  font-size: 11px;
+  color: #1e40af;
+}
+.plan-reflection p {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #475569;
+  margin: 9px 0;
+}
+.plan-reflection small {
+  font-size: 10px;
+  color: #64748b;
+}
+.session-detail-cover {
+  background: linear-gradient(125deg, #06162f, #07396e 60%, #087cc7);
+  border-radius: 18px;
+  padding: 25px;
+  color: white;
+  margin-bottom: 24px;
+}
+.session-detail-cover .eyebrow {
+  color: #bfdbfe;
+}
+.session-detail-cover h3 {
+  font-size: 25px;
+  line-height: 1.4;
+  margin: 12px 0;
+}
+.session-detail-cover p {
+  font-size: 12px;
+  line-height: 2;
+  color: #dbeafe;
+  margin-bottom: 14px;
+}
+.session-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.session-info {
+  padding: 13px 0;
+}
+.session-info h4 {
+  font-size: 12px;
+  color: #1e40af;
+  margin-bottom: 8px;
+}
+.session-info p {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #475569;
+}
+.session-choice-list {
+  border: 1px solid #dbeafe;
+  border-radius: 13px;
+  margin: 14px 0;
+  padding: 14px 16px;
+  max-height: 220px;
+  overflow: auto;
+}
+.session-choice-list legend {
+  font-size: 11px;
+  color: #475569;
+  padding: 0 5px;
+}
+.session-choice-list label {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 11px;
+  line-height: 1.9;
+  padding: 8px 0;
+  color: #475569;
+}
+.session-choice-list input {
+  margin: 0;
+  flex-shrink: 0;
+  position: relative;
+  top: 2px;
+}
+.session-choice-list p {
+  font-size: 11px;
+  color: #64748b;
+}
+.review-extra {
+  padding: 15px 0;
+  border-bottom: 1px solid #edf2f7;
+}
+.review-extra strong {
+  font-size: 11px;
+  color: #1e40af;
+}
+.review-extra p {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.9;
+  margin-top: 7px;
+}
+.temporary-credentials {
+  border: 1px solid #fcd34d;
+  border-radius: 15px;
+  padding: 20px;
+  background: #fffbeb;
+  margin: 20px 0;
+  color: #92400e;
+}
+.temporary-credentials > strong {
+  font-size: 13px;
+}
+.temporary-credentials > p {
+  font-size: 11px;
+  line-height: 1.9;
+  margin: 10px 0;
+  max-width: 650px;
+}
+.temporary-credentials > code {
+  font-size: 17px;
+  letter-spacing: 1px;
+  color: #172238;
+  display: block;
+  overflow-wrap: anywhere;
+  background: white;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 13px;
+  margin: 12px 0;
+}
+.account-action {
+  display: block;
+  font-size: 10px;
+  margin-top: 10px;
+}
+.operational-checks {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.operational-checks > div {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid #e6ecf4;
+  border-radius: 12px;
+  padding: 15px;
+}
+.operational-checks strong {
+  font-size: 11px;
+  color: #334155;
+  flex: 1;
+  font-weight: 600;
+}
+.operational-checks small {
+  font-size: 9px;
+  color: #64748b;
+}
+.operational-ok,
+.operational-pending {
+  display: flex;
+  padding: 5px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #166534;
+  flex-shrink: 0;
+}
+.operational-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+.backup-files {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+.panel:has(.operational-checks) > .button-row {
+  margin: 20px 0;
+}
+.calendar-event.cancelled {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.session-card:focus-visible,
+.learning-activity:focus-within {
+  outline-offset: 4px;
+}
+.modal .form-grid > .wide > .session-choice-list {
+  margin-top: 0;
+}
+.workspace-live:has(+ .demo-chip) {
+  max-width: 230px;
+}
+.production-onboarding {
+  padding: 23px 25px;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  border-radius: 20px;
+  margin-bottom: 24px;
+}
+.production-onboarding h2 {
+  font-size: 20px;
+  color: #172238;
+}
+.production-onboarding p {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #475569;
+  margin: 9px 0 18px;
+}
+.production-onboarding .button-row {
+  gap: 12px;
+}
+@media (max-width: 960px) {
+  .session-detail-grid {
+    gap: 15px;
+  }
+  .operational-checks {
+    grid-template-columns: 1fr;
+  }
+  .session-card-end {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .learning-plan-banner {
+    flex-wrap: wrap;
+  }
+  .learning-plan-banner > div {
+    min-width: 220px;
+  }
+  .session-card {
+    gap: 14px;
+  }
+  .session-date {
+    min-width: 95px;
+    padding: 11px;
+  }
+  .session-card h3 {
+    font-size: 15px;
+  }
+  .learning-activity {
+    padding: 19px;
+  }
+}
+@media (max-width: 700px) {
+  .session-card {
+    display: grid;
+    grid-template-columns: 86px 1fr;
+    gap: 12px;
+    padding: 19px 0;
+  }
+  .session-date {
+    min-width: 0;
+    width: 86px;
+    padding: 10px;
+    gap: 7px;
+    border-radius: 11px;
+  }
+  .session-date > b {
+    font-size: 10px;
+    line-height: 1.7;
+  }
+  .session-date > small {
+    font-size: 9px;
+  }
+  .session-card h3 {
+    font-size: 14px;
+    line-height: 1.6;
+    margin-top: 7px;
+  }
+  .session-card p {
+    font-size: 10px;
+  }
+  .session-card .eyebrow {
+    font-size: 7px;
+  }
+  .session-card-end {
+    grid-column: 2;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  .session-codes > span {
+    font-size: 9px;
+  }
+  .review-deadline {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .review-deadline h3 {
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .review-deadline p {
+    font-size: 10px;
+  }
+  .review-deadline > div {
+    flex-basis: calc(100% - 45px);
+  }
+  .review-deadline .button {
+    margin-left: 33px;
+    font-size: 10px;
+  }
+  .learning-plan-banner {
+    padding: 20px;
+    gap: 14px;
+    border-radius: 20px;
+  }
+  .learning-plan-banner > div {
+    flex-basis: calc(100% - 65px);
+    min-width: 0;
+  }
+  .learning-plan-banner h2 {
+    font-size: 18px;
+    line-height: 1.5;
+  }
+  .learning-plan-banner .eyebrow {
+    font-size: 7px;
+  }
+  .learning-plan-banner p {
+    font-size: 10px;
+  }
+  .learning-plan-banner .programme-icon {
+    width: 42px;
+    height: 45px;
+  }
+  .learning-plan-banner .button {
+    margin-top: 6px;
+    font-size: 10px;
+  }
+  .learning-activity {
+    padding: 17px;
+    border-radius: 15px;
+  }
+  .learning-activity h3 {
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  .learning-activity .eyebrow {
+    font-size: 7px;
+    line-height: 1.9;
+  }
+  .learning-activity-heading {
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .learning-activity > p,
+  .plan-reflection p {
+    font-size: 11px;
+  }
+  .learning-activity .button-row .button {
+    font-size: 9px;
+    gap: 6px;
+    padding: 9px 11px;
+  }
+  .learning-activity .button-row svg {
+    width: 13px;
+  }
+  .session-resources > div {
+    font-size: 10px;
+    gap: 8px;
+    padding: 12px;
+  }
+  .session-resources strong {
+    font-size: 10px;
+    flex-basis: calc(100% - 40px);
+  }
+  .session-resources a {
+    font-size: 9px;
+  }
+  .session-detail-cover {
+    padding: 21px;
+    border-radius: 16px;
+  }
+  .session-detail-cover h3 {
+    font-size: 23px;
+  }
+  .session-detail-cover .eyebrow {
+    font-size: 7px;
+  }
+  .session-detail-cover p {
+    font-size: 11px;
+  }
+  .session-detail-grid {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+  .session-info h4 {
+    font-size: 11px;
+  }
+  .session-info p {
+    font-size: 11px;
+  }
+  .session-choice-list {
+    padding: 12px;
+    max-height: 210px;
+  }
+  .session-choice-list label {
+    font-size: 10px;
+    gap: 9px;
+  }
+  .session-choice-list legend {
+    font-size: 10px;
+  }
+  .review-extra p {
+    font-size: 11px;
+  }
+  .operational-checks > div {
+    padding: 13px;
+    gap: 9px;
+  }
+  .operational-checks strong {
+    font-size: 10px;
+  }
+  .operational-checks small {
+    font-size: 8px;
+  }
+  .temporary-credentials {
+    padding: 17px;
+  }
+  .temporary-credentials > code {
+    font-size: 14px;
+  }
+  .temporary-credentials > p {
+    font-size: 10px;
+  }
+  .production-onboarding {
+    padding: 20px;
+  }
+  .production-onboarding h2 {
+    font-size: 18px;
+  }
+  .production-onboarding p {
+    font-size: 11px;
+  }
+  .production-onboarding .button {
+    font-size: 10px;
+  }
+}

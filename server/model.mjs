@@ -403,6 +403,7 @@ export function seed() {
       },
     ],
     appointments: [],
+    learningPlans: [],
     messages: [],
     quality: [],
     audit: [],

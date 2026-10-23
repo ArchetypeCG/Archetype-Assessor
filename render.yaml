@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: archetype-assessor
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    numInstances: 1
+    disk:
+      name: archetype-persistent-data
+      mountPath: /var/data
+      sizeGB: 10
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DEMO_MODE
+        value: "0"
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: DATA_DIR
+        value: /var/data/archetype
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: BACKUP_ENCRYPTION_KEY
+        generateValue: true
+      - key: BACKUP_RETENTION_DAYS
+        value: "14"

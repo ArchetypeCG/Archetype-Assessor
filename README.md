@@ -22,6 +22,14 @@ A connected apprenticeship portfolio and delivery workspace, modelled on the sup
 
 </details>
 
+## Deploy the live system
+
+[Deploy to Render](https://render.com/deploy?repo=https://github.com/ArchetypeCG/Archetype-Assessor) · [Full deployment, account setup and backup guide](docs/DEPLOYMENT.md)
+
+The Render Blueprint uses a paid single-instance web service and a 10 GB persistent disk. Live mode has no public demo accounts: supply your administrator email/password securely in Render, then set a new password on first login. A generated encryption key protects daily backups. Configure a separate S3-compatible bucket for off-site disaster recovery. Render account setup, payment, credentials and launch are external steps; repository configuration alone does not publish a website.
+
+All authorised devices use the same HTTPS address and server-held database/files. Views refresh automatically while open; changes are not written to browser localStorage. A detailed **Learning plan** now connects objectives, activities, KSBs, resources, learner reflections and scheduled teaching/review sessions. Calendar sessions include agenda, preparation, participants, room/meeting link, start/end time, attendance, outcomes and private staff notes. Accounts support forced initial password changes, manager-issued password recovery and deactivation across devices.
+
 ## Preview in GitHub Codespaces
 
 1. Open this repository on GitHub → **Code → Codespaces → Create codespace on main**.
@@ -102,6 +110,7 @@ read -rs -p 'Initial administrator password (12+ characters): ' ADMIN_PASSWORD
 export ADMIN_PASSWORD
 printf '\n'
 export COOKIE_SECURE=1
+# Also supply BACKUP_ENCRYPTION_KEY securely (32+ characters) for scheduled encrypted backups.
 npm start
 ```
 
@@ -111,8 +120,8 @@ Use an HTTPS reverse proxy and restrict network access to the application port. 
 
 ## Scope and next work
 
-This is a substantial working foundation, **not a certified or complete Smart Assessor replacement**. The supplied HTML is a design/workflow reference, not a production security specification. No original staff passwords or institutional branding from the file were adopted.
+The core workflows have server persistence and production deployment configuration. This is **not a certified or complete Smart Assessor replacement**. The supplied HTML is a design/workflow reference, not a production security specification. No original staff passwords or institutional branding from the file were adopted.
 
-Before real learner use, complete provider-specific requirements and a security/accessibility review, implement malware scanning, operational backups and retention policies, configure official versioned standards and applicable funding rules, and test the deployment. There is no multi-organisation tenancy, SSO/MFA, account invitation/reset email, ILR/MIS/LMS integration, EPA-provider integration, email/SMS/push notifications, live video capture, plagiarism service, or qualified electronic signature. Review acknowledgements are recorded attestations, not qualified signatures. Gateway checks support provider judgement and do not certify funding or assessment eligibility. Automated risk uses configured rules; forecasting uses entered dates, not AI.
+Before real learner use, complete provider-specific requirements and a security/accessibility review, implement malware scanning, off-site backup configuration and retention policies, configure official versioned standards and applicable funding rules, and test the deployment. There is no multi-organisation tenancy, SSO/MFA, account invitation/reset email (master-managed password recovery is available), ILR/MIS/LMS integration, EPA-provider integration, email/SMS/push notifications, live video capture, plagiarism service, or qualified electronic signature. Review acknowledgements are recorded attestations, not qualified signatures. Gateway checks support provider judgement and do not certify funding or assessment eligibility. Automated risk uses configured rules; forecasting uses entered dates, not AI.
 
 See [docs/FEATURES.md](docs/FEATURES.md) for the functional map and remaining parity work.

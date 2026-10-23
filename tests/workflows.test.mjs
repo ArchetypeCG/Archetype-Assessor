@@ -386,7 +386,33 @@ test("snapshots recover records and user roles are scoped to assigned caseloads"
     }),
   });
   assert.equal((await state(login.cookie)).learners.length, 0);
-  const r2 = await command("learner.save", { ...l }, login.cookie);
+  assert.equal(login.data.user.mustChangePassword, true);
+  assert.equal(
+    (await command("learner.save", { ...l }, login.cookie)).status,
+    403,
+  );
+  assert.equal(
+    (
+      await command(
+        "password.change",
+        {
+          current: "LongTestPassword123!",
+          password: "ChangedTestPassword123!",
+        },
+        login.cookie,
+      )
+    ).status,
+    200,
+  );
+  const signedIn = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "other@example.test",
+      password: "ChangedTestPassword123!",
+    }),
+  });
+  assert.equal(signedIn.data.user.mustChangePassword, false);
+  const r2 = await command("learner.save", { ...l }, signedIn.cookie);
   assert.equal(r2.status, 404);
 });
 test("fully verified learner can record gateway readiness and concurrent stale writes cannot overwrite changes", async () => {
@@ -593,5 +619,254 @@ test("legacy records without standard IDs are bound before a programme changes",
     r.data.state.otj
       .filter((e) => e.learnerId === l.id)
       .every((e) => e.standardId === old),
+  );
+});
+
+test("detailed learning plans, linked sessions, shared reflections and private staff notes are permission-scoped", async () => {
+  const s = await state(),
+    l = s.learners[0],
+    resource = s.resources[0].id;
+  let r = await command("plan.save", {
+    learnerId: l.id,
+    title: "Develop stakeholder communication",
+    description: "Workshop followed by supported workplace practice.",
+    objectives:
+      "Explain stakeholder needs and practise appropriate communication.",
+    criteria: ["K1", "S1"],
+    resources: [resource],
+    startDate: today(),
+    due: today(),
+    plannedHours: 2,
+    status: "Planned",
+  });
+  assert.equal(r.status, 200);
+  const plan = r.data.state.learningPlans.at(-1);
+  const learnerCookie = await login("apprentice@archetype.demo");
+  r = await command(
+    "plan.reflect",
+    {
+      learnerId: l.id,
+      id: plan.id,
+      reflection: "I applied the new approach to a workplace conversation.",
+    },
+    learnerCookie,
+  );
+  assert.equal(r.status, 200);
+  assert.equal(r.data.state.learningPlans.at(-1).status, "In progress");
+  const employerCookie = await login("employer@archetype.demo");
+  assert.equal(
+    (await command("plan.save", { learnerId: l.id }, employerCookie)).status,
+    403,
+  );
+  const payload = {
+    learnerId: l.id,
+    title: "Detailed progress, review",
+    type: "Progress review",
+    date: today(),
+    time: "10:00",
+    endTime: "11:00",
+    delivery: "Online",
+    meetingUrl: "https://example.test/meeting",
+    location: "Online meeting",
+    description: "Review evidence and the individual learning plan.",
+    notes: "Discuss progress, support and next steps.",
+    objectives: "Agree two new workplace opportunities.",
+    preparation: "Bring a reflection and recent work.",
+    criteria: ["K1"],
+    resources: [resource],
+    participants: ["manager", "assessor", "apprentice", "employer"],
+    staffNotes: "Private assessment preparation",
+    planId: plan.id,
+  };
+  r = await command("session.save", payload);
+  assert.equal(r.status, 200);
+  const appointment = r.data.state.appointments.at(-1);
+  assert.equal(appointment.planId, plan.id);
+  assert.equal(r.data.state.learningPlans.at(-1).sessionId, appointment.id);
+  assert.equal(r.data.state.learners[0].nextReview, today());
+  assert.equal(appointment.staffNotes, "Private assessment preparation");
+  const learnerState = await state(learnerCookie);
+  assert.ok(learnerState.appointments.some((a) => a.id === appointment.id));
+  assert.equal(
+    learnerState.appointments.find((a) => a.id === appointment.id).staffNotes,
+    undefined,
+  );
+  assert.equal(
+    (
+      await command(
+        "session.save",
+        { ...payload, id: appointment.id },
+        learnerCookie,
+      )
+    ).status,
+    403,
+  );
+  r = await command("session.save", {
+    ...payload,
+    id: appointment.id,
+    notes: "Updated full agenda with learner questions.",
+  });
+  assert.equal(r.status, 200);
+  assert.equal(
+    r.data.state.appointments.filter((a) => a.id === appointment.id).length,
+    1,
+  );
+  assert.equal(
+    r.data.state.appointments.find((a) => a.id === appointment.id).notes,
+    "Updated full agenda with learner questions.",
+  );
+  const exportResponse = await fetch(base + "/api/calendar.ics", {
+    headers: { cookie: learnerCookie },
+  });
+  assert.equal(exportResponse.status, 200);
+  const ics = await exportResponse.text();
+  assert.match(ics, /BEGIN:VCALENDAR/);
+  assert.match(ics, /Detailed progress\\, review/);
+  assert.ok(!ics.includes("Private assessment preparation"));
+  assert.match(ics, new RegExp(`UID:session-${appointment.id}@archetype`));
+  r = await command("review.add", {
+    learnerId: l.id,
+    appointmentId: appointment.id,
+    type: "Tripartite review",
+    date: today(),
+    nextDate: new Date(Date.now() + 28 * 86400000).toISOString().slice(0, 10),
+    text: "Reviewed progress and learning.",
+    actions: "Practise the agreed workplace task.",
+    learnerVoice: "I would like more observation opportunities.",
+    employerVoice: "We will provide supported practice.",
+    wellbeing: "Agreed support discussed with all participants.",
+    nextObjectives: "Capture new evidence.",
+  });
+  assert.equal(r.status, 200);
+  assert.equal(
+    r.data.state.appointments.find((a) => a.id === appointment.id).status,
+    "Completed",
+  );
+  assert.equal(
+    r.data.state.reviews.at(-1).learnerVoice,
+    "I would like more observation opportunities.",
+  );
+});
+test("scheduling rejects invalid mappings, inaccessible participants and invalid time ranges", async () => {
+  const l = (await state()).learners[0],
+    p = {
+      learnerId: l.id,
+      title: "Validation session",
+      date: today(),
+      time: "10:00",
+      endTime: "11:00",
+      criteria: [],
+      resources: [],
+      participants: ["assessor"],
+    };
+  assert.equal(
+    (await command("session.save", { ...p, endTime: "09:00" })).status,
+    400,
+  );
+  assert.equal(
+    (await command("session.save", { ...p, criteria: ["K999"] })).status,
+    400,
+  );
+  assert.equal(
+    (await command("session.save", { ...p, participants: ["not-an-account"] }))
+      .status,
+    400,
+  );
+  assert.equal(
+    (await command("session.save", { ...p, meetingUrl: "javascript:alert(1)" }))
+      .status,
+    400,
+  );
+  assert.equal(
+    (
+      await command("plan.save", {
+        learnerId: l.id,
+        title: "Bad dates",
+        description: "Example",
+        objectives: "Example",
+        criteria: [],
+        resources: [],
+        startDate: "2027-02-02",
+        due: "2027-02-01",
+        plannedHours: 1,
+        status: "Planned",
+      })
+    ).status,
+    400,
+  );
+});
+test("password reset and deactivation invalidate every old session and require a new password", async () => {
+  const cookie = await login("apprentice@archetype.demo");
+  let r = await command("user.resetPassword", { id: "apprentice" });
+  assert.equal(r.status, 200);
+  const temporary = r.data.result.temporaryPassword;
+  assert.equal((await request("/api/state", { cookie })).status, 401);
+  const signed = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: temporary,
+    }),
+  });
+  assert.equal(signed.data.user.mustChangePassword, true);
+  assert.equal((await state(signed.cookie)).learners.length, 0);
+  assert.equal(
+    (
+      await command(
+        "message.send",
+        { to: "manager", text: "Must change first" },
+        signed.cookie,
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await command(
+        "password.change",
+        { current: temporary, password: "NewLearnerPassword123!" },
+        signed.cookie,
+      )
+    ).status,
+    200,
+  );
+  const newLogin = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: "NewLearnerPassword123!",
+    }),
+  });
+  assert.equal(newLogin.data.user.mustChangePassword, false);
+  assert.equal((await state(newLogin.cookie)).learners.length, 1);
+  assert.equal(
+    (await command("user.setActive", { id: "apprentice", active: false }))
+      .status,
+    200,
+  );
+  assert.equal(
+    (await request("/api/state", { cookie: newLogin.cookie })).status,
+    401,
+  );
+  assert.equal(
+    (
+      await request("/api/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: "apprentice@archetype.demo",
+          password: "NewLearnerPassword123!",
+        }),
+      })
+    ).status,
+    401,
+  );
+  assert.equal(
+    (await command("user.setActive", { id: "manager", active: false })).status,
+    400,
+  );
+  assert.equal(
+    (await command("user.setActive", { id: "apprentice", active: true }))
+      .status,
+    200,
   );
 });

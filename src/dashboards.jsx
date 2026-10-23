@@ -218,6 +218,37 @@ function Master({ s, user, go, openLearner, setModal }) {
     .sort((a, b) => a.date.localeCompare(b.date));
   return (
     <div data-dashboard="manager">
+      {!s.learners.length && (
+        <section className="production-onboarding">
+          <h2>Set up your live organisation</h2>
+          <p>
+            Create assessor and IQA accounts, add your verified standards, then
+            enrol apprentices and create their linked login accounts. Your
+            records and files are saved centrally and shared across authorised
+            devices.
+          </p>
+          <div className="button-row">
+            <button className="button" onClick={() => go("Team & caseloads")}>
+              1 · Create team accounts
+            </button>
+            <button
+              className="button secondary"
+              onClick={() => go("Standards & KSBs")}
+            >
+              2 · Add official standards
+            </button>
+            <button
+              className="button secondary"
+              onClick={() => go("Apprentices")}
+            >
+              3 · Enrol apprentices
+            </button>
+            <button className="button secondary" onClick={() => go("Settings")}>
+              Check backups & live storage
+            </button>
+          </div>
+        </section>
+      )}
       <Hero
         eyebrow="WORK-BASED LEARNING INTELLIGENCE"
         title="Delivery Command Centre"
@@ -707,6 +738,12 @@ function Assessor({ s, user, go, openLearner, setModal }) {
             <Nothing>No reviews due in the next 14 days.</Nothing>
           )}
           <div className="dashboard-actions two compact">
+            <Action
+              icon={BookOpen}
+              label="Learning plan"
+              detail="Sessions, objectives & reflections"
+              onClick={() => go("Learning plan")}
+            />
             <Action
               icon={BookOpen}
               label="Resource library"

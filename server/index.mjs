@@ -1,4 +1,6 @@
 import http from "node:http";
+import { createBackupService } from "./backups.mjs";
+import { schedulingCommand, calendarICS } from "./scheduling.mjs";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync, existsSync, statSync } from "node:fs";
 import { resolve, extname } from "node:path";
@@ -13,23 +15,65 @@ const PORT = Number(process.env.PORT || 3000),
   demo = process.env.DEMO_MODE === "1",
   root = resolve("dist"),
   dataDir = resolve(process.env.DATA_DIR || "data");
-mkdirSync(dataDir, { recursive: true });
+process.umask(0o077);
+if (process.env.NODE_ENV === "production") {
+  if (demo) throw Error("Demo accounts cannot run with NODE_ENV=production.");
+  if (process.env.COOKIE_SECURE !== "1" || !process.env.DATA_DIR)
+    throw Error(
+      "Production requires COOKIE_SECURE=1 and an explicit persistent DATA_DIR.",
+    );
+  if (
+    !process.env.BACKUP_ENCRYPTION_KEY ||
+    process.env.BACKUP_ENCRYPTION_KEY.length < 32
+  )
+    throw Error(
+      "Production requires a BACKUP_ENCRYPTION_KEY of at least 32 characters.",
+    );
+  if (
+    process.env.S3_BACKUP_BUCKET &&
+    (!process.env.S3_BACKUP_ACCESS_KEY_ID ||
+      !process.env.S3_BACKUP_SECRET_ACCESS_KEY)
+  )
+    throw Error(
+      "The configured off-site backup bucket requires S3 backup credentials.",
+    );
+}
+mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 const db = new DatabaseSync(resolve(dataDir, "archetype.sqlite"));
 db.exec(
   "PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS workspace (id INTEGER PRIMARY KEY, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS credentials (user_id TEXT PRIMARY KEY, salt TEXT NOT NULL, hash TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY,learner_id TEXT,name TEXT NOT NULL,body BLOB NOT NULL);",
 );
+if (
+  !db
+    .prepare("PRAGMA table_info(credentials)")
+    .all()
+    .some((x) => x.name === "must_change")
+)
+  db.exec(
+    "ALTER TABLE credentials ADD COLUMN must_change INTEGER NOT NULL DEFAULT 0",
+  );
+const backups = createBackupService(db, dataDir);
 const get = () =>
-  JSON.parse(db.prepare("SELECT data FROM workspace WHERE id=1").get().data);
+  (() => {
+    const s = JSON.parse(
+      db.prepare("SELECT data FROM workspace WHERE id=1").get().data,
+    );
+    s.learningPlans ||= [];
+    return s;
+  })();
 const put = (s) =>
   db
     .prepare("INSERT OR REPLACE INTO workspace(id,data) VALUES(1,?)")
     .run(JSON.stringify(s));
-function password(userId, pw) {
+function password(userId, pw, mustChange = false) {
   const salt = randomBytes(16).toString("hex");
-  db.prepare("INSERT OR REPLACE INTO credentials VALUES(?,?,?)").run(
+  db.prepare(
+    "INSERT OR REPLACE INTO credentials(user_id,salt,hash,must_change) VALUES(?,?,?,?)",
+  ).run(
     userId,
     salt,
     scryptSync(pw, salt, 64).toString("hex"),
+    mustChange ? 1 : 0,
   );
 }
 if (!db.prepare("SELECT id FROM workspace WHERE id=1").get()) {
@@ -63,7 +107,11 @@ if (!db.prepare("SELECT id FROM workspace WHERE id=1").get()) {
   }
   put(s);
   for (const u of s.users)
-    password(u.id, demo ? "ArchetypeDemo2026!" : process.env.ADMIN_PASSWORD);
+    password(
+      u.id,
+      demo ? "ArchetypeDemo2026!" : process.env.ADMIN_PASSWORD,
+      !demo,
+    );
 }
 if (!demo && get().users.some((u) => u.email.endsWith("@archetype.demo")))
   throw Error(
@@ -130,14 +178,19 @@ function visible(s, u) {
   const out = {
     ...s,
     users: s.users
-      .filter((x) => x.active)
-      .map(({ id, name, role, email, employer, learnerId }) => ({
+      .filter((x) => u.role === "Manager" || x.active)
+      .map(({ id, name, role, email, employer, learnerId, active }) => ({
         id,
         name,
         role,
-        ...(u.role === "Manager" ? { email, employer, learnerId } : {}),
+        ...(u.role === "Manager" ? { email, employer, learnerId, active } : {}),
       })),
-    learners: ls.map((l) => derive(l, s)),
+    learners: ls.map((l) => ({
+      ...derive(l, s),
+      participantIds: s.users
+        .filter((account) => account.active && canSee(account, l))
+        .map((account) => account.id),
+    })),
     audit: staff.includes(u.role)
       ? s.audit.filter((x) => u.role === "Manager" || ids.has(x.learnerId))
       : [],
@@ -153,8 +206,11 @@ function visible(s, u) {
     "tasks",
     "appointments",
     "quality",
+    "learningPlans",
   ])
     out[k] = s[k].filter((x) => ids.has(x.learnerId));
+  if (!staff.includes(u.role))
+    out.appointments = out.appointments.map(({ staffNotes, ...a }) => a);
   out.messages = s.messages.filter((x) => x.from === u.id || x.to === u.id);
   out.resources = s.resources.filter(
     (x) =>
@@ -265,6 +321,24 @@ function uploadFiles(files, learnerId) {
 function command(s, u, kind, p) {
   let l;
   if (p.learnerId) l = learnerFor(s, u, p.learnerId);
+  const scheduleResult = schedulingCommand({
+    s,
+    u,
+    kind,
+    p,
+    l,
+    fail,
+    requireRole,
+    editors,
+    id,
+    text,
+    optional,
+    choice,
+    date,
+    number,
+    canSee,
+  });
+  if (scheduleResult !== null) return scheduleResult;
   switch (kind) {
     case "learner.save": {
       requireRole(u, editors);
@@ -499,7 +573,30 @@ function command(s, u, kind, p) {
         actions: text(p.actions, "Agreed actions"),
         by: u.id,
         acknowledgements: [],
+        appointmentId: optional(p.appointmentId, 100),
+        location: optional(p.location, 1000),
+        learnerVoice: optional(p.learnerVoice, 10000),
+        employerVoice: optional(p.employerVoice, 10000),
+        wellbeing: optional(p.wellbeing, 10000),
+        nextObjectives: optional(p.nextObjectives, 10000),
       };
+      if (r.date > today())
+        fail(
+          "Completed reviews cannot be dated in the future. Schedule a review in the calendar instead.",
+        );
+      if (r.appointmentId) {
+        const appointment = s.appointments.find(
+          (a) => a.id === r.appointmentId && a.learnerId === l.id,
+        );
+        if (!appointment || appointment.status === "Cancelled")
+          fail("Scheduled review not found or cancelled.");
+        appointment.status = "Completed";
+        appointment.reviewId = r.id;
+        appointment.updated = new Date().toISOString();
+        appointment.outcomeNotes = r.text;
+        appointment.attendance = "Attended";
+        appointment.sequence = (appointment.sequence || 0) + 1;
+      }
       if (r.nextDate <= r.date) fail("Next review must be after this review.");
       s.reviews.push(r);
       l.lastReview = r.date;
@@ -558,23 +655,6 @@ function command(s, u, kind, p) {
         url,
         standardId: p.standardId || "",
         files: uploadFiles(p.files || [], null),
-        by: u.id,
-      });
-      break;
-    }
-    case "appointment.add": {
-      requireRole(u, editors);
-      if (!l) fail("Select a learner.");
-      s.appointments.push({
-        id: id(),
-        learnerId: l.id,
-        title: text(p.title, "Appointment title", 200),
-        date: date(p.date, "appointment date", true),
-        time: /^([01]\d|2[0-3]):[0-5]\d$/.test(p.time)
-          ? p.time
-          : fail("Enter a valid time."),
-        location: optional(p.location, 1000),
-        notes: optional(p.notes),
         by: u.id,
       });
       break;
@@ -664,8 +744,30 @@ function command(s, u, kind, p) {
         ...(role === "Employer" ? { employer: p.employer } : {}),
       };
       s.users.push(user);
-      password(user.id, pw);
+      password(user.id, pw, true);
       break;
+    }
+    case "user.resetPassword": {
+      requireRole(u, ["Manager"]);
+      const account = s.users.find((x) => x.id === p.id && x.active);
+      if (!account) fail("Active account not found.", 404);
+      if (account.id === u.id) fail("Change your own password in Settings.");
+      const temporaryPassword = randomBytes(18).toString("base64url");
+      password(account.id, temporaryPassword, true);
+      db.prepare("DELETE FROM sessions WHERE user_id=?").run(account.id);
+      return { temporaryPassword };
+    }
+    case "user.setActive": {
+      requireRole(u, ["Manager"]);
+      const account = s.users.find((x) => x.id === p.id);
+      if (!account) fail("Account not found.", 404);
+      if (typeof p.active !== "boolean") fail("Invalid account status.");
+      if (account.id === u.id && !p.active)
+        fail("You cannot deactivate your own account.");
+      account.active = p.active;
+      if (!p.active)
+        db.prepare("DELETE FROM sessions WHERE user_id=?").run(account.id);
+      return {};
     }
     case "password.change": {
       const c = db
@@ -703,12 +805,16 @@ function command(s, u, kind, p) {
       const snap = s.snapshots.find((x) => x.id === p.id);
       if (!snap) fail("Snapshot not found.");
       const { users, audit, revision, snapshots } = s;
-      Object.assign(s, JSON.parse(JSON.stringify(snap.data)), {
-        users,
-        audit,
-        revision,
-        snapshots,
-      });
+      Object.assign(
+        s,
+        { learningPlans: [], ...JSON.parse(JSON.stringify(snap.data)) },
+        {
+          users,
+          audit,
+          revision,
+          snapshots,
+        },
+      );
       break;
     }
     default:
@@ -741,6 +847,15 @@ const server = http.createServer(async (req, res) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "same-origin");
   res.setHeader("X-Frame-Options", "DENY");
+  if (process.env.COOKIE_SECURE === "1")
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains",
+    );
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=()",
+  );
   try {
     const path = new URL(req.url, "http://local").pathname;
     if (path.startsWith("/api/")) {
@@ -758,11 +873,21 @@ const server = http.createServer(async (req, res) => {
           } catch {
             fail("Invalid request origin.", 403);
           }
-          if (origin.host !== req.headers.host)
+          if (
+            process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL
+              ? origin.origin !==
+                new URL(
+                  process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL,
+                ).origin
+              : origin.host !== req.headers.host
+          )
             fail("Cross-origin requests are not allowed.", 403);
         }
       }
-      if (path === "/api/health") return json(res, 200, { ok: true });
+      if (path === "/api/health") {
+        db.prepare("SELECT 1").get();
+        return json(res, 200, { ok: true });
+      }
       if (path === "/api/login" && req.method === "POST") {
         const key = req.socket.remoteAddress,
           now = Date.now(),
@@ -803,7 +928,9 @@ const server = http.createServer(async (req, res) => {
           "Set-Cookie",
           `archetype_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${process.env.COOKIE_SECURE === "1" ? "; Secure" : ""}`,
         );
-        return json(res, 200, { user: u });
+        return json(res, 200, {
+          user: { ...u, mustChangePassword: !!c.must_change },
+        });
       }
       if (path === "/api/demo" && req.method === "GET")
         return json(res, 200, {
@@ -846,7 +973,78 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true });
       }
       if (path === "/api/state" && req.method === "GET")
-        return json(res, 200, { user: u, state: visible(s, u), demo });
+        return json(res, 200, {
+          user: {
+            ...u,
+            mustChangePassword: !!db
+              .prepare("SELECT must_change FROM credentials WHERE user_id=?")
+              .get(u.id)?.must_change,
+          },
+          state: db
+            .prepare("SELECT must_change FROM credentials WHERE user_id=?")
+            .get(u.id)?.must_change
+            ? { revision: s.revision, learners: [] }
+            : visible(s, u),
+          demo,
+        });
+      const passwordRequired = !!db
+        .prepare("SELECT must_change FROM credentials WHERE user_id=?")
+        .get(u.id)?.must_change;
+      if (passwordRequired && path !== "/api/command")
+        fail(
+          "Change your temporary password before accessing workspace data.",
+          403,
+        );
+      if (path === "/api/admin/backups" && req.method === "GET") {
+        requireRole(u, ["Manager"]);
+        return json(res, 200, {
+          ...(await backups.status()),
+          production: !demo,
+          secureCookies: process.env.COOKIE_SECURE === "1",
+          persistentDirectoryConfigured: !!process.env.DATA_DIR,
+        });
+      }
+      if (path === "/api/admin/backups" && req.method === "POST") {
+        requireRole(u, ["Manager"]);
+        await body(req);
+        const result = await backups.create();
+        const current = get();
+        current.audit.unshift({
+          id: id(),
+          by: u.id,
+          actor: u.name,
+          role: u.role,
+          action: "backup.create",
+          learnerId: null,
+          date: new Date().toISOString(),
+        });
+        current.revision++;
+        put(current);
+        return json(res, 200, result);
+      }
+      if (path.startsWith("/api/admin/backups/") && req.method === "GET") {
+        requireRole(u, ["Manager"]);
+        const file = await backups.downloadPath(
+          decodeURIComponent(path.split("/").at(-1)),
+        );
+        if (!file) fail("Backup not found.", 404);
+        res.writeHead(200, {
+          "Content-Type": "application/octet-stream",
+          "Content-Disposition":
+            'attachment; filename="' + file.split("/").at(-1) + '"',
+          "Cache-Control": "no-store",
+        });
+        return res.end(readFileSync(file));
+      }
+      if (path === "/api/calendar.ics" && req.method === "GET") {
+        res.writeHead(200, {
+          "Content-Type": "text/calendar; charset=utf-8",
+          "Content-Disposition":
+            'attachment; filename="archetype-calendar.ics"',
+          "Cache-Control": "no-store",
+        });
+        return res.end(calendarICS(visible(s, u)));
+      }
       if (path.startsWith("/api/files/") && req.method === "GET") {
         const fileId = path.split("/").at(-1),
           f = db.prepare("SELECT * FROM files WHERE id=?").get(fileId);
@@ -874,6 +1072,11 @@ const server = http.createServer(async (req, res) => {
       }
       if (path === "/api/command" && req.method === "POST") {
         const p = await body(req);
+        if (passwordRequired && p.kind !== "password.change")
+          fail(
+            "Change your temporary password before making other changes.",
+            403,
+          );
         db.exec("BEGIN IMMEDIATE");
         try {
           const current = get();
@@ -950,3 +1153,17 @@ server.listen(PORT, "0.0.0.0", () =>
     `Archetype API listening on ${PORT}. ${demo ? "Fictional demo accounts enabled." : "Production mode."}`,
   ),
 );
+
+backups.start();
+let closing = false;
+for (const signal of ["SIGTERM", "SIGINT"])
+  process.on(signal, () => {
+    if (closing) return;
+    closing = true;
+    backups.stop();
+    server.close(() => {
+      db.close();
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10000).unref();
+  });

@@ -62,6 +62,12 @@ import RoleDashboard, {
   activeRecord,
 } from "./dashboards";
 import ProgressReport from "./progress-report";
+import {
+  SchedulingWorkspace,
+  LearningPlan,
+  ScheduleDialog,
+} from "./scheduling";
+import { PasswordGate, AccountControls, ProductionStatus } from "./production";
 import "./style.css";
 import "./reference-theme.css";
 const Context = createContext();
@@ -83,6 +89,7 @@ const navGroups = [
     [
       [Layers, "Portfolios"],
       [FileBarChart, "Progress report"],
+      [BookOpen, "Learning plan"],
       [BookOpen, "Standards & KSBs"],
       [Clock, "Off-the-job learning"],
       [FolderOpen, "Resources"],
@@ -134,7 +141,11 @@ function App() {
     [toast, setToast] = useState(""),
     [error, setError] = useState(""),
     [mobile, setMobile] = useState(false),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [connection, setConnection] = useState("online");
+  const modalBase = useRef({ value: null, revision: null });
+  if (modalBase.current.value !== modal)
+    modalBase.current = { value: modal, revision: state?.revision };
   const timer = useRef();
   useEffect(() => {
     refresh();
@@ -143,15 +154,28 @@ function App() {
       .catch(() => {});
     return () => clearTimeout(timer.current);
   }, []);
+  useEffect(() => {
+    if (!user || modal || busy) return;
+    const sync = () => {
+      if (document.visibilityState === "visible") refresh(true);
+    };
+    const interval = setInterval(sync, 20000);
+    window.addEventListener("focus", sync);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", sync);
+    };
+  }, [user?.id, modal, busy]);
   function notify(message) {
     setToast(message);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setToast(""), 4500);
   }
-  async function refresh() {
+  async function refresh(quiet = false) {
     try {
       const r = await api("state");
       setState(r.state);
+      setConnection("online");
       setUser(r.user);
       setLearnerId((x) => x || r.state.learners[0]?.id || "");
       setDemo((d) => ({ ...d, enabled: r.demo }));
@@ -160,7 +184,10 @@ function App() {
       if (e.status === 401) {
         setUser(null);
         setState(null);
-      } else setError(e.message);
+      } else {
+        setConnection("offline");
+        if (!quiet) setError(e.message);
+      }
     }
   }
   async function command(kind, payload) {
@@ -168,13 +195,24 @@ function App() {
     try {
       const r = await api("command", {
         method: "POST",
-        body: JSON.stringify({ kind, payload, revision: state.revision }),
+        body: JSON.stringify({
+          kind,
+          payload,
+          revision: modal ? modalBase.current.revision : state.revision,
+        }),
       });
       setState(r.state);
+      setConnection("online");
       notify("Changes saved to the workspace");
       return r.result;
     } catch (e) {
-      if (e.status === 409) await refresh();
+      if (!e.status) setConnection("offline");
+      if (e.status === 409) {
+        await refresh();
+        if (modal)
+          e.message +=
+            " Your edits remain in this form. Close and reopen the current record before saving again.";
+      }
       if (e.status === 401) {
         setUser(null);
         setState(null);
@@ -217,6 +255,7 @@ function App() {
     notify,
     busy,
     refresh,
+    connection,
   };
   if (!user)
     return (
@@ -232,6 +271,21 @@ function App() {
         error={error}
       />
     );
+  if (user.mustChangePassword)
+    return (
+      <PasswordGate
+        user={user}
+        onChange={async (payload) => {
+          await command("password.change", payload);
+          await refresh();
+        }}
+        onSignOut={async () => {
+          await api("logout", { method: "POST", body: "{}" });
+          setUser(null);
+          setState(null);
+        }}
+      />
+    );
   const restricted = ["Apprentice", "Employer"].includes(user.role);
   const allowed =
     user.role === "Apprentice"
@@ -239,6 +293,7 @@ function App() {
           "Command centre",
           "Portfolios",
           "Progress report",
+          "Learning plan",
           "Standards & KSBs",
           "Off-the-job learning",
           "Resources",
@@ -253,6 +308,7 @@ function App() {
             "Command centre",
             "Apprentices",
             "Progress report",
+            "Learning plan",
             "Action plans",
             "Reviews Hub",
             "Calendar",
@@ -267,6 +323,7 @@ function App() {
               "Action plans",
               "Progress report",
               "Portfolios",
+              "Learning plan",
               "Standards & KSBs",
               "Off-the-job learning",
               "Resources",
@@ -282,6 +339,7 @@ function App() {
                 "Apprentices",
                 "Progress report",
                 "Portfolios",
+                "Learning plan",
                 "Standards & KSBs",
                 "Resources",
                 "Messages",
@@ -359,7 +417,10 @@ function App() {
           <div className="side-bottom">
             <div className="storage-indicator">
               <span />
-              Server connected <small>SQLite · autosaved</small>
+              {connection === "offline"
+                ? "Connection lost"
+                : "Server connected"}{" "}
+              <small>Shared secure records</small>
             </div>
             <button
               className={"nav-link " + (page === "Settings" ? "active" : "")}
@@ -420,7 +481,11 @@ function App() {
             <div className="topbar-right">
               <span className="workspace-live">
                 <i />
-                Live workspace
+                {connection === "offline"
+                  ? "Offline · reconnect to save"
+                  : busy
+                    ? "Saving changes…"
+                    : "Live workspace"}
               </span>
               {demo?.enabled && (
                 <span className="demo-chip">FICTIONAL DEMO DATA</span>
@@ -489,6 +554,12 @@ function App() {
                 )}
               </div>
             </div>
+            {connection === "offline" && (
+              <div className="error-banner" role="status">
+                Connection lost. Changes cannot be saved while offline.
+                Reconnect and refresh before continuing.
+              </div>
+            )}
             {error && <div className="error-banner">{error}</div>}
             {profile ? <LearnerProfile /> : <Page page={page} />}
             <footer>
@@ -502,7 +573,17 @@ function App() {
             </footer>
           </main>
         </div>
-        {modal && <ModalHost key={modal.type + (modal.item?.id || "")} />}{" "}
+        {modal &&
+          (["session", "sessionDetail", "plan", "planReflect"].includes(
+            modal.type,
+          ) ? (
+            <ScheduleDialog
+              key={modal.type + (modal.item?.id || "")}
+              {...ctx}
+            />
+          ) : (
+            <ModalHost key={modal.type + (modal.item?.id || "")} />
+          ))}{" "}
         {toast && (
           <div className="toast" role="status">
             <Check size={17} />
@@ -681,6 +762,8 @@ function Page({ page }) {
       return <Gateway />;
     case "Calendar":
       return <Calendar />;
+    case "Learning plan":
+      return <LearningPlanPage />;
     case "Employers":
       return <Employers />;
     case "Forecasting":
@@ -935,6 +1018,7 @@ function LearnerPicker() {
   );
 }
 function LearnerProfile() {
+  const ctx = useApp();
   const { s, profile, setProfile, go, setModal, user } = useApp(),
     l = s.learners.find((x) => x.id === profile.id);
   if (!l) return <Empty>Learner record unavailable.</Empty>;
@@ -944,6 +1028,7 @@ function LearnerProfile() {
       : [
           "Overview",
           "Evidence",
+          "Learning plan",
           "KSB coverage",
           "Learning hours",
           "Reviews",
@@ -1091,6 +1176,8 @@ function LearnerProfile() {
         </>
       ) : profile.tab === "Evidence" ? (
         <Evidence learner={l} />
+      ) : profile.tab === "Learning plan" ? (
+        <LearningPlan {...ctx} learner={l} />
       ) : profile.tab === "KSB coverage" ? (
         <Coverage learner={l} />
       ) : profile.tab === "Learning hours" ? (
@@ -1715,6 +1802,19 @@ function Reviews({ learner }) {
             <span className="next-date">Next: {fmt(r.nextDate)}</span>
           </div>
           <p className="preserve-text">{r.text}</p>
+          {[
+            ["Learner voice", r.learnerVoice],
+            ["Employer voice", r.employerVoice],
+            ["Wellbeing & support", r.wellbeing],
+            ["Next learning objectives", r.nextObjectives],
+          ]
+            .filter(([, v]) => v)
+            .map(([label, value]) => (
+              <div className="review-extra" key={label}>
+                <strong>{label}</strong>
+                <p className="preserve-text">{value}</p>
+              </div>
+            ))}
           <div className="agreed-actions">
             <strong>Agreed next steps</strong>
             <p>{r.actions}</p>
@@ -2531,143 +2631,16 @@ function Files({ files = [] }) {
   );
 }
 function Calendar() {
-  const { s, user, setModal, openLearner } = useApp(),
-    [month, M] = useState(() => new Date().toISOString().slice(0, 7)),
-    [selected, S] = useState("");
-  const first = new Date(month + "-01T12:00:00"),
-    days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate(),
-    offset = (first.getDay() + 6) % 7;
-  function move(n) {
-    const d = new Date(first);
-    d.setMonth(d.getMonth() + n);
-    M(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-    S("");
-  }
-  const events = [
-      ...s.appointments.map((a) => ({ ...a, source: "appointment" })),
-      ...s.learners
-        .filter((l) => l.nextReview)
-        .map((l) => ({
-          id: l.id,
-          learnerId: l.id,
-          title: "Progress review due",
-          date: l.nextReview,
-          time: "",
-          source: "review",
-        })),
-    ],
-    shown = events
-      .filter((a) =>
-        selected ? a.date === selected : a.date.startsWith(month),
-      )
-      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-  return (
-    <>
-      <Panel
-        title="Calendar & appointments"
-        subtitle="Review deadlines and scheduled appointments · times are Europe/London"
-        action={
-          ["Manager", "Assessor"].includes(user.role) && (
-            <Button onClick={() => setModal({ type: "appointment" })}>
-              <Plus size={15} />
-              Schedule appointment
-            </Button>
-          )
-        }
-      >
-        <div className="calendar-controls">
-          <Button secondary onClick={() => move(-1)}>
-            <ChevronLeft size={16} />
-            Previous
-          </Button>
-          <h3>
-            {first.toLocaleDateString("en-GB", {
-              month: "long",
-              year: "numeric",
-            })}
-          </h3>
-          <Button secondary onClick={() => move(1)}>
-            Next
-            <ChevronRight size={16} />
-          </Button>
-        </div>
-        <div className="calendar-grid labels">
-          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((x) => (
-            <div key={x}>{x}</div>
-          ))}
-        </div>
-        <div className="calendar-grid">
-          {Array.from({ length: offset }, (_, i) => (
-            <div className="calendar-blank" key={"b" + i} />
-          ))}
-          {Array.from({ length: days }, (_, i) => {
-            const d = month + "-" + String(i + 1).padStart(2, "0");
-            return (
-              <button
-                className={
-                  "calendar-day " +
-                  (d === localDate() ? "today " : "") +
-                  (selected === d ? "selected" : "")
-                }
-                key={d}
-                onClick={() => S(selected === d ? "" : d)}
-              >
-                <strong>{i + 1}</strong>
-                {events
-                  .filter((a) => a.date === d)
-                  .slice(0, 3)
-                  .map((a) => (
-                    <span
-                      className={
-                        "calendar-event " +
-                        (a.source === "review" ? "review" : "")
-                      }
-                      key={a.source + a.id}
-                    >
-                      {a.time} {a.title}
-                    </span>
-                  ))}
-              </button>
-            );
-          })}
-        </div>
-      </Panel>
-      <Panel
-        title={
-          selected ? "Appointments · " + fmt(selected) : "This month’s schedule"
-        }
-      >
-        {shown.map((a) => (
-          <div className="schedule-row" key={a.source + a.id}>
-            <div className="icon-tile">
-              <CalendarDays size={19} />
-            </div>
-            <div>
-              <h3>{a.title}</h3>
-              <p>
-                {fmt(a.date)} {a.time} · <LearnerLink id={a.learnerId} />
-              </p>
-              {a.location && <small>{a.location}</small>}
-              {a.notes && <p>{a.notes}</p>}
-            </div>
-            <button
-              className="text-link"
-              onClick={() => openLearner(a.learnerId, "Reviews")}
-            >
-              Open learner <ArrowUpRight size={14} />
-            </button>
-          </div>
-        ))}
-        {!shown.length && <Empty>No appointments in this period.</Empty>}
-      </Panel>
-    </>
-  );
+  return <SchedulingWorkspace {...useApp()} />;
+}
+function LearningPlanPage() {
+  return <LearningPlan {...useApp()} />;
 }
 function Messages() {
   const { s, user, command, notify } = useApp(),
     [recipient, R] = useState(""),
     [pending, P] = useState(false);
-  const users = s.users.filter((x) => x.id !== user.id),
+  const users = s.users.filter((x) => x.id !== user.id && x.active !== false),
     selected = recipient || users[0]?.id || "",
     items = s.messages.filter(
       (m) =>
@@ -2748,7 +2721,9 @@ function Messages() {
               placeholder="Share an update or ask a question…"
             />
             <div className="message-actions">
-              <small>Refresh the workspace to check for replies.</small>
+              <small>
+                Replies sync automatically while the workspace is open.
+              </small>
               <Button disabled={pending || !selected}>
                 <Send size={15} />
                 Send message
@@ -2890,63 +2865,67 @@ function Forecast() {
   );
 }
 function Team() {
-  const { s, user, setModal } = useApp();
+  const ctx = useApp();
+  const { s, user, setModal } = ctx;
   return (
-    <Panel
-      title="Team & caseloads"
-      subtitle="Role-based access is enforced by the server, including learner and employer scoping"
-      action={
-        user.role === "Manager" && (
-          <Button onClick={() => setModal({ type: "user" })}>
-            <Plus size={15} />
-            Add account
-          </Button>
-        )
-      }
-    >
-      <Table
-        headers={[
-          "Team member",
-          "Role",
-          "Caseload",
-          "At-risk learners",
-          "Account",
-        ]}
+    <>
+      <Panel
+        title="Team & caseloads"
+        subtitle="Role-based access is enforced by the server, including learner and employer scoping"
+        action={
+          user.role === "Manager" && (
+            <Button onClick={() => setModal({ type: "user" })}>
+              <Plus size={15} />
+              Add account
+            </Button>
+          )
+        }
       >
-        {s.users.map((u) => {
-          const ls = s.learners.filter(
-            (l) =>
-              u.role === "Manager" ||
-              l.assessorId === u.id ||
-              l.iqaId === u.id ||
-              l.id === u.learnerId ||
-              l.employer === u.employer,
-          );
-          return (
-            <tr key={u.id}>
-              <td>
-                <div className="person-inline">
-                  <span className="avatar cool">{initials(u.name)}</span>
-                  <strong>{u.name}</strong>
-                </div>
-              </td>
-              <td>
-                <Tag tone="blue">
-                  {u.role === "Manager" ? "Master user" : u.role}
-                </Tag>
-              </td>
-              <td>{ls.length}</td>
-              <td>{ls.filter((l) => l.rag === "Red").length}</td>
-              <td>{u.email || "Restricted"}</td>
-            </tr>
-          );
-        })}
-      </Table>
-      <p className="caption">
-        Managers can add accounts and assign assessors/IQAs. User deletion and
-        organisation-level tenancy are not implemented.
-      </p>
-    </Panel>
+        <Table
+          headers={[
+            "Team member",
+            "Role",
+            "Caseload",
+            "At-risk learners",
+            "Account",
+          ]}
+        >
+          {s.users.map((u) => {
+            const ls = s.learners.filter(
+              (l) =>
+                u.role === "Manager" ||
+                l.assessorId === u.id ||
+                l.iqaId === u.id ||
+                l.id === u.learnerId ||
+                l.employer === u.employer,
+            );
+            return (
+              <tr key={u.id}>
+                <td>
+                  <div className="person-inline">
+                    <span className="avatar cool">{initials(u.name)}</span>
+                    <strong>{u.name}</strong>
+                  </div>
+                </td>
+                <td>
+                  <Tag tone="blue">
+                    {u.role === "Manager" ? "Master user" : u.role}
+                  </Tag>
+                </td>
+                <td>{ls.length}</td>
+                <td>{ls.filter((l) => l.rag === "Red").length}</td>
+                <td>{u.email || "Restricted"}</td>
+              </tr>
+            );
+          })}
+        </Table>
+        <p className="caption">
+          Managers can add accounts and assign assessors/IQAs. User deletion and
+          organisation-level tenancy are not implemented.
+        </p>
+      </Panel>
+      <AccountControls {...ctx} />
+    </>
   );
 }
 function Quality() {
@@ -3136,9 +3115,11 @@ function Quality() {
   );
 }
 function SettingsPage() {
-  const { s, user, demo, setModal, notify } = useApp();
+  const ctx = useApp();
+  const { s, user, demo, setModal, notify } = ctx;
   return (
     <>
+      <ProductionStatus {...ctx} />
       <div className="grid two">
         <Panel
           title="Your workspace"
@@ -3484,7 +3465,7 @@ function ModalHost() {
   }, []);
   const userOptions = (role) =>
     s.users
-      .filter((u) => u.role === role)
+      .filter((u) => u.role === role && u.active !== false)
       .map((u) => ({ value: u.id, label: u.name }));
   const standards = s.standards.map((x) => ({
     value: x.id,
@@ -3537,8 +3518,10 @@ function ModalHost() {
         p.id = item.id;
         p.learnerId = item.learnerId;
         p.status = "Returned";
-      } else if (type === "review") kind = "review.add";
-      else if (type === "task") kind = "task.add";
+      } else if (type === "review") {
+        kind = "review.add";
+        if (modal.appointment) p.appointmentId = modal.appointment.id;
+      } else if (type === "task") kind = "task.add";
       else if (type === "resource") {
         kind = "resource.add";
         p.files = await filePayload(form.getAll("files").filter((f) => f.size));
@@ -4151,7 +4134,7 @@ function ModalHost() {
                   label="Review date"
                   name="date"
                   type="date"
-                  defaultValue={localDate()}
+                  defaultValue={modal.appointment?.date || localDate()}
                   required
                 />
                 <Field
@@ -4160,6 +4143,40 @@ function ModalHost() {
                   type="textarea"
                   rows={4}
                   required
+                  wide
+                />
+                <Field
+                  label="Learner voice / feedback"
+                  name="learnerVoice"
+                  type="textarea"
+                  rows={3}
+                  wide
+                />
+                <Field
+                  label="Employer voice / feedback"
+                  name="employerVoice"
+                  type="textarea"
+                  rows={3}
+                  wide
+                />
+                <Field
+                  label="Wellbeing & agreed support (shared with review participants)"
+                  name="wellbeing"
+                  type="textarea"
+                  rows={3}
+                  wide
+                />
+                <Field
+                  label="Next learning objectives"
+                  name="nextObjectives"
+                  type="textarea"
+                  rows={3}
+                  wide
+                />
+                <Field
+                  label="Review location"
+                  name="location"
+                  defaultValue={modal.appointment?.location}
                   wide
                 />
                 <Field
@@ -4465,6 +4482,7 @@ function ModalHost() {
                   label="Role"
                   name="role"
                   type="select"
+                  defaultValue="Assessor"
                   options={[
                     "Manager",
                     "Assessor",
