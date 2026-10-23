@@ -2634,22 +2634,35 @@ function Standards() {
       >
         <div className="standard-cards">
           {library.map((x) => (
-            <button
-              key={x.id}
-              className={"standard-card " + (st?.id === x.id ? "selected" : "")}
-              onClick={() => S(x.id)}
-            >
-              <div className="icon-tile">
-                <BookOpen size={21} />
-              </div>
-              <span>LEVEL {x.level}</span>
-              <h3>{x.name}</h3>
-              <p>{x.reference}</p>
-              <small>
-                {x.criteria.length} KSB criteria · {x.version}
-              </small>
-              <ArrowUpRight size={18} />
-            </button>
+            <div className="standard-card-entry" key={x.id}>
+              <button
+                aria-pressed={st?.id === x.id}
+                className={
+                  "standard-card " + (st?.id === x.id ? "selected" : "")
+                }
+                onClick={() => S(x.id)}
+              >
+                <div className="icon-tile">
+                  <BookOpen size={21} />
+                </div>
+                <span>LEVEL {x.level}</span>
+                <h3>{x.name}</h3>
+                <p>{x.reference}</p>
+                <small>
+                  {x.criteria.length} KSB criteria · {x.version}
+                </small>
+                <ArrowUpRight size={18} />
+              </button>
+              {["Manager", "IQA"].includes(user.role) && (
+                <Button
+                  secondary
+                  onClick={() => setModal({ type: "standard", item: x })}
+                  aria-label={`Edit standard: ${x.name}`}
+                >
+                  Edit standard & KSBs
+                </Button>
+              )}
+            </div>
           ))}
         </div>
         {!s.standards.length && (
@@ -4931,7 +4944,9 @@ function ModalHost() {
                   disabled={
                     pending ||
                     busy ||
-                    (type === "standard" && !parsed.length) ||
+                    (type === "standard" &&
+                      !parsed.length &&
+                      (!item || item.criteria.length > 0 || raw.trim())) ||
                     (type === "import" && !importRows)
                   }
                 >

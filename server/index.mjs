@@ -519,7 +519,7 @@ function command(s, u, kind, p) {
       if (p.id && !existing) fail("Standard not found.", 404);
       if (
         !Array.isArray(p.criteria) ||
-        !p.criteria.length ||
+        (!p.criteria.length && (!existing || existing.criteria.length > 0)) ||
         p.criteria.length > 500
       )
         fail("Provide 1–500 criteria.");

@@ -3551,3 +3551,18 @@ input[type="file"]::file-selector-button {
     }
   }
 }
+
+.standard-card-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.standard-card-entry > .standard-card {
+  width: 100%;
+  flex: 1;
+}
+.standard-card-entry > .button {
+  width: 100%;
+  justify-content: center;
+}

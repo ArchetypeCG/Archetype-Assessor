@@ -1467,3 +1467,45 @@ test("WBL imports require a manager, retain real learners and keep staff tracker
   assert.equal(updated.tracker.fields["DAS COHORT REFERENCE"], undefined);
   assert.equal((await state(apprentice)).learners[0].tracker, undefined);
 });
+
+test("an imported empty standard can have its details edited before KSBs are supplied", async () => {
+  const sheetRows = [
+    ["Pro Ref No", "Apprenticeship Title", "Level"],
+    ["EMPTY-STANDARD-EDIT", "Synthetic empty programme", 3],
+  ];
+  assert.equal(
+    (await command("learners.importTracker", { sheetRows })).status,
+    200,
+  );
+  const current = await state();
+  const st = current.standards.find((x) =>
+    x.name.startsWith("Synthetic empty programme"),
+  );
+  assert.ok(st);
+  assert.equal(
+    (
+      await command("standard.save", {
+        ...st,
+        name: "Updated empty programme",
+        version: "Awaiting KSB schedule",
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await state()).standards.find((x) => x.id === st.id).name,
+    "Updated empty programme",
+  );
+  assert.equal(
+    (
+      await command("standard.save", {
+        name: "Another empty standard",
+        reference: "EMPTY-NEW",
+        level: 3,
+        version: "New",
+        criteria: [],
+      })
+    ).status,
+    400,
+  );
+});
