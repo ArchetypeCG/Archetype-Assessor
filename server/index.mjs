@@ -868,13 +868,29 @@ function command(s, u, kind, p) {
       });
       break;
     }
+    case "task.setStatus":
     case "task.toggle": {
       const t = s.tasks.find((x) => x.id === p.id);
       if (!t) fail("Action not found.", 404);
       learnerFor(s, u, t.learnerId);
       if (!editors.includes(u.role) && t.owner !== u.id)
         fail("Only the owner or assessor can update an action.", 403);
-      t.status = t.status === "Open" ? "Complete" : "Open";
+      const status =
+        kind === "task.setStatus"
+          ? choice(p.status, ["Open", "Complete"], "action status")
+          : ["Complete", "Completed"].includes(t.status)
+            ? "Open"
+            : "Complete";
+      if (t.status !== status) {
+        t.status = status;
+        if (status === "Complete") {
+          t.completedAt = new Date().toISOString();
+          t.completedBy = u.id;
+        } else {
+          delete t.completedAt;
+          delete t.completedBy;
+        }
+      }
       break;
     }
     case "resource.add": {

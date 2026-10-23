@@ -1509,3 +1509,56 @@ test("an imported empty standard can have its details edited before KSBs are sup
     400,
   );
 });
+
+test("action completion is explicit and repeatable, retains the completion record, and supports reopening", async () => {
+  const apprenticeLogin = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: "NewLearnerPassword123!",
+    }),
+  });
+  assert.equal(apprenticeLogin.status, 200);
+  const apprentice = apprenticeLogin.cookie;
+  const learner = (await state(apprentice)).learners[0];
+  assert.equal(
+    (
+      await command("task.add", {
+        learnerId: learner.id,
+        title: "Action status regression",
+        owner: "manager",
+        due: "2026-12-01",
+      })
+    ).status,
+    200,
+  );
+  const task = (await state()).tasks.find(
+    (t) => t.title === "Action status regression",
+  );
+  const payload = { id: task.id, learnerId: learner.id, status: "Complete" };
+  assert.equal(
+    (await command("task.setStatus", payload, apprentice)).status,
+    403,
+  );
+  let r = await command("task.setStatus", payload);
+  assert.equal(r.status, 200);
+  let completed = r.data.state.tasks.find((t) => t.id === task.id);
+  assert.equal(completed.status, "Complete");
+  assert.equal(completed.completedBy, "manager");
+  assert.ok(completed.completedAt);
+  r = await command("task.setStatus", payload);
+  assert.equal(r.status, 200);
+  assert.deepEqual(
+    r.data.state.tasks.find((t) => t.id === task.id),
+    completed,
+  );
+  assert.equal(
+    (await command("task.setStatus", { ...payload, status: "Invalid" })).status,
+    400,
+  );
+  r = await command("task.setStatus", { ...payload, status: "Open" });
+  assert.equal(r.status, 200);
+  const reopened = r.data.state.tasks.find((t) => t.id === task.id);
+  assert.equal(reopened.status, "Open");
+  assert.equal(reopened.completedAt, undefined);
+});

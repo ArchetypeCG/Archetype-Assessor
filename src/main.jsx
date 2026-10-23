@@ -669,6 +669,7 @@ function Tag({ children, tone = "" }) {
       Returned: "amber",
       Rejected: "red",
       Complete: "green",
+      "In progress": "blue",
       Open: "blue",
       Ready: "green",
       "Action required": "red",
@@ -1613,8 +1614,8 @@ function Alerts({ interventions = false }) {
   );
 }
 function Tasks({ learner }) {
-  const { s, user, act, setModal } = useApp(),
-    [filter, F] = useState("Open");
+  const { s, user, command, notify, busy, setModal } = useApp(),
+    [filter, F] = useState("All");
   const items = s.tasks.filter(
     (x) =>
       (!learner || x.learnerId === learner.id) &&
@@ -1642,7 +1643,7 @@ function Tasks({ learner }) {
             key={x}
             onClick={() => F(x)}
           >
-            {x}
+            {x === "Open" ? "In progress" : x}
           </button>
         ))}
       </div>
@@ -1672,18 +1673,36 @@ function Tasks({ learner }) {
               {fmt(t.due)}
             </td>
             <td>
-              <Tag>{t.status}</Tag>
+              <Tag>{t.status === "Open" ? "In progress" : t.status}</Tag>
             </td>
             <td>
               {(["Manager", "Assessor"].includes(user.role) ||
                 t.owner === user.id) && (
                 <button
                   className="text-link"
-                  onClick={() =>
-                    act("task.toggle", { id: t.id, learnerId: t.learnerId })
-                  }
+                  disabled={busy}
+                  aria-label={`${t.status === "Complete" ? "Reopen action" : "Mark complete"}: ${t.title}`}
+                  onClick={async () => {
+                    const status =
+                      t.status === "Complete" ? "Open" : "Complete";
+                    try {
+                      await command("task.setStatus", {
+                        id: t.id,
+                        learnerId: t.learnerId,
+                        status,
+                      });
+                      F("All");
+                      notify(
+                        status === "Complete"
+                          ? "Action marked complete."
+                          : "Action reopened and in progress.",
+                      );
+                    } catch (error) {
+                      notify(error.message);
+                    }
+                  }}
                 >
-                  {t.status === "Open" ? "Complete" : "Reopen"}
+                  {t.status === "Complete" ? "Reopen action" : "Mark complete"}
                   <Check size={14} />
                 </button>
               )}
