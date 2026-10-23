@@ -4,7 +4,7 @@ import { today, derive } from "./model.mjs";
 import { applicationOrigins } from "./origins.mjs";
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 export function urgentItems(s, u, canSee, day = today()) {
-  const learners = s.learners.filter((l) => canSee(u, l)),
+  const learners = s.learners.filter((l) => !l.fictional && canSee(u, l)),
     ids = new Set(learners.map((l) => l.id));
   const items = [];
   for (const t of s.tasks.filter(

@@ -1,4 +1,5 @@
 import http from "node:http";
+import { installUploadedStarter } from "./uploaded-starter.mjs";
 import { validateNewPassword } from "./passwords.mjs";
 import { applicationOrigins } from "./origins.mjs";
 import {
@@ -173,6 +174,24 @@ if (demo && get().users.some((u) => u.email.endsWith("@archetype.demo"))) {
     put(s);
   }
 }
+// The user-requested live starter import runs once, in the same transaction as its marker.
+if (!demo) {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const s = get();
+    const result = installUploadedStarter(s);
+    if (result) {
+      put(s);
+      console.log(
+        "Uploaded standards and fictional practice learners installed.",
+      );
+    }
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
 function fail(message, status = 400) {
   const e = Error(message);
   e.status = status;
@@ -295,6 +314,7 @@ function normalizeLearner(p, s, old) {
     fail("Learner reference already exists.");
   return {
     id: old?.id || id(),
+    ...(old?.fictional ? { fictional: true } : {}),
     ref,
     name: text(p.name, "Learner name", 160),
     email: optional(p.email, 200),

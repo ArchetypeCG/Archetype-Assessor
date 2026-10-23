@@ -142,6 +142,10 @@ test("administrator and assessor passwords survive restart and changed bootstrap
       ).status,
       200,
     );
+    const installed = (await call("/api/state", null, session)).data.state;
+    assert.equal(installed.learners.filter((l) => l.fictional).length, 6);
+    assert.equal(installed.standards.length, 3);
+    const installedIds = installed.learners.map((l) => l.id);
     const marker = (
       await call("/api/state", null, session)
     ).data.state.users.find((u) => u.email === "assessor@example.test").id;
@@ -165,6 +169,12 @@ test("administrator and assessor passwords survive restart and changed bootstrap
         (u) => u.id === marker,
       ),
     );
+    const restarted = (await call("/api/state", null, session)).data.state;
+    assert.deepEqual(
+      restarted.learners.map((l) => l.id),
+      installedIds,
+    );
+    assert.equal(restarted.standards.length, 3);
     const max = "x".repeat(200);
     assert.equal(
       (await command("password.change", { current: chosen, password: max }))
