@@ -1,3 +1,4 @@
+import { sessionHeaders, sessionLink, rotateSessionTab } from "./session";
 import {
   parseTrackerSheet,
   trackerCourseKey,
@@ -124,10 +125,15 @@ const navGroups = [
   ],
 ];
 async function api(path, options = {}) {
+  if (path === "login") rotateSessionTab();
   const res = await fetch("/api/" + path, {
     credentials: "same-origin",
     ...options,
-    headers: { "Content-Type": "application/json", ...options.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...sessionHeaders(),
+      ...options.headers,
+    },
   });
   const out = await res.json();
   if (!res.ok) {
@@ -2801,7 +2807,11 @@ function Files({ files = [] }) {
   return (
     <div className="attachment-list">
       {files.map((f) => (
-        <a key={f.id} href={"/api/files/" + f.id} className="attachment">
+        <a
+          key={f.id}
+          href={sessionLink("/api/files/" + f.id)}
+          className="attachment"
+        >
           <FileText size={15} />
           <span>{f.name}</span>
           <small>{Math.ceil(f.size / 1024)} KB</small>

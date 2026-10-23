@@ -1,3 +1,4 @@
+import { sessionLink } from "./session";
 import React, { useState, useEffect, useRef } from "react";
 import {
   CalendarDays,
@@ -179,7 +180,10 @@ export function SchedulingWorkspace({ s, user, setModal, openLearner }) {
         subtitle="Detailed sessions, review appointments and due dates · all times Europe/London"
         action={
           <div className="button-row">
-            <a className="button secondary" href="/api/calendar.ics">
+            <a
+              className="button secondary"
+              href={sessionLink("/api/calendar.ics")}
+            >
               <Download size={15} />
               Export calendar
             </a>
@@ -667,7 +671,7 @@ function ResourceLinks({ ids = [], s }) {
                 </a>
               )}
               {r.files.map((f) => (
-                <a key={f.id} href={"/api/files/" + f.id}>
+                <a key={f.id} href={sessionLink("/api/files/" + f.id)}>
                   {f.name}
                   <Download size={13} />
                 </a>

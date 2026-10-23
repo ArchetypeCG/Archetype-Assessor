@@ -1,3 +1,4 @@
+import { sessionHeaders, sessionLink } from "./session";
 import React, { useState, useEffect } from "react";
 import {
   ShieldCheck,
@@ -231,7 +232,7 @@ async function call(path, options = {}) {
   const r = await fetch(path, {
     ...options,
     credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
   });
   const data = await r.json();
   if (!r.ok) throw Error(data.error || "Request failed.");
@@ -349,7 +350,9 @@ export function ProductionStatus({ user, notify }) {
             {info.files.slice(0, 7).map((f) => (
               <a
                 className="attachment"
-                href={"/api/admin/backups/" + encodeURIComponent(f.name)}
+                href={sessionLink(
+                  "/api/admin/backups/" + encodeURIComponent(f.name),
+                )}
                 key={f.name}
               >
                 <LockKeyhole size={15} />

@@ -1,9 +1,10 @@
+import { sessionHeaders } from "./session";
 import React, { useState, useEffect } from "react";
 import { Mail, LockKeyhole } from "lucide-react";
 async function request(path, data) {
   const r = await fetch("/api/" + path, {
     method: data ? "POST" : "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...sessionHeaders() },
     ...(data ? { body: JSON.stringify(data) } : {}),
   });
   const result = await r.json();

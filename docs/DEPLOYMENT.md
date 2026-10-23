@@ -148,3 +148,11 @@ The Render production startup check requires a real `/var/data` mount and DATA_D
 Master users can select **Edit access & caseload** in Accounts & caseloads to change an account's name, email, role, apprentice/employer link and assessor/IQA learner assignments. Reassign an assessor/IQA's caseload before changing their role. Administrators cannot remove their own manager role. Access or email changes revoke existing sessions and recovery tokens; passwords are preserved. Deactivation and password recovery remain separate controls.
 
 Managers and IQAs can select **Edit standard & KSBs** in Standards & KSBs. Edits retain the standard ID and existing learner/evidence mappings. Duplicate course versions remain blocked. Criteria mapped in current learner records cannot be removed or renamed; their wording can be corrected. Changes apply across learners assigned to the standard, so review wording carefully. Editing the pasted source requires parsing and reviewing it again before saving.
+
+## Signing in to different accounts in browser tabs
+
+Each new application tab now starts its own sign-in session. Open the website in each tab and sign in with the required account. Reloading a tab retains that tab's session. Signing out of one tab does not sign out other tabs or devices. Following this update, refresh existing tabs and sign in again once.
+
+The browser keeps only a non-secret tab identifier in sessionStorage. Actual session tokens remain in separate HttpOnly, SameSite=Strict cookies (Secure in production); tokens are not stored in JavaScript storage or download URLs. Scoped API calls, files, calendar exports, backups and email settings select the tab's session. Download URLs include a non-secret selector and still require the matching cookie and normal role/learner permissions. Legacy API clients without a tab selector continue to use their existing independent sessions. Invalid or unknown selectors cannot fall back to another account's cookie.
+
+Password changes, password resets, access changes and deactivation continue to invalidate the affected account's sessions as documented. They do not invalidate unrelated accounts. Login failure counters are separated by account and connection, preventing one user's failed attempts from blocking different accounts sharing a Render proxy or network.

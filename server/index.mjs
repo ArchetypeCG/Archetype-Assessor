@@ -1,4 +1,5 @@
 import http from "node:http";
+import { sessionCookieName } from "./session-scope.mjs";
 import { importTracker } from "./tracker-import.mjs";
 import { installUploadedStarter } from "./uploaded-starter.mjs";
 import { validateNewPassword } from "./passwords.mjs";
@@ -1174,7 +1175,11 @@ const server = http.createServer(async (req, res) => {
     "camera=(), microphone=(), geolocation=()",
   );
   try {
-    const path = new URL(req.url, "http://local").pathname;
+    const requestUrl = new URL(req.url, "http://local");
+    const path = requestUrl.pathname;
+    const cookieName = path.startsWith("/api/")
+      ? sessionCookieName(req.headers, requestUrl, req.method)
+      : "archetype_session";
     if (path.startsWith("/api/")) {
       if (req.method !== "GET") {
         if (
@@ -1228,7 +1233,12 @@ const server = http.createServer(async (req, res) => {
         });
       }
       if (path === "/api/login" && req.method === "POST") {
-        const key = req.socket.remoteAddress,
+        const p = await body(req);
+        const email = String(p.email ?? "")
+          .trim()
+          .toLowerCase()
+          .slice(0, 200);
+        const key = `login:${req.socket.remoteAddress}:${email}`,
           now = Date.now(),
           record = attempts.get(key) || { count: 0, until: now + 600000 };
         if (record.until < now) {
@@ -1237,8 +1247,7 @@ const server = http.createServer(async (req, res) => {
         }
         if (record.count >= 30)
           fail("Too many attempts. Try again in 10 minutes.", 429);
-        const p = await body(req),
-          s = get(),
+        const s = get(),
           u = s.users.find(
             (x) =>
               x.email.toLowerCase() === String(p.email).trim().toLowerCase() &&
@@ -1273,7 +1282,7 @@ const server = http.createServer(async (req, res) => {
         );
         res.setHeader(
           "Set-Cookie",
-          `archetype_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${process.env.COOKIE_SECURE === "1" ? "; Secure" : ""}`,
+          `${cookieName}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${process.env.COOKIE_SECURE === "1" ? "; Secure" : ""}`,
         );
         return json(res, 200, {
           user: { ...u, mustChangePassword: !!c.must_change },
@@ -1299,7 +1308,7 @@ const server = http.createServer(async (req, res) => {
       const token = (req.headers.cookie || "")
         .split(";")
         .map((x) => x.trim())
-        .find((x) => x.startsWith("archetype_session="))
+        .find((x) => x.startsWith(cookieName + "="))
         ?.split("=")[1];
       const session = token
         ? db
@@ -1315,7 +1324,7 @@ const server = http.createServer(async (req, res) => {
         db.prepare("DELETE FROM sessions WHERE token=?").run(session.token);
         res.setHeader(
           "Set-Cookie",
-          "archetype_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0",
+          `${cookieName}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${process.env.COOKIE_SECURE === "1" ? "; Secure" : ""}`,
         );
         return json(res, 200, { ok: true });
       }
