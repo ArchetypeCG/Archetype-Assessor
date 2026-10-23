@@ -1,4 +1,5 @@
 import { randomBytes, createHash } from "node:crypto";
+import { validateNewPassword } from "./passwords.mjs";
 import { today, derive } from "./model.mjs";
 import { applicationOrigins } from "./origins.mjs";
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -138,6 +139,7 @@ export function createMailService({
     return { emailQueued: true };
   }
   function redeem(token, pw) {
+    pw = validateNewPassword(pw);
     if (
       typeof token !== "string" ||
       typeof pw !== "string" ||

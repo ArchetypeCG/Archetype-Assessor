@@ -1,4 +1,5 @@
 import http from "node:http";
+import { validateNewPassword } from "./passwords.mjs";
 import { applicationOrigins } from "./origins.mjs";
 import {
   setReviewSeries,
@@ -78,6 +79,7 @@ const put = (s) =>
     .prepare("INSERT OR REPLACE INTO workspace(id,data) VALUES(1,?)")
     .run(JSON.stringify(s));
 function password(userId, pw, mustChange = false) {
+  pw = validateNewPassword(pw);
   const salt = randomBytes(16).toString("hex");
   db.prepare(
     "INSERT OR REPLACE INTO credentials(user_id,salt,hash,must_change) VALUES(?,?,?,?)",
@@ -89,13 +91,15 @@ function password(userId, pw, mustChange = false) {
   );
 }
 if (!db.prepare("SELECT id FROM workspace WHERE id=1").get()) {
-  if (
-    !demo &&
-    (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.length < 12)
-  )
-    throw Error(
-      "First production start requires ADMIN_PASSWORD (at least 12 characters) and optionally ADMIN_EMAIL. Configure these variables before starting the application.",
-    );
+  if (!demo) {
+    try {
+      validateNewPassword(process.env.ADMIN_PASSWORD);
+    } catch {
+      throw Error(
+        "First production start requires ADMIN_PASSWORD (12–200 characters) and optionally ADMIN_EMAIL. Configure these variables before starting the application.",
+      );
+    }
+  }
   const s = seed();
   if (!demo) {
     s.users = [
@@ -117,13 +121,21 @@ if (!db.prepare("SELECT id FROM workspace WHERE id=1").get()) {
     ])
       s[k] = [];
   }
-  put(s);
-  for (const u of s.users)
-    password(
-      u.id,
-      demo ? "ArchetypeDemo2026!" : process.env.ADMIN_PASSWORD,
-      !demo,
-    );
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    put(s);
+    for (const u of s.users)
+      password(
+        u.id,
+        demo ? "ArchetypeDemo2026!" : process.env.ADMIN_PASSWORD,
+        !demo,
+      );
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+  console.log("New workspace initialised; administrator credentials created.");
 }
 if (!demo && get().users.some((u) => u.email.endsWith("@archetype.demo")))
   throw Error(
@@ -861,9 +873,7 @@ function command(s, u, kind, p) {
       )
         fail("Use a unique valid email.");
       const role = choice(p.role, roles, "role");
-      const pw = text(p.password, "Initial password", 200);
-      if (pw.length < 12)
-        fail("Passwords must contain at least 12 characters.");
+      const pw = validateNewPassword(p.password);
       if (
         role === "Apprentice" &&
         !s.learners.some((l) => l.id === p.learnerId)
@@ -939,8 +949,7 @@ function command(s, u, kind, p) {
         )
       )
         fail("Current password is incorrect.");
-      const pw = text(p.password, "New password", 200);
-      if (pw.length < 12) fail("Use at least 12 characters.");
+      const pw = validateNewPassword(p.password);
       password(u.id, pw);
       db.prepare("DELETE FROM password_resets WHERE user_id=?").run(u.id);
       db.prepare("DELETE FROM sessions WHERE user_id=?").run(u.id);
@@ -1088,12 +1097,18 @@ const server = http.createServer(async (req, res) => {
           c = u
             ? db.prepare("SELECT * FROM credentials WHERE user_id=?").get(u.id)
             : null;
+        const validCandidate =
+          typeof p.password === "string" && p.password.length <= 200;
         const hash = scryptSync(
           typeof p.password === "string" ? p.password.slice(0, 200) : "",
           c?.salt || "dummy-salt",
           64,
         );
-        if (!c || !timingSafeEqual(hash, Buffer.from(c.hash, "hex"))) {
+        if (
+          !c ||
+          !validCandidate ||
+          !timingSafeEqual(hash, Buffer.from(c.hash, "hex"))
+        ) {
           record.count++;
           attempts.set(key, record);
           fail("Email or password is incorrect.", 401);

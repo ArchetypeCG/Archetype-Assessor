@@ -143,6 +143,8 @@ function App() {
     [modal, setModal] = useState(null),
     [toast, setToast] = useState(""),
     [error, setError] = useState(""),
+    [signInMessage, setSignInMessage] = useState(""),
+    [signInEmail, setSignInEmail] = useState(""),
     [mobile, setMobile] = useState(false),
     [busy, setBusy] = useState(false),
     [connection, setConnection] = useState("online");
@@ -241,6 +243,16 @@ function App() {
     setMobile(false);
     window.scrollTo({ top: 0 });
   }
+  function finishPasswordChange() {
+    setSignInEmail(user?.email || "");
+    setSignInMessage(
+      "Your password has been saved. Sign in with the new password you just chose; your previous password will no longer work.",
+    );
+    setModal(null);
+    setUser(null);
+    setState(null);
+    setError("");
+  }
   const ctx = {
     s: state,
     user,
@@ -259,6 +271,7 @@ function App() {
     busy,
     refresh,
     connection,
+    finishPasswordChange,
   };
   if (
     !user &&
@@ -270,12 +283,15 @@ function App() {
     return (
       <Login
         demo={demo}
+        message={signInMessage}
+        initialEmail={signInEmail}
         onLogin={async (email, password) => {
           await api("login", {
             method: "POST",
             body: JSON.stringify({ email, password }),
           });
           await refresh();
+          setSignInMessage("");
         }}
         error={error}
       />
@@ -286,7 +302,7 @@ function App() {
         user={user}
         onChange={async (payload) => {
           await command("password.change", payload);
-          await refresh();
+          finishPasswordChange();
         }}
         onSignOut={async () => {
           await api("logout", { method: "POST", body: "{}" });
@@ -3333,10 +3349,10 @@ function SettingsPage() {
     </>
   );
 }
-function Login({ demo, onLogin, error }) {
+function Login({ demo, onLogin, error, message, initialEmail = "" }) {
   const [err, E] = useState(""),
     [busy, B] = useState(false),
-    [email, EM] = useState(""),
+    [email, EM] = useState(initialEmail),
     [pw, PW] = useState("");
   return (
     <div className="reference-login">
@@ -3362,6 +3378,11 @@ function Login({ demo, onLogin, error }) {
           <br />
           One connected picture of learning and progress.
         </p>
+        {message && (
+          <div className="login-password-success" role="status">
+            {message}
+          </div>
+        )}
         <form
           onSubmit={async (e) => {
             e.preventDefault();
@@ -3472,8 +3493,17 @@ function Field({
   );
 }
 function ModalHost() {
-  const { s, user, modal, setModal, command, notify, busy, learnerId } =
-      useApp(),
+  const {
+      s,
+      user,
+      modal,
+      setModal,
+      command,
+      notify,
+      busy,
+      learnerId,
+      finishPasswordChange,
+    } = useApp(),
     [error, E] = useState(""),
     [pending, P] = useState(false),
     [criteria, C] = useState(modal.item?.criteria || []),
@@ -3598,8 +3628,11 @@ function ModalHost() {
         kind = "gateway.record";
         p.learnerId = learner.id;
       } else if (type === "user") kind = "user.add";
-      else if (type === "password") kind = "password.change";
-      else if (type === "import") {
+      else if (type === "password") {
+        if (p.password !== p.confirm)
+          throw Error("The new passwords do not match.");
+        kind = "password.change";
+      } else if (type === "import") {
         kind = "learners.import";
         p.rows = importRows;
       } else if (type === "restore") {
@@ -3608,7 +3641,7 @@ function ModalHost() {
       }
       await command(kind, p);
       setModal(null);
-      if (type === "password") window.location.reload();
+      if (type === "password") finishPasswordChange();
     } catch (e) {
       E(e.message);
     } finally {
@@ -4553,6 +4586,17 @@ function ModalHost() {
                   name="password"
                   type="password"
                   minLength="12"
+                  autoComplete="new-password"
+                  maxLength="200"
+                  required
+                  wide
+                />
+                <Field
+                  label="Confirm new password"
+                  name="confirm"
+                  type="password"
+                  minLength="12"
+                  maxLength="200"
                   autoComplete="new-password"
                   required
                   wide

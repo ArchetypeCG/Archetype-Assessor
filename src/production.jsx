@@ -43,6 +43,12 @@ export function PasswordGate({ user, onChange, onSignOut }) {
             }
           }}
         >
+          <input
+            type="hidden"
+            name="username"
+            autoComplete="username"
+            value={user.email || ""}
+          />
           <label>
             Temporary / current password
             <input
@@ -58,6 +64,7 @@ export function PasswordGate({ user, onChange, onSignOut }) {
               name="password"
               type="password"
               minLength={12}
+              maxLength={200}
               autoComplete="new-password"
               required
             />
@@ -68,6 +75,7 @@ export function PasswordGate({ user, onChange, onSignOut }) {
               name="confirm"
               type="password"
               minLength={12}
+              maxLength={200}
               autoComplete="new-password"
               required
             />

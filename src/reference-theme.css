@@ -5131,3 +5131,13 @@ footer > span:last-child {
   font-size: 11px;
   color: #6b839d;
 }
+.login-password-success {
+  padding: 15px;
+  margin: 18px 0;
+  border: 1px solid #bce5d2;
+  border-radius: 12px;
+  background: #edf9f3;
+  color: #226547;
+  font-size: 13px;
+  line-height: 1.7;
+}
