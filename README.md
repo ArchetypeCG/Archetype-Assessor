@@ -37,6 +37,8 @@ All authorised devices use the same HTTPS address and server-held database/files
 3. In the terminal run `npm run dev`.
 4. Open the browser for **port 5173** from the Ports tab. Keep the port private.
 
+Codespaces startup automatically permits the exact forwarded preview address for sign-in. Use `npm run dev` so both Vite and the API start; do not run Vite alone. After pulling a login/configuration update, stop the old process with **Ctrl+C**, then run `npm run dev` again. Training credentials are listed below.
+
 Outside Codespaces, install **Node.js 24 or newer**, then run:
 
 ```sh

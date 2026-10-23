@@ -1,10 +1,14 @@
 import { spawn } from "node:child_process";
+import { developmentConfig } from "./development-config.mjs";
+const config = developmentConfig();
 const children = [
   spawn(process.execPath, ["--watch", "server/index.mjs"], {
     stdio: "inherit",
     env: {
       ...process.env,
       PORT: "3001",
+      ...(config.origin ? { APP_ORIGIN: config.origin } : {}),
+      COOKIE_SECURE: config.secureCookies,
       DEMO_MODE: process.env.DEMO_MODE ?? "1",
     },
   }),

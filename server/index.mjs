@@ -1023,7 +1023,7 @@ const server = http.createServer(async (req, res) => {
         const p = await body(req),
           s = get(),
           u = s.users.find(
-            (x) => x.email === String(p.email).toLowerCase() && x.active,
+            (x) => x.email.toLowerCase() === String(p.email).trim().toLowerCase() && x.active,
           ),
           c = u
             ? db.prepare("SELECT * FROM credentials WHERE user_id=?").get(u.id)
