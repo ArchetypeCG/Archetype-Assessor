@@ -22,10 +22,11 @@ const dayAfter = (day, days) =>
 // One-time, additive installation. No credential writes and no resetting existing records.
 export function installUploadedStarter(
   s,
-  { day = today(), makeId = id, includeLearners = false } = {},
+  { day = today(), makeId = id, includeLearners = false, force = false } = {},
 ) {
   s.migrations ||= [];
-  if (s.migrations.includes(UPLOADED_STARTER_VERSION)) return null;
+  const alreadyInstalled = s.migrations.includes(UPLOADED_STARTER_VERSION);
+  if (!force && alreadyInstalled) return null;
   for (const key of [
     "standards",
     "learners",
@@ -72,7 +73,7 @@ export function installUploadedStarter(
       s.standards.push(standard);
       result.addedStandards++;
       result.addedCriteria += standard.criteria.length;
-    } else {
+    } else if (!alreadyInstalled) {
       // Preserve any user-authored wording and evidence mappings on matching codes.
       for (const criterion of source.criteria) {
         if (
@@ -122,7 +123,7 @@ export function installUploadedStarter(
       };
       s.learners.push(learner);
       result.addedLearners++;
-      const codes = source.criteria.slice(0, n ? 8 : 4).map((c) => c.code);
+      const codes = standard.criteria.slice(0, n ? 8 : 4).map((c) => c.code);
       for (const [e, code] of codes.entries()) {
         const submitted = e === codes.length - 1;
         s.evidence.push({
@@ -226,7 +227,8 @@ export function installUploadedStarter(
       });
     }
   }
-  s.migrations.push(UPLOADED_STARTER_VERSION);
+  if (!s.migrations.includes(UPLOADED_STARTER_VERSION))
+    s.migrations.push(UPLOADED_STARTER_VERSION);
   s.revision++;
   s.audit.unshift({
     id: makeId(),

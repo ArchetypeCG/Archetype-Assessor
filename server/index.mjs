@@ -1,4 +1,9 @@
 import http from "node:http";
+import {
+  practiceRestoreNeeded,
+  importedLearnerIds,
+  restorePracticeWorkspace,
+} from "./practice-workspace.mjs";
 import { sessionCookieName } from "./session-scope.mjs";
 import { importTracker } from "./tracker-import.mjs";
 import { installUploadedStarter } from "./uploaded-starter.mjs";
@@ -190,6 +195,26 @@ if (!demo) {
   } catch (e) {
     db.exec("ROLLBACK");
     throw e;
+  }
+}
+// Explicitly requested one-time return to fictional practice data. Never reruns on later imports.
+if (!demo && practiceRestoreNeeded(get())) {
+  // Complete the online encrypted backup before opening a write transaction.
+  if (importedLearnerIds(get()).length) await backups.create();
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const s = get();
+    const result = restorePracticeWorkspace(s);
+    if (result) {
+      for (const learnerId of result.removedIds)
+        db.prepare("DELETE FROM files WHERE learner_id=?").run(learnerId);
+      put(s);
+      console.log("Requested fictional practice workspace restored.");
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
   }
 }
 function fail(message, status = 400) {

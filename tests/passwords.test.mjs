@@ -143,7 +143,7 @@ test("administrator and assessor passwords survive restart and changed bootstrap
       200,
     );
     const installed = (await call("/api/state", null, session)).data.state;
-    assert.equal(installed.learners.filter((l) => l.fictional).length, 0);
+    assert.equal(installed.learners.filter((l) => l.fictional).length, 6);
     assert.equal(installed.standards.length, 3);
     const installedIds = installed.learners.map((l) => l.id);
     const marker = (
