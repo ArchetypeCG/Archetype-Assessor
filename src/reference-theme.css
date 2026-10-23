@@ -4751,3 +4751,323 @@ footer > span:last-child {
     display: none;
   }
 }
+/* Structured progress reviews */
+.review-template-dialog {
+  width: min(980px, 96vw);
+  padding: 28px;
+}
+.review-template-dialog .modal-heading p {
+  color: #6c7f99;
+  margin: 8px 0 0;
+}
+.review-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.review-context {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding: 20px;
+  margin: 18px 0;
+  background: #f0f6ff;
+  border: 1px solid #dce8f7;
+  border-radius: 15px;
+}
+.review-context > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.review-context small {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #607c9f;
+}
+.review-context strong {
+  color: #15355d;
+  font-size: 15px;
+}
+.review-context span {
+  color: #647b99;
+  font-size: 12px;
+}
+.review-shared-note {
+  background: #eaf6ff;
+  color: #315a80;
+  padding: 14px 16px;
+  border-left: 3px solid #1685e7;
+  font-size: 12px;
+  line-height: 1.7;
+  border-radius: 8px;
+}
+.review-form-section {
+  margin: 28px 0;
+  padding: 0 0 26px;
+  border-bottom: 1px solid #e2ebf6;
+}
+.review-section-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 0 0 20px;
+}
+.review-section-heading > span {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  background: #e5f1ff;
+  color: #0870e0;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 750;
+}
+.review-section-heading h3 {
+  font-size: 17px;
+  margin: 0;
+  color: #183658;
+}
+.review-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.review-form-grid .wide {
+  grid-column: 1/-1;
+}
+.review-form-grid label,
+.review-apprentice-select label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  color: #244361;
+  font-size: 13px;
+  font-weight: 600;
+}
+.review-form-grid label small,
+.review-apprentice-select label small {
+  color: #6d809b;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.review-form-grid input,
+.review-form-grid textarea,
+.review-form-grid select,
+.review-apprentice-select select {
+  width: 100%;
+  min-width: 0;
+}
+.review-form-grid textarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+.review-check {
+  padding: 16px;
+  background: #f7faff;
+  border: 1px solid #e3ecf6;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.review-target {
+  border: 1px solid #dbe7f5;
+  border-radius: 15px;
+  padding: 20px;
+  background: #fbfdff;
+}
+.review-target-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.review-target-heading h4 {
+  margin: 0;
+  color: #0e67c8;
+}
+.review-agreement {
+  display: flex;
+  gap: 14px;
+  background: #edf6ff;
+  border: 1px solid #d6e8fc;
+  padding: 18px;
+  border-radius: 13px;
+  margin: 20px 0;
+  color: #294d72;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.review-agreement > svg {
+  flex-shrink: 0;
+  color: #0877e7;
+  margin-top: 3px;
+}
+.review-agreement h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.review-agreement p {
+  margin: 4px 0;
+}
+.review-save-row {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 0 0;
+}
+.review-full-record {
+  margin: 20px 0;
+  border: 1px solid #dce7f4;
+  padding: 16px;
+  border-radius: 13px;
+}
+.review-full-record > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #0874e1;
+  font-weight: 650;
+}
+.review-template-details {
+  margin: 20px 0;
+}
+.review-template-details > section {
+  border-bottom: 1px solid #e2eaf5;
+  padding: 14px 0;
+}
+.review-template-details h4 {
+  margin: 0 0 15px;
+  color: #1267c1;
+  font-size: 15px;
+}
+.review-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 22px;
+}
+.review-detail-entry {
+  padding: 8px 0;
+  break-inside: avoid;
+}
+.review-detail-entry > strong {
+  display: block;
+  font-size: 12px;
+  color: #4a6381;
+}
+.review-detail-entry p {
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 5px 0;
+  color: #223d5d;
+}
+.review-detail-target {
+  padding: 15px;
+  margin: 12px 0;
+  background: #f6f9fd;
+  border-radius: 10px;
+  break-inside: avoid;
+}
+.review-detail-target > p {
+  font-size: 12px;
+  color: #647b99;
+}
+.review-agreement-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0;
+}
+@media (max-width: 600px) {
+  .review-template-dialog {
+    padding: 18px;
+  }
+  .review-context,
+  .review-form-grid,
+  .review-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .review-context {
+    padding: 15px;
+    gap: 16px;
+  }
+  .review-check,
+  .review-target {
+    padding: 12px;
+  }
+  .review-section-heading h3 {
+    font-size: 15px;
+  }
+  .review-template-dialog .modal-heading h2 {
+    font-size: 23px;
+  }
+  .review-save-row .button {
+    flex: 1;
+    justify-content: center;
+  }
+}
+@media print {
+  .review-template-details .review-context,
+  .review-detail-target {
+    background: white;
+    border: 1px solid #ddd;
+  }
+  .review-template-details > section {
+    break-inside: auto;
+  }
+  .review-detail-entry {
+    break-inside: avoid;
+  }
+  .review-agreement-status {
+    break-inside: avoid;
+  }
+}
+.review-section-nav {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 10px 0;
+  background: white;
+  position: sticky;
+  top: -28px;
+  z-index: 2;
+  border-bottom: 1px solid #e2eaf5;
+}
+.review-section-nav button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  border: 1px solid #dbe8f7;
+  background: #f7faff;
+  color: #3f648d;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.review-section-nav button:hover {
+  background: #e7f2ff;
+  color: #076ee0;
+}
+.review-section-nav button > span {
+  color: #0874e1;
+}
+.review-form-section {
+  scroll-margin-top: 68px;
+}
+@media (max-width: 600px) {
+  .review-section-nav {
+    top: -18px;
+  }
+}

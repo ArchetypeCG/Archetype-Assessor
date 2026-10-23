@@ -1,3 +1,4 @@
+import { ReviewDetails } from "./reviews";
 import React from "react";
 import {
   Printer,
@@ -32,7 +33,11 @@ export default function ProgressReport({
     logs = s.otj.filter((x) => x.learnerId === l.id && activeRecord(s, x)),
     reviews = s.reviews
       .filter((r) => r.learnerId === l.id)
-      .sort((a, b) => b.date.localeCompare(a.date)),
+      .sort(
+        (a, b) =>
+          b.date.localeCompare(a.date) ||
+          String(b.createdAt || "").localeCompare(a.createdAt || ""),
+      ),
     actions = s.tasks.filter((t) => t.learnerId === l.id),
     isEmployer = user.role === "Employer",
     name = (id) => s.users.find((u) => u.id === id)?.name || "Unassigned";
@@ -281,9 +286,15 @@ export default function ProgressReport({
                 <strong>
                   {reviews[0].type} · {fmt(reviews[0].date)}
                 </strong>
-                <p>{reviews[0].text}</p>
-                <h4>Agreed next steps</h4>
-                <p>{reviews[0].actions}</p>
+                {reviews[0].template ? (
+                  <ReviewDetails review={reviews[0]} />
+                ) : (
+                  <>
+                    <p>{reviews[0].text}</p>
+                    <h4>Agreed next steps</h4>
+                    <p>{reviews[0].actions}</p>
+                  </>
+                )}
                 <small>
                   {reviews[0].acknowledgements.length} participant
                   acknowledgements · recorded by {name(reviews[0].by)}

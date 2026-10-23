@@ -1,4 +1,5 @@
 import http from "node:http";
+import { normalizeReview } from "./reviews.mjs";
 import { samplingCommand } from "./sampling.mjs";
 import { createMailService } from "./mail.mjs";
 import { createBackupService } from "./backups.mjs";
@@ -610,14 +611,32 @@ function command(s, u, kind, p) {
     case "review.add": {
       requireRole(u, editors);
       if (!l) fail("Select a learner.");
+      const template = normalizeReview(p, {
+        s,
+        l,
+        u,
+        text,
+        choice,
+        number,
+        date,
+        fail,
+        canSee,
+      });
       const r = {
+        template,
+        createdAt: new Date().toISOString(),
         id: id(),
         learnerId: l.id,
         date: date(p.date, "review date", true),
         nextDate: date(p.nextDate, "next review date", true),
         type: text(p.type, "Review type", 80),
         text: text(p.text, "Review discussion", 20000),
-        actions: text(p.actions, "Agreed actions"),
+        actions: template.targets
+          .map(
+            (t) =>
+              `${t.category}: ${t.what}\nHow: ${t.how}\nWhy: ${t.why}\nOwner: ${t.ownerName} · Due: ${t.due}`,
+          )
+          .join("\n\n"),
         by: u.id,
         acknowledgements: [],
         appointmentId: optional(p.appointmentId, 100),
@@ -645,6 +664,22 @@ function command(s, u, kind, p) {
         appointment.sequence = (appointment.sequence || 0) + 1;
       }
       if (r.nextDate <= r.date) fail("Next review must be after this review.");
+      r.targetTaskIds = template.targets.map((t) => {
+        const task = {
+          id: id(),
+          learnerId: l.id,
+          title: t.what,
+          description: `How: ${t.how}\nWhy: ${t.why}`,
+          owner: t.owner,
+          due: t.due,
+          status: "Open",
+          by: u.id,
+          reviewId: r.id,
+          category: t.category,
+        };
+        s.tasks.push(task);
+        return task.id;
+      });
       s.reviews.push(r);
       l.lastReview = r.date;
       l.nextReview = r.nextDate;
@@ -658,6 +693,7 @@ function command(s, u, kind, p) {
         r.acknowledgements.push({
           by: u.id,
           role: u.role,
+          name: u.name,
           date: new Date().toISOString(),
         });
       break;
@@ -1023,7 +1059,9 @@ const server = http.createServer(async (req, res) => {
         const p = await body(req),
           s = get(),
           u = s.users.find(
-            (x) => x.email.toLowerCase() === String(p.email).trim().toLowerCase() && x.active,
+            (x) =>
+              x.email.toLowerCase() === String(p.email).trim().toLowerCase() &&
+              x.active,
           ),
           c = u
             ? db.prepare("SELECT * FROM credentials WHERE user_id=?").get(u.id)

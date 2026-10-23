@@ -1,4 +1,5 @@
 import { SamplingPlanner, SamplingDialog } from "./iqa";
+import { ReviewDialog, ReviewDetails } from "./reviews";
 import { EmailSettings, PasswordRecovery } from "./email";
 import React, {
   useState,
@@ -583,6 +584,8 @@ function App() {
               key={modal.type + (modal.item?.id || "")}
               {...ctx}
             />
+          ) : modal.type === "review" ? (
+            <ReviewDialog {...ctx} />
           ) : ["samplingPlan", "samplingFinding"].includes(modal.type) ? (
             <SamplingDialog
               key={modal.type + (modal.item?.id || "")}
@@ -1594,6 +1597,14 @@ function Tasks({ learner }) {
           <tr key={t.id}>
             <td className="wide-cell">
               <strong>{t.title}</strong>
+              {t.description && (
+                <small className="preserve-text">{t.description}</small>
+              )}
+              {t.reviewId && (
+                <small>
+                  SMART target from a progress review · {t.category}
+                </small>
+              )}
             </td>
             <td>
               <LearnerLink id={t.learnerId} />
@@ -1775,11 +1786,15 @@ function Reviews({ learner }) {
     items = s.reviews
       .filter((x) => !learner || x.learnerId === learner.id)
       .slice()
-      .sort((a, b) => b.date.localeCompare(a.date));
+      .sort(
+        (a, b) =>
+          b.date.localeCompare(a.date) ||
+          String(b.createdAt || "").localeCompare(a.createdAt || ""),
+      );
   return (
     <Panel
       title="Progress reviews"
-      subtitle="Discussion, agreed actions, and separate participant acknowledgements"
+      subtitle="Training, support, functional skills, KSBs, SMART targets and three-party agreement"
       action={
         ["Manager", "Assessor"].includes(user.role) && (
           <Button onClick={() => setModal({ type: "review", learner })}>
@@ -1790,7 +1805,7 @@ function Reviews({ learner }) {
       }
     >
       {items.map((r) => (
-        <article className="review-record" key={r.id}>
+        <article className="review-record" data-review-id={r.id} key={r.id}>
           <div className="review-heading">
             <div className="calendar-tile">
               <span>
@@ -1826,10 +1841,55 @@ function Reviews({ learner }) {
             <strong>Agreed next steps</strong>
             <p>{r.actions}</p>
           </div>
+          {r.template && (
+            <details className="review-full-record">
+              <summary>View the complete review</summary>
+              <ReviewDetails review={r} />
+            </details>
+          )}
+          <div className="review-agreement-status">
+            {[
+              ["Apprentice", "Learner"],
+              ["Employer", "Employer"],
+              ["Assessor", "Assessor"],
+            ].map(([role, label]) => (
+              <span
+                key={role}
+                className={
+                  "tag " +
+                  (r.acknowledgements.some(
+                    (a) =>
+                      a.role === role &&
+                      (role !== "Assessor" ||
+                        a.by ===
+                          (r.template?.context.assessorId ||
+                            s.learners.find((l) => l.id === r.learnerId)
+                              ?.assessorId)),
+                  )
+                    ? "green"
+                    : "neutral")
+                }
+              >
+                {label}:{" "}
+                {r.acknowledgements.some(
+                  (a) =>
+                    a.role === role &&
+                    (role !== "Assessor" ||
+                      a.by ===
+                        (r.template?.context.assessorId ||
+                          s.learners.find((l) => l.id === r.learnerId)
+                            ?.assessorId)),
+                )
+                  ? "acknowledged"
+                  : "awaiting acknowledgement"}
+              </span>
+            ))}
+          </div>
           <div className="ack-row">
             {r.acknowledgements.map((a) => (
               <Tag key={a.by} tone="green">
-                {nameOf(s, a.by)} acknowledged · {fmt(a.date)}
+                {a.name || nameOf(s, a.by)} ({a.role}) acknowledged ·{" "}
+                {fmt(a.date)}
               </Tag>
             ))}
             {!r.acknowledgements.some((a) => a.by === user.id) && (
@@ -1840,7 +1900,7 @@ function Reviews({ learner }) {
                 }
               >
                 <CheckCheck size={15} />
-                Acknowledge review
+                Agree & acknowledge review
               </button>
             )}
           </div>
@@ -3388,7 +3448,6 @@ function ModalHost() {
     evidenceDetail: "Evidence & assessment",
     otj: "Record off-the-job learning",
     otjDecision: "Return learning log",
-    review: "Record progress review",
     task: "Create an action",
     standard: "Create apprenticeship standard",
     assignStandard: "Assign apprenticeship standard",
@@ -3487,9 +3546,6 @@ function ModalHost() {
         p.id = item.id;
         p.learnerId = item.learnerId;
         p.status = "Returned";
-      } else if (type === "review") {
-        kind = "review.add";
-        if (modal.appointment) p.appointmentId = modal.appointment.id;
       } else if (type === "task") kind = "task.add";
       else if (type === "resource") {
         kind = "resource.add";
@@ -4081,91 +4137,6 @@ function ModalHost() {
                   required
                   wide
                 />
-              </>
-            )}
-            {type === "review" && (
-              <>
-                {learnerField}
-                <Field
-                  label="Review type"
-                  name="type"
-                  type="select"
-                  options={[
-                    "Progress review",
-                    "Tripartite review",
-                    "Assessment feedback",
-                    "Gateway review",
-                    "One-to-one",
-                    "Workplace visit",
-                  ]}
-                />
-                <Field
-                  label="Review date"
-                  name="date"
-                  type="date"
-                  defaultValue={modal.appointment?.date || localDate()}
-                  required
-                />
-                <Field
-                  label="Discussion, progress & wellbeing"
-                  name="text"
-                  type="textarea"
-                  rows={4}
-                  required
-                  wide
-                />
-                <Field
-                  label="Learner voice / feedback"
-                  name="learnerVoice"
-                  type="textarea"
-                  rows={3}
-                  wide
-                />
-                <Field
-                  label="Employer voice / feedback"
-                  name="employerVoice"
-                  type="textarea"
-                  rows={3}
-                  wide
-                />
-                <Field
-                  label="Wellbeing & agreed support (shared with review participants)"
-                  name="wellbeing"
-                  type="textarea"
-                  rows={3}
-                  wide
-                />
-                <Field
-                  label="Next learning objectives"
-                  name="nextObjectives"
-                  type="textarea"
-                  rows={3}
-                  wide
-                />
-                <Field
-                  label="Review location"
-                  name="location"
-                  defaultValue={modal.appointment?.location}
-                  wide
-                />
-                <Field
-                  label="Agreed actions / next steps"
-                  name="actions"
-                  type="textarea"
-                  rows={3}
-                  required
-                  wide
-                />
-                <Field
-                  label="Next review due"
-                  name="nextDate"
-                  type="date"
-                  required
-                />
-                <p className="caption wide">
-                  Saving updates the learner’s last and next review dates. Each
-                  participant can acknowledge the record from their own account.
-                </p>
               </>
             )}
             {type === "task" && (

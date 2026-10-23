@@ -1,3 +1,4 @@
+import { reviewPayload } from "./support/review-fixture.mjs";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -258,6 +259,11 @@ test("learning hours require assessor approval; reviews and separate acknowledge
     .toISOString()
     .slice(0, 10);
   r = await command("review.add", {
+    ...reviewPayload(
+      l,
+      today(),
+      new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10),
+    ),
     learnerId: l.id,
     type: "Tripartite review",
     date: today(),
@@ -725,6 +731,11 @@ test("detailed learning plans, linked sessions, shared reflections and private s
   assert.ok(!ics.includes("Private assessment preparation"));
   assert.match(ics, new RegExp(`UID:session-${appointment.id}@archetype`));
   r = await command("review.add", {
+    ...reviewPayload(
+      l,
+      today(),
+      new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10),
+    ),
     learnerId: l.id,
     appointmentId: appointment.id,
     type: "Tripartite review",
@@ -984,4 +995,127 @@ test("IQA sampling plans preselect KSBs and evidence, enforce coverage and hide 
     criteria: [{ code: "K1", type: "Knowledge", text: "Duplicate course" }],
   });
   assert.equal(other.status, 400);
+});
+
+test("complete review snapshots programme context, creates owned SMART actions, and persists all template sections", async () => {
+  const s = await state(),
+    l = s.learners[0],
+    day = today(),
+    nextDate = new Date(Date.now() + 28 * 86400000).toISOString().slice(0, 10),
+    p = reviewPayload(l, day, nextDate);
+  p.template.context = {
+    learnerName: "Untrusted name",
+    approvedOffJobHours: 99999,
+    verifiedProgress: 100,
+  };
+  p.template.checks.accident = {
+    answer: "Yes",
+    details: "Follow organisational reporting and catch-up arrangements.",
+  };
+  p.template.accidentDays = 2;
+  p.template.accidentReport = "Completed";
+  p.template.checks.roleChanged = {
+    answer: "Yes",
+    details: "Supervisor change recorded and induction arranged.",
+  };
+  p.template.induction = "Pending";
+  p.template.checks.alsRequested = {
+    answer: "Yes",
+    details: "Learning support referral agreed.",
+  };
+  p.template.alsReferral = "Requested";
+  const r = await command("review.add", p);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const saved = r.data.state.reviews.at(-1);
+  assert.equal(saved.template.context.learnerName, l.name);
+  assert.equal(saved.template.context.approvedOffJobHours, l.hours);
+  assert.equal(saved.template.context.verifiedProgress, l.progress);
+  assert.equal(saved.template.responses.english, p.template.responses.english);
+  assert.equal(
+    saved.template.checks.accident.details,
+    p.template.checks.accident.details,
+  );
+  assert.equal(saved.template.induction, "Pending");
+  assert.equal(saved.template.alsReferral, "Requested");
+  assert.equal(saved.template.accidentDays, 2);
+  assert.equal(saved.acknowledgements.length, 0);
+  const tasks = r.data.state.tasks.filter((t) => t.reviewId === saved.id);
+  assert.equal(tasks.length, 2);
+  assert.deepEqual(
+    tasks.map((t) => t.id),
+    saved.targetTaskIds,
+  );
+  assert(
+    tasks.every(
+      (t) =>
+        t.owner === l.assessorId && t.due === nextDate && t.status === "Open",
+    ),
+  );
+  assert.equal(
+    (await state()).reviews.at(-1).template.responses.trainingImpact,
+    p.template.responses.trainingImpact,
+  );
+  const foreignCookie = await login("employer@archetype.demo");
+  const foreign = (await state(foreignCookie)).reviews.find(
+    (x) => x.id === saved.id,
+  );
+  if (l.employer === "Northstar Digital") assert(foreign);
+  else assert(!foreign);
+  const assessorCookie = await login("assessor@archetype.demo");
+  const acknowledged = await command(
+    "review.ack",
+    {
+      id: saved.id,
+      learnerId: l.id,
+      by: "apprentice",
+      name: "Untrusted signature",
+      role: "Apprentice",
+    },
+    assessorCookie,
+  );
+  assert.equal(acknowledged.status, 200);
+  const signature = acknowledged.data.state.reviews.find(
+    (x) => x.id === saved.id,
+  ).acknowledgements[0];
+  assert.equal(signature.role, "Assessor");
+  assert.equal(signature.name, s.users.find((u) => u.id === l.assessorId).name);
+});
+test("review completion rejects missing coverage, unexplained concerns, invalid owners and targets outside the review period atomically", async () => {
+  const l = (await state()).learners[0],
+    day = today(),
+    next = new Date(Date.now() + 28 * 86400000).toISOString().slice(0, 10),
+    valid = reviewPayload(l, day, next);
+  const before = await state();
+  const incomplete = structuredClone(valid);
+  delete incomplete.template.responses.safeguardingPrevent;
+  assert.equal((await command("review.add", incomplete)).status, 400);
+  const concern = structuredClone(valid);
+  concern.template.checks.workplaceIssues = { answer: "Yes", details: "" };
+  assert.equal((await command("review.add", concern)).status, 400);
+  const dates = structuredClone(valid);
+  dates.template.targets[0].due = day;
+  assert.equal((await command("review.add", dates)).status, 400);
+  const owner = structuredClone(valid);
+  owner.template.targets[0].owner = "missing-user";
+  assert.equal((await command("review.add", owner)).status, 400);
+  const category = structuredClone(valid);
+  category.template.targets[1].category = "Maths";
+  assert.equal((await command("review.add", category)).status, 400);
+  const missingReferral = structuredClone(valid);
+  missingReferral.template.checks.alsRequested = {
+    answer: "Yes",
+    details: "Support required",
+  };
+  assert.equal((await command("review.add", missingReferral)).status, 400);
+  const legacy = { ...valid };
+  delete legacy.templateVersion;
+  delete legacy.template;
+  assert.equal((await command("review.add", legacy)).status, 400);
+  const after = await state();
+  assert.equal(after.reviews.length, before.reviews.length);
+  assert.equal(after.tasks.length, before.tasks.length);
+  assert.equal(
+    after.learners.find((x) => x.id === l.id).nextReview,
+    before.learners.find((x) => x.id === l.id).nextReview,
+  );
 });
