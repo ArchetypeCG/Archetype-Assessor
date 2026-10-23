@@ -2660,7 +2660,17 @@ function Standards() {
         </Panel>
       )}
       {st && (
-        <Panel title={st.name + " · criteria"} subtitle={st.version}>
+        <Panel
+          title={st.name + " · criteria"}
+          subtitle={st.version}
+          action={
+            ["Manager", "IQA"].includes(user.role) && (
+              <Button onClick={() => setModal({ type: "standard", item: st })}>
+                Edit standard & KSBs
+              </Button>
+            )
+          }
+        >
           <Table headers={["Code", "Type", "Full criterion wording"]}>
             {st.criteria.map((c) => (
               <tr key={c.code}>
@@ -3040,14 +3050,24 @@ function Team() {
                 </td>
                 <td>{ls.length}</td>
                 <td>{ls.filter((l) => l.rag === "Red").length}</td>
-                <td>{u.email || "Restricted"}</td>
+                <td>
+                  {u.email || "Restricted"}
+                  {user.role === "Manager" && (
+                    <button
+                      className="text-link"
+                      onClick={() => setModal({ type: "user", item: u })}
+                    >
+                      Edit access & caseload
+                    </button>
+                  )}
+                </td>
               </tr>
             );
           })}
         </Table>
         <p className="caption">
-          Managers can add accounts and assign assessors/IQAs. User deletion and
-          organisation-level tenancy are not implemented.
+          Manage account roles, linked learners and employers, and assessor/IQA
+          caseloads.
         </p>
       </Panel>
       <AccountControls {...ctx} />
@@ -3507,8 +3527,16 @@ function ModalHost() {
     [error, E] = useState(""),
     [pending, P] = useState(false),
     [criteria, C] = useState(modal.item?.criteria || []),
-    [raw, RAW] = useState(""),
-    [parsed, PARSED] = useState([]),
+    [raw, RAW] = useState(
+      modal.type === "standard"
+        ? (modal.item?.criteria || [])
+            .map((c) => `${c.code}: ${c.text}`)
+            .join("\n")
+        : "",
+    ),
+    [parsed, PARSED] = useState(
+      modal.type === "standard" ? modal.item?.criteria || [] : [],
+    ),
     [importRows, IR] = useState(null),
     [importError, IE] = useState("");
   const ref = useRef(null);
@@ -3521,13 +3549,13 @@ function ModalHost() {
     otj: "Record off-the-job learning",
     otjDecision: "Return learning log",
     task: "Create an action",
-    standard: "Create apprenticeship standard",
+    standard: item ? "Edit standard & KSBs" : "Create apprenticeship standard",
     assignStandard: "Assign apprenticeship standard",
     resource: "Add learning resource",
     appointment: "Schedule appointment",
     quality: "Record IQA sample",
     gateway: "Gateway readiness",
-    user: "Add workspace account",
+    user: item ? "Edit account access & caseload" : "Add workspace account",
     password: "Change your password",
     import: "Import apprentice records",
     restore: "Restore recovery snapshot",
@@ -3612,6 +3640,7 @@ function ModalHost() {
       } else if (type === "standard") {
         kind = "standard.save";
         p.criteria = parsed;
+        if (item) p.id = item.id;
       } else if (type === "otj") kind = "otj.add";
       else if (type === "otjDecision") {
         kind = "otj.decide";
@@ -3627,8 +3656,11 @@ function ModalHost() {
       else if (type === "gateway") {
         kind = "gateway.record";
         p.learnerId = learner.id;
-      } else if (type === "user") kind = "user.add";
-      else if (type === "password") {
+      } else if (type === "user") {
+        kind = item ? "user.update" : "user.add";
+        if (item) p.id = item.id;
+        p.caseload = form.getAll("caseload");
+      } else if (type === "password") {
         if (p.password !== p.confirm)
           throw Error("The new passwords do not match.");
         kind = "password.change";
@@ -4276,16 +4308,23 @@ function ModalHost() {
             )}
             {type === "standard" && (
               <>
-                <Field label="Standard title" name="name" required />
+                <Field
+                  label="Standard title"
+                  name="name"
+                  defaultValue={item?.name}
+                  required
+                />
                 <Field
                   label="Reference"
                   name="reference"
+                  defaultValue={item?.reference}
                   placeholder="ST reference"
                   required
                 />
                 <Field
                   label="Version"
                   name="version"
+                  defaultValue={item?.version}
                   placeholder="Version / effective date"
                   required
                 />
@@ -4294,14 +4333,17 @@ function ModalHost() {
                   name="level"
                   type="select"
                   options={["2", "3", "4", "5", "6", "7"]}
-                  defaultValue="3"
+                  defaultValue={item?.level || "3"}
                 />
                 <label className="wide">
                   Paste official KSB criteria
                   <textarea
                     rows={10}
                     value={raw}
-                    onChange={(e) => RAW(e.target.value)}
+                    onChange={(e) => {
+                      RAW(e.target.value);
+                      PARSED([]);
+                    }}
                     placeholder={
                       "K1: Full knowledge criterion wording\nS1: Full skill criterion wording\nB1: Full behaviour criterion wording"
                     }
@@ -4323,8 +4365,10 @@ function ModalHost() {
                   Parse & preview criteria
                 </Button>
                 <p className="caption wide">
-                  Review every extracted criterion before saving. The parser is
-                  a formatting aid; it does not validate an official standard.
+                  Edits apply to all apprentices assigned to this standard. Used
+                  criterion codes cannot be removed or renamed. Review every
+                  extracted criterion before saving. The parser is a formatting
+                  aid; it does not validate an official standard.
                 </p>
                 {parsed.length > 0 && (
                   <div className="wide parsed-criteria">
@@ -4522,10 +4566,16 @@ function ModalHost() {
             )}
             {type === "user" && (
               <>
-                <Field label="Full name" name="name" required />
+                <Field
+                  label="Full name"
+                  name="name"
+                  defaultValue={item?.name}
+                  required
+                />
                 <Field
                   label="Email address"
                   name="email"
+                  defaultValue={item?.email}
                   type="email"
                   required
                 />
@@ -4533,7 +4583,7 @@ function ModalHost() {
                   label="Role"
                   name="role"
                   type="select"
-                  defaultValue="Assessor"
+                  defaultValue={item?.role || "Assessor"}
                   options={[
                     "Manager",
                     "Assessor",
@@ -4542,32 +4592,60 @@ function ModalHost() {
                     "Employer",
                   ]}
                 />
-                <Field
-                  label="Initial password"
-                  name="password"
-                  type="password"
-                  minLength="12"
-                  autoComplete="new-password"
-                  required
-                />
+                {!item && (
+                  <Field
+                    label="Initial password"
+                    name="password"
+                    type="password"
+                    minLength="12"
+                    autoComplete="new-password"
+                    required
+                  />
+                )}
                 <Field
                   label="Linked apprentice (apprentice role only)"
                   name="learnerId"
+                  defaultValue={item?.learnerId}
                   type="select"
                   options={[{ value: "", label: "Not linked" }, ...learners]}
                 />
                 <Field
                   label="Employer organisation (employer role only)"
                   name="employer"
+                  defaultValue={item?.employer}
                   type="select"
                   options={[
                     { value: "", label: "Not linked" },
                     ...[...new Set(s.learners.map((l) => l.employer))],
                   ]}
                 />
+                {item && (
+                  <fieldset className="wide">
+                    <legend>Assessor / IQA caseload</legend>
+                    <p>
+                      Selecting a learner reassigns their assessor or IQA to
+                      this account. Other roles use the linked learner or
+                      employer above.
+                    </p>
+                    {s.learners.map((l) => (
+                      <label key={l.id}>
+                        <input
+                          type="checkbox"
+                          name="caseload"
+                          value={l.id}
+                          defaultChecked={
+                            l.assessorId === item.id || l.iqaId === item.id
+                          }
+                        />
+                        {l.name}
+                      </label>
+                    ))}
+                  </fieldset>
+                )}
                 <p className="caption wide">
-                  Use a unique initial password of at least 12 characters. Share
-                  it securely. The account owner can change it in Settings.
+                  Account edits keep the existing password. Changes to access or
+                  email sign the user out. New accounts must change their
+                  initial password.
                 </p>
               </>
             )}

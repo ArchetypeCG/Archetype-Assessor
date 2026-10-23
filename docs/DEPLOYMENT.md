@@ -130,3 +130,21 @@ Do not delete the database, delete/recreate a disk, change the data directory, o
 New accounts and the first administrator must choose their own password once. Saving it signs out existing sessions; the login screen confirms the change and asks for the newly chosen password. The initial Render password is no longer the sign-in password after that change. Updating a normal account password in Settings requires matching confirmation.
 
 All password-setting paths preserve spaces and Unicode exactly and enforce the same 12–200 character limit. Earlier versions trimmed leading/trailing spaces on account creation and password changes, although email recovery preserved them. The fix prevents that inconsistency; it does not guess or silently rewrite existing password hashes. If a password created under the earlier flow cannot be recalled, use the normal email recovery flow to choose a known new password.
+
+
+## Existing Render service losing records after deploys
+
+An administrator password reverting to the bootstrap password **together with missing records** strongly suggests that the application has been starting against an empty database. A missing persistent disk or a DATA_DIR pointing outside it can cause this. The live service configuration must be checked to confirm the cause; the presence of render.yaml in GitHub alone does not attach storage to a manually created service.
+
+1. Pause automatic deploys while diagnosing. Before changing environment variables, attaching a new disk or redeploying, preserve any surviving records: download an encrypted backup from Settings & export and retain the matching BACKUP_ENCRYPTION_KEY securely. If login is unavailable, use normal password recovery or an owner-controlled Render Shell to obtain a consistent SQLite backup; copying only a live WAL database file can omit recent writes.
+2. Under the existing Render service → Disks, verify that a persistent disk is actually attached at `/var/data`. Under Environment, verify `DATA_DIR=/var/data/archetype`. An environment variable does not create a disk. Attaching a new blank disk does not migrate the old database.
+3. If migration is required, restore the saved encrypted backup into an unused location on the attached disk using the documented restore script, then configure DATA_DIR to its directory. Do not overwrite an existing database. Recovery needs a separate safe maintenance process with the disk mounted; the application deliberately refuses to start with missing persistent storage on Render.
+4. Only after data is preserved and restored should you deploy and check that chosen passwords, learner records and uploads survive a restart. Changing ADMIN_PASSWORD does not change an existing account's password. It is used only when creating a fresh workspace.
+
+The Render production startup check requires a real `/var/data` mount and DATA_DIR beneath it. It fails before creating a SQLite database when that storage is missing. This prevents silent use of another temporary database; it does not provision a disk, recover already lost data or prove that a backup exists. Already lost data requires a surviving database, Render disk snapshot or independent backup.
+
+## Editing access and standards
+
+Master users can select **Edit access & caseload** in Accounts & caseloads to change an account's name, email, role, apprentice/employer link and assessor/IQA learner assignments. Reassign an assessor/IQA's caseload before changing their role. Administrators cannot remove their own manager role. Access or email changes revoke existing sessions and recovery tokens; passwords are preserved. Deactivation and password recovery remain separate controls.
+
+Managers and IQAs can select **Edit standard & KSBs** in Standards & KSBs. Edits retain the standard ID and existing learner/evidence mappings. Duplicate course versions remain blocked. Criteria mapped in current learner records cannot be removed or renamed; their wording can be corrected. Changes apply across learners assigned to the standard, so review wording carefully. Editing the pasted source requires parsing and reviewing it again before saving.

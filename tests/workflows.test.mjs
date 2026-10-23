@@ -1286,3 +1286,125 @@ test("administrator review dates create one shared 10-week calendar series, with
     "Completed",
   );
 });
+
+test("administrators edit account roles and caseloads without resetting passwords; access changes revoke sessions", async () => {
+  const s = await state();
+  const assessor = s.users.find((u) => u.role === "Assessor");
+  const cookie = await login(assessor.email);
+  const payload = {
+    id: assessor.id,
+    name: "Updated assessor",
+    email: assessor.email,
+    role: "Assessor",
+    learnerId: "",
+    employer: "",
+    caseload: [s.learners[0].id],
+  };
+  assert.equal((await command("user.update", payload, cookie)).status, 403);
+  assert.equal((await command("user.update", payload)).status, 200);
+  const updated = await state();
+  assert.equal(
+    updated.users.find((u) => u.id === assessor.id).name,
+    "Updated assessor",
+  );
+  assert.deepEqual(
+    updated.learners
+      .filter((l) => l.assessorId === assessor.id)
+      .map((l) => l.id),
+    [s.learners[0].id],
+  );
+  assert.equal(
+    (await command("user.update", { ...payload, role: "IQA" })).status,
+    400,
+  );
+  assert.equal(
+    (await command("user.update", { ...payload, caseload: [] })).status,
+    200,
+  );
+  assert.equal(
+    (
+      await command("user.update", {
+        ...payload,
+        role: "IQA",
+        email: "updated-assessor@example.test",
+        caseload: [],
+      })
+    ).status,
+    200,
+  );
+  assert.equal((await request("/api/state", { cookie })).status, 401);
+  assert.ok(await login("updated-assessor@example.test"));
+  const manager = updated.users.find((u) => u.id === "manager");
+  assert.equal(
+    (
+      await command("user.update", {
+        ...payload,
+        id: manager.id,
+        email: manager.email,
+        role: "Employer",
+      })
+    ).status,
+    400,
+  );
+});
+
+test("standard edits retain identity and evidence mappings and reject duplicates and removal of used criteria", async () => {
+  const s = await state();
+  const evidence = s.evidence.find(
+    (e) => e.criteria?.length && s.learners.some((l) => l.id === e.learnerId),
+  );
+  const learner = s.learners.find((l) => l.id === evidence.learnerId);
+  const standard = s.standards.find(
+    (st) => st.id === (evidence.standardId || learner.standardId),
+  );
+  const payload = {
+    ...standard,
+    name: standard.name + " updated",
+    criteria: standard.criteria.map((c) => ({
+      ...c,
+      text: c.text + " clarified",
+    })),
+  };
+  const apprentice = (
+    await request("/api/login", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "apprentice@archetype.demo",
+        password: "NewLearnerPassword123!",
+      }),
+    })
+  ).cookie;
+  assert.ok(apprentice);
+  assert.equal(
+    (await command("standard.save", payload, apprentice)).status,
+    403,
+  );
+  assert.equal((await command("standard.save", payload)).status, 200);
+  const next = await state();
+  assert.equal(next.standards.length, s.standards.length);
+  assert.equal(
+    next.standards.find((st) => st.id === standard.id).name,
+    payload.name,
+  );
+  assert.deepEqual(
+    next.evidence.find((e) => e.id === evidence.id).criteria,
+    evidence.criteria,
+  );
+  assert.equal(
+    (
+      await command("standard.save", {
+        ...payload,
+        criteria: payload.criteria.filter(
+          (c) => c.code !== evidence.criteria[0],
+        ),
+      })
+    ).status,
+    400,
+  );
+  const other = s.standards.find((st) => st.id !== standard.id);
+  assert.equal(
+    (await command("standard.save", { ...payload, reference: other.reference }))
+      .status,
+    400,
+  );
+});

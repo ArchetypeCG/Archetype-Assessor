@@ -22,6 +22,7 @@ import {
   createHash,
 } from "node:crypto";
 import { seed, id, derive, roles, today } from "./model.mjs";
+import { assertRenderStorage } from "./storage.mjs";
 const origins = applicationOrigins();
 const PORT = Number(process.env.PORT || 3000),
   demo = process.env.DEMO_MODE === "1",
@@ -50,6 +51,7 @@ if (process.env.NODE_ENV === "production") {
       "The configured off-site backup bucket requires S3 backup credentials.",
     );
 }
+assertRenderStorage(process.env, dataDir);
 mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 const db = new DatabaseSync(resolve(dataDir, "archetype.sqlite"));
 db.exec(
@@ -469,6 +471,8 @@ function command(s, u, kind, p) {
     }
     case "standard.save": {
       requireRole(u, ["Manager", "IQA"]);
+      const existing = p.id ? s.standards.find((x) => x.id === p.id) : null;
+      if (p.id && !existing) fail("Standard not found.", 404);
       if (
         !Array.isArray(p.criteria) ||
         !p.criteria.length ||
@@ -489,26 +493,62 @@ function command(s, u, kind, p) {
       if (
         s.standards.some(
           (x) =>
-            (
+            x.id !== existing?.id &&
+            ((
               x.reference.match(/^ST\d{4}/i)?.[0] || x.reference.trim()
             ).toLowerCase() ===
               (
                 String(p.reference).match(/^ST\d{4}/i)?.[0] ||
                 String(p.reference).trim()
-              ).toLowerCase() || courseName(x.name) === courseName(p.name),
+              ).toLowerCase() ||
+              courseName(x.name) === courseName(p.name)),
         )
       )
         fail(
           "This course already has a standard. Only one version per course is allowed.",
         );
-      s.standards.push({
-        id: id(),
+      if (existing) {
+        const removed = existing.criteria.filter(
+          (c) => !criteria.some((n) => n.code === c.code),
+        );
+        const used = [
+          ...s.evidence,
+          ...s.samplingPlans,
+          ...s.learningPlans,
+          ...s.appointments,
+          ...s.quality,
+          ...s.otj,
+        ];
+        if (
+          removed.some((c) =>
+            used.some(
+              (r) =>
+                (r.standardId === existing.id ||
+                  (!r.standardId &&
+                    s.learners.some(
+                      (l) =>
+                        l.id === r.learnerId && l.standardId === existing.id,
+                    ))) &&
+                [...(r.criteria || []), ...(r.ksbs || [])].includes(c.code),
+            ),
+          )
+        )
+          fail(
+            "A criterion used in learner records cannot be removed or renamed. You can edit its wording.",
+          );
+      }
+      const saved = {
+        id: existing?.id || id(),
         name: text(p.name, "Standard title", 200),
         reference: text(p.reference, "Standard reference", 100),
         version: text(p.version, "Version", 100),
         level: number(p.level, "Level", 2, 7),
         criteria,
-      });
+      };
+      if (existing) Object.assign(existing, saved);
+      else s.standards.push(saved);
+      for (const learner of s.learners.filter((l) => l.standardId === saved.id))
+        learner.level = saved.level;
       break;
     }
     case "evidence.save": {
@@ -895,6 +935,72 @@ function command(s, u, kind, p) {
       };
       s.users.push(user);
       password(user.id, pw, true);
+      syncReviewParticipants(s);
+      break;
+    }
+    case "user.update": {
+      requireRole(u, ["Manager"]);
+      const account = s.users.find((x) => x.id === p.id);
+      if (!account) fail("Account not found.", 404);
+      const role = choice(p.role, roles, "role");
+      const email = text(p.email, "Email", 200).toLowerCase();
+      if (
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+        s.users.some(
+          (x) => x.id !== account.id && x.email.toLowerCase() === email,
+        )
+      )
+        fail("Use a unique valid email.");
+      if (account.id === u.id && role !== "Manager")
+        fail("You cannot remove your own administrator access.");
+      if (
+        role === "Apprentice" &&
+        !s.learners.some((l) => l.id === p.learnerId)
+      )
+        fail("Link the apprentice to a learner.");
+      if (
+        role === "Employer" &&
+        !s.learners.some((l) => l.employer === p.employer)
+      )
+        fail("Choose an existing employer.");
+      if (
+        role !== account.role &&
+        s.learners.some(
+          (l) => l.assessorId === account.id || l.iqaId === account.id,
+        )
+      )
+        fail(
+          "Reassign this account's assessor/IQA caseload before changing its role.",
+        );
+      if (
+        !Array.isArray(p.caseload) ||
+        p.caseload.some((id) => !s.learners.some((l) => l.id === id))
+      )
+        fail("Choose valid caseload learners.");
+      const name = text(p.name, "Name", 160);
+      const securityChanged =
+        email !== account.email ||
+        role !== account.role ||
+        p.learnerId !== (account.learnerId || "") ||
+        p.employer !== (account.employer || "");
+      Object.assign(account, { name, email, role });
+      delete account.learnerId;
+      delete account.employer;
+      if (role === "Apprentice") account.learnerId = p.learnerId;
+      if (role === "Employer") account.employer = p.employer;
+      if (["Assessor", "IQA"].includes(role)) {
+        const key = role === "Assessor" ? "assessorId" : "iqaId";
+        for (const learner of s.learners) {
+          if (p.caseload.includes(learner.id)) learner[key] = account.id;
+          else if (learner[key] === account.id) learner[key] = "";
+        }
+      }
+      if (securityChanged) {
+        db.prepare("DELETE FROM sessions WHERE user_id=?").run(account.id);
+        db.prepare("DELETE FROM password_resets WHERE user_id=?").run(
+          account.id,
+        );
+      }
       syncReviewParticipants(s);
       break;
     }
