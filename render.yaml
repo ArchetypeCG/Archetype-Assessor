@@ -29,3 +29,11 @@ services:
         generateValue: true
       - key: BACKUP_RETENTION_DAYS
         value: "14"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MORNING_DIGEST_ENABLED
+        value: "1"
+      - key: MORNING_DIGEST_HOUR
+        value: "8"

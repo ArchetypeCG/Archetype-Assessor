@@ -1136,6 +1136,29 @@ function IQA({ s, user, go, setModal, openLearner }) {
         >
           <div className="dashboard-actions">
             <Action
+              icon={CalendarDays}
+              label="Sampling plan & calendar"
+              onClick={() => go("Audit & quality")}
+            />
+            <Action
+              icon={Plus}
+              label="Plan a KSB sample"
+              onClick={() => setModal({ type: "samplingPlan" })}
+            />
+            <p className="body-copy">
+              {
+                (s.samplingPlans || []).filter((p) => p.status === "Planned")
+                  .length
+              }{" "}
+              samples planned ·{" "}
+              {
+                (s.samplingPlans || []).filter(
+                  (p) => p.status === "Planned" && p.date < localDate(),
+                ).length
+              }{" "}
+              overdue
+            </p>
+            <Action
               icon={BookOpen}
               label="Standards & KSBs"
               onClick={() => go("Standards & KSBs")}

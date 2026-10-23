@@ -9,7 +9,7 @@ Render is the hosting provider. This repository contains a Docker image definiti
 1. Sign in to Render and connect your GitHub account. Give it access to **ArchetypeCG/Archetype-Assessor**.
 2. Use the deployment link above, or choose **New → Blueprint**, select the repository and use `render.yaml` on `main`.
 3. Review Render's current charges before confirming. The blueprint requests a **paid Starter web service**, a **10 GB persistent disk**, and the Frankfurt region. Pricing and available data locations are controlled by Render. Select an appropriate region and contractual/data-processing terms for your organisation before storing learner data.
-4. Enter `ADMIN_EMAIL` (your first master-user login email) and a unique `ADMIN_PASSWORD` of at least 12 characters **in Render's secure environment-variable form**, never in GitHub, source files or chat.
+4. Configure a verified sending domain in Resend and obtain an API key; [follow the email setup guide](EMAIL.md). Enter `RESEND_API_KEY` and `MAIL_FROM` in Render, along with `ADMIN_EMAIL` (your first master-user login email) and a unique `ADMIN_PASSWORD` of at least 12 characters **in Render's secure environment-variable form**, never in GitHub, source files or chat.
 5. Deploy. The image build runs the automated tests and builds the frontend. Render checks `/api/health` before routing traffic to the service.
 6. Open the HTTPS `onrender.com` address Render provides. Sign in with your initial administrator credentials and choose a new password when prompted. The live service does not offer public demo accounts or demo learners.
 
@@ -24,11 +24,11 @@ The empty master dashboard includes a setup guide:
 1. In **Accounts & caseloads**, create assessor and IQA accounts using unique temporary passwords. New accounts must set their own password on first login.
 2. In **Standards & KSBs**, add the exact official criteria and versions used for delivery.
 3. Add or import apprentice records, assign their assessor/IQA, employer and standard, and configure programme dates and targets.
-4. Create linked apprentice and employer login accounts. Share temporary credentials using your organisation's secure channel. Account owners can change their passwords; managers can issue replacement temporary passwords if someone loses access.
+4. Create linked apprentice and employer login accounts. Share temporary credentials using your organisation's secure channel. Account owners can change their passwords; managers can queue a one-hour recovery link to the account email if someone loses access.
 5. Create learning-plan activities, upload resources and schedule detailed sessions or reviews.
 6. Log in as each intended role on a second device to confirm scope and access before onboarding your learners.
 
-Deactivate an account to revoke all its existing sessions without deleting its learners or audit trail. Managers cannot deactivate themselves. Self-service reset emails and invitations are not configured; access recovery is explicitly managed by a master user.
+Deactivate an account to revoke all its existing sessions without deleting its learners or audit trail. Managers cannot deactivate themselves. Self-service password recovery and manager-triggered reset emails work once the email provider is configured. Account invitations are still issued by sharing the initial temporary password securely.
 
 ## 3. Shared data and access from any device
 
@@ -89,10 +89,18 @@ Test this procedure with a disposable restored directory before relying on backu
 
 The deployment configuration, application workflows and automated checks are provided. You still need to activate the Render service, enter credentials, configure off-site storage, verify the live domain and implement your organisation's access, retention and learner-data policies. Hosting and bucket subscriptions belong to your organisation.
 
-Before admitting real learner data, complete an appropriate deployment/security and accessibility review, arrange malware scanning for learner uploads, and verify official standard/funding-rule configuration. Uploaded files are served as protected downloads, not executed or previewed, but this is not a malware scanning service. Do not describe the system as a certified Smart Assessor replacement or as compliant with a regulation solely because it has a compliance dashboard. SSO/MFA, MIS/ILR/EPA-provider integrations, automated email/SMS and qualified electronic signatures remain separate integrations.
+Before admitting real learner data, complete an appropriate deployment/security and accessibility review, arrange malware scanning for learner uploads, and verify official standard/funding-rule configuration. Uploaded files are served as protected downloads, not executed or previewed, but this is not a malware scanning service. Do not describe the system as a certified Smart Assessor replacement or as compliant with a regulation solely because it has a compliance dashboard. SSO/MFA, MIS/ILR/EPA-provider integrations, SMS and qualified electronic signatures remain separate integrations.
 
 ## Local production smoke test
 
 `npm run dev` and `npm run preview` intentionally use fictional demo data for development. To exercise the live-mode image locally, build the image, supply production environment variables from a secure env file excluded from Git, and mount a disposable persistent volume. Secure cookies are intended for HTTPS; use an HTTPS proxy for a realistic browser test. Keep test databases separate from live data.
 
 GitHub Actions runs the tests and build on pushes and pull requests; the Docker build repeats them. Never disable TLS, npm integrity checks or tests to get a deployment through.
+
+## 7. IQA sampling and morning email
+
+Open **Audit & quality → Sampling plan** as an IQA or master user. Select an apprentice, scheduled date, risk, method, KSB criteria and optional accepted evidence. The monthly calendar and agenda share the same persistent plans. Use **Record finding** to link a sample to the plan. Completion requires findings covering every selected criterion. Apprentice and employer accounts cannot see sampling plans; assessors have read access to plans for their assigned learners through the quality hub.
+
+The Render blueprint enables daily email scheduling at 08:00 Europe/London. It uses the same always-on service and persistent database; there is no separate cron-service subscription. Provider credentials and a verified sender are required before email can be sent. Delivery and configuration status appear in master-user Settings. Each user can opt out of morning reminders. [Email settings, delivery checks and recovery behaviour](EMAIL.md).
+
+Fictional learner records remain available in the local training workspace as requested. No migration deletes or rewrites learner evidence. Public training credentials must remain separate from a live database containing real learner information. Removing the on-screen demo banners does not change the security properties of those training accounts.

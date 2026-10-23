@@ -4512,3 +4512,242 @@ footer > span:last-child {
     font-size: 10px;
   }
 }
+/* IQA planning */
+.sampling-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 20px 0;
+}
+.sampling-stats > div {
+  background: var(--bg, #f0f6ff);
+  border: 1px solid #dce8f5;
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sampling-stats strong {
+  font-size: 30px;
+  color: #1365d6;
+}
+.sampling-toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+.sampling-toolbar label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.sampling-calendar-scroll {
+  overflow: auto;
+}
+.sampling-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(125px, 1fr));
+  min-width: 875px;
+  border: 1px solid #dce8f5;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.sampling-weekday {
+  background: #142e55;
+  color: white;
+  padding: 12px;
+  text-align: center;
+}
+.sampling-day {
+  border-right: 1px solid #e4edf8;
+  border-bottom: 1px solid #e4edf8;
+  min-height: 120px;
+  padding: 8px;
+}
+.sampling-day.outside {
+  background: #f5f8fc;
+}
+.sampling-day-number {
+  background: none;
+  border: none;
+  color: #25476f;
+  padding: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.sampling-day-number:hover {
+  background: #dbeafe;
+}
+.sampling-event {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  border: 0;
+  border-left: 3px solid #1686e9;
+  background: #eaf4ff;
+  text-align: left;
+  padding: 8px;
+  border-radius: 6px;
+  margin: 5px 0;
+  color: #183e70;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.sampling-event.risk-high {
+  border-color: #df5a6b;
+  background: #fff0f1;
+}
+.sampling-event.risk-medium {
+  border-color: #e3a33d;
+}
+.sampling-event span,
+.sampling-event small {
+  font-size: 11px;
+}
+.sampling-agenda {
+  margin-top: 24px;
+}
+.sampling-agenda h3 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.sampling-agenda article {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 20px 0;
+  border-bottom: 1px solid #dce8f5;
+}
+.sampling-agenda article strong {
+  display: block;
+  margin-top: 8px;
+}
+.sampling-agenda article p {
+  margin: 8px 0;
+}
+.sampling-dialog {
+  width: min(850px, 95vw);
+  max-height: 90dvh;
+  overflow: auto;
+  padding: 24px;
+}
+.sampling-dialog fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.sampling-dialog .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.sampling-dialog .wide {
+  grid-column: 1/-1;
+}
+.sampling-dialog label:not(.sampling-checkbox) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sampling-criteria {
+  max-height: 320px;
+  overflow: auto;
+  background: #f5f9ff;
+  border-radius: 12px;
+  padding: 12px;
+}
+.sampling-criteria label,
+.sampling-checkbox {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-bottom: 1px solid #e0eafa;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sampling-criteria input,
+.sampling-checkbox input {
+  width: 18px;
+  min-width: 18px;
+  accent-color: #1674e8;
+}
+.sampling-dialog .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sampling-dialog form > .button,
+.sampling-dialog fieldset > .button {
+  margin-top: 20px;
+}
+.email-status {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.email-status .button {
+  align-self: flex-start;
+}
+@media (max-width: 600px) {
+  .sampling-stats {
+    gap: 8px;
+  }
+  .sampling-stats > div {
+    padding: 12px;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sampling-stats strong {
+    font-size: 25px;
+  }
+  .sampling-dialog .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .sampling-toolbar .button-row {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+@media (max-width: 600px) {
+  .sampling-calendar {
+    min-width: 0;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .sampling-weekday {
+    font-size: 9px;
+    padding: 10px 0;
+  }
+  .sampling-day {
+    min-height: 86px;
+    padding: 4px;
+    min-width: 0;
+  }
+  .sampling-day-number {
+    font-size: 11px;
+    padding: 3px;
+  }
+  .sampling-event {
+    padding: 4px 2px;
+    border-left-width: 2px;
+    overflow: hidden;
+  }
+  .sampling-event strong {
+    font-size: 9px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .sampling-event span,
+  .sampling-event small {
+    display: none;
+  }
+}

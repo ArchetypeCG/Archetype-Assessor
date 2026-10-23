@@ -100,13 +100,17 @@ export function AccountControls({ s, user, command, refresh, notify }) {
   async function reset(account) {
     if (
       !window.confirm(
-        `Reset the password for ${account.name}? Their existing sessions will be signed out.`,
+        `Reset the password for ${account.name}? A secure recovery link will be emailed and their existing sessions will be signed out.`,
       )
     )
       return;
     B(true);
     try {
       const result = await command("user.resetPassword", { id: account.id });
+      if (result.emailQueued) {
+        notify(`Password reset email queued for ${account.email}.`);
+        return;
+      }
       T({
         name: account.name,
         email: account.email,
@@ -143,8 +147,8 @@ export function AccountControls({ s, user, command, refresh, notify }) {
         <div>
           <h2>Account access & recovery</h2>
           <p>
-            New and reset accounts must choose their own password. Share
-            temporary credentials securely.
+            Password resets send a secure link to the account email. Links
+            expire after one hour and can be used once.
           </p>
         </div>
       </div>

@@ -1,3 +1,5 @@
+import { SamplingPlanner, SamplingDialog } from "./iqa";
+import { EmailSettings, PasswordRecovery } from "./email";
 import React, {
   useState,
   useEffect,
@@ -257,6 +259,12 @@ function App() {
     refresh,
     connection,
   };
+  if (
+    !user &&
+    (new URLSearchParams(window.location.search).has("reset") ||
+      window.location.hash.startsWith("#reset="))
+  )
+    return <PasswordRecovery />;
   if (!user)
     return (
       <Login
@@ -487,9 +495,7 @@ function App() {
                     ? "Saving changes…"
                     : "Live workspace"}
               </span>
-              {demo?.enabled && (
-                <span className="demo-chip">FICTIONAL DEMO DATA</span>
-              )}
+
               <button
                 title="Refresh workspace"
                 aria-label="Refresh workspace"
@@ -565,11 +571,7 @@ function App() {
             <footer>
               <strong>archetype.</strong>
               <span>Better insight. Better outcomes.</span>
-              <span>
-                {demo?.enabled
-                  ? "Demonstration workspace · fictional learners"
-                  : "Your connected apprenticeship workspace"}
-              </span>
+              <span>Your connected apprenticeship workspace</span>
             </footer>
           </main>
         </div>
@@ -578,6 +580,11 @@ function App() {
             modal.type,
           ) ? (
             <ScheduleDialog
+              key={modal.type + (modal.item?.id || "")}
+              {...ctx}
+            />
+          ) : ["samplingPlan", "samplingFinding"].includes(modal.type) ? (
+            <SamplingDialog
               key={modal.type + (modal.item?.id || "")}
               {...ctx}
             />
@@ -2395,7 +2402,8 @@ function Reports() {
           <span className="eyebrow">PORTFOLIO INTELLIGENCE</span>
           <h2>{title}</h2>
           <p>
-            Generated {fmt(localDate())} · {ls.length} records · {demoLabel(s)}
+            Generated {fmt(localDate())} · {ls.length} records ·{" "}
+            {workspaceLabel()}
           </p>
         </div>
         <div className="metrics three">
@@ -2447,7 +2455,7 @@ function Reports() {
     </>
   );
 }
-function demoLabel() {
+function workspaceLabel() {
   return "current workspace data";
 }
 function Standards() {
@@ -2464,7 +2472,7 @@ function Standards() {
     <>
       <Panel
         title="Standard library"
-        subtitle="Use the exact official wording and version. Sample criteria are illustrative, not an authoritative standard."
+        subtitle="Programme KSBs and standard assignments. One standard version per course."
         action={
           ["Manager", "IQA"].includes(user.role) && (
             <Button onClick={() => setModal({ type: "standard" })}>
@@ -2930,13 +2938,14 @@ function Team() {
 }
 function Quality() {
   const { s, user, setModal, act } = useApp(),
-    [tab, T] = useState("Quality sampling");
+    [tab, T] = useState("Sampling plan");
   const samples = s.quality,
     eligible = s.evidence.filter((e) => e.status === "Accepted");
   return (
     <>
       <div className="tabs">
         {[
+          "Sampling plan",
           "Quality sampling",
           "Audit trail",
           "Data quality",
@@ -2951,7 +2960,9 @@ function Quality() {
           </button>
         ))}
       </div>
-      {tab === "Quality sampling" ? (
+      {tab === "Sampling plan" ? (
+        <SamplingPlanner {...{ s, user, setModal, act }} />
+      ) : tab === "Quality sampling" ? (
         <>
           <Panel
             title="Internal quality assurance"
@@ -3119,6 +3130,7 @@ function SettingsPage() {
   const { s, user, demo, setModal, notify } = ctx;
   return (
     <>
+      <EmailSettings {...ctx} />
       <ProductionStatus {...ctx} />
       <div className="grid two">
         <Panel
@@ -3130,9 +3142,7 @@ function SettingsPage() {
           <Detail label="Database" value="SQLite · server-side storage" />
           <Detail
             label="Environment"
-            value={
-              demo?.enabled ? "Fictional demonstration" : "Production mode"
-            }
+            value={demo?.enabled ? "Training workspace" : "Production mode"}
           />
           <Detail label="Workspace revision" value={s.revision} />
           <Button secondary onClick={() => setModal({ type: "password" })}>
@@ -3295,48 +3305,7 @@ function Login({ demo, onLogin, error }) {
             <ArrowRight size={17} />
           </Button>
         </form>
-        {demo?.enabled && (
-          <div className="reference-demo-roles">
-            <span className="eyebrow">EXPLORE THE DIFFERENT WORKSPACES</span>
-            <p>
-              Select a demo account, then sign in.
-              <br />
-              Public demo password: <code>ArchetypeDemo2026!</code>
-            </p>
-            <div>
-              {demo.accounts?.map((a) => (
-                <button
-                  key={a.email}
-                  onClick={() => {
-                    EM(a.email);
-                    PW("ArchetypeDemo2026!");
-                  }}
-                >
-                  <span className="demo-role-icon">
-                    {a.role === "Manager" ? (
-                      <LayoutDashboard size={18} />
-                    ) : a.role === "Assessor" ? (
-                      <ClipboardCheck size={18} />
-                    ) : a.role === "Apprentice" ? (
-                      <GraduationCap size={18} />
-                    ) : a.role === "IQA" ? (
-                      <ShieldCheck size={18} />
-                    ) : (
-                      <Building2 size={18} />
-                    )}
-                  </span>
-                  <div>
-                    <strong>
-                      {a.role === "Manager" ? "Master user" : a.role}
-                    </strong>
-                    <small>{a.name}</small>
-                  </div>
-                  <ArrowUpRight size={14} />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <PasswordRecovery compact />
         <div className="reference-login-security">
           <LockKeyhole size={13} />
           Individual accounts · role-based permissions · server-saved records

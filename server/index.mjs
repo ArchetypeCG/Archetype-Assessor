@@ -1,4 +1,6 @@
 import http from "node:http";
+import { samplingCommand } from "./sampling.mjs";
+import { createMailService } from "./mail.mjs";
 import { createBackupService } from "./backups.mjs";
 import { schedulingCommand, calendarICS } from "./scheduling.mjs";
 import { DatabaseSync } from "node:sqlite";
@@ -59,6 +61,7 @@ const get = () =>
       db.prepare("SELECT data FROM workspace WHERE id=1").get().data,
     );
     s.learningPlans ||= [];
+    s.samplingPlans ||= [];
     return s;
   })();
 const put = (s) =>
@@ -82,7 +85,7 @@ if (!db.prepare("SELECT id FROM workspace WHERE id=1").get()) {
     (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.length < 12)
   )
     throw Error(
-      "First production start requires ADMIN_PASSWORD (at least 12 characters) and optionally ADMIN_EMAIL. Use npm run dev for fictional demo data.",
+      "First production start requires ADMIN_PASSWORD (at least 12 characters) and optionally ADMIN_EMAIL. Configure these variables before starting the application.",
     );
   const s = seed();
   if (!demo) {
@@ -207,8 +210,10 @@ function visible(s, u) {
     "appointments",
     "quality",
     "learningPlans",
+    "samplingPlans",
   ])
     out[k] = s[k].filter((x) => ids.has(x.learnerId));
+  if (!staff.includes(u.role)) out.samplingPlans = [];
   if (!staff.includes(u.role))
     out.appointments = out.appointments.map(({ staffNotes, ...a }) => a);
   out.messages = s.messages.filter((x) => x.from === u.id || x.to === u.id);
@@ -221,6 +226,7 @@ function visible(s, u) {
   if (u.role === "Employer") {
     out.evidence = [];
     out.quality = [];
+    out.samplingPlans = [];
     out.learners = out.learners.map(({ email, notes, ...l }) => l);
   }
   return out;
@@ -318,7 +324,33 @@ function uploadFiles(files, learnerId) {
     return { id: fid, name, size: b.length };
   });
 }
+const mail = createMailService({ db, get, password, canSee });
+function courseName(value) {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/team leader(?: or|\/| and)?\s*(?:supervisor)?/, "team leader")
+    .replace(
+      /operations(?: or|\/| and)?\s*(?:departmental)?\s*manager/,
+      "operations manager",
+    );
+}
 function command(s, u, kind, p) {
+  const sampleResult = samplingCommand({
+    s,
+    u,
+    kind,
+    p,
+    fail,
+    requireRole,
+    id,
+    text,
+    date,
+    choice,
+    learnerFor,
+  });
+  if (sampleResult !== null) return sampleResult;
   let l;
   if (p.learnerId) l = learnerFor(s, u, p.learnerId);
   const scheduleResult = schedulingCommand({
@@ -430,6 +462,21 @@ function command(s, u, kind, p) {
       }));
       if (new Set(criteria.map((c) => c.code)).size !== criteria.length)
         fail("Criterion codes must be unique.");
+      if (
+        s.standards.some(
+          (x) =>
+            (
+              x.reference.match(/^ST\d{4}/i)?.[0] || x.reference.trim()
+            ).toLowerCase() ===
+              (
+                String(p.reference).match(/^ST\d{4}/i)?.[0] ||
+                String(p.reference).trim()
+              ).toLowerCase() || courseName(x.name) === courseName(p.name),
+        )
+      )
+        fail(
+          "This course already has a standard. Only one version per course is allowed.",
+        );
       s.standards.push({
         id: id(),
         name: text(p.name, "Standard title", 200),
@@ -683,7 +730,32 @@ function command(s, u, kind, p) {
       if (!e) fail("Evidence not found.", 404);
       learnerFor(s, u, e.learnerId);
       if (e.status !== "Accepted") fail("Sample accepted evidence only.");
+      const plan = p.planId
+        ? s.samplingPlans.find(
+            (x) =>
+              x.id === p.planId &&
+              x.learnerId === e.learnerId &&
+              x.status === "Planned",
+          )
+        : null;
+      if (p.planId && !plan) fail("Active sampling plan not found.");
+      const criteria = plan
+        ? plan.criteria.filter((c) => e.criteria.includes(c))
+        : e.criteria;
+      if (
+        plan &&
+        ((!e.standardId
+          ? s.learners.find((l) => l.id === e.learnerId)?.standardId
+          : e.standardId) !== plan.standardId ||
+          !criteria.length ||
+          (plan.evidenceIds.length && !plan.evidenceIds.includes(e.id)))
+      )
+        fail(
+          "Evidence must match the sampling plan, standard and selected KSBs.",
+        );
       s.quality.push({
+        planId: plan?.id || null,
+        criteria,
         id: id(),
         learnerId: e.learnerId,
         evidenceId: e.id,
@@ -752,6 +824,11 @@ function command(s, u, kind, p) {
       const account = s.users.find((x) => x.id === p.id && x.active);
       if (!account) fail("Active account not found.", 404);
       if (account.id === u.id) fail("Change your own password in Settings.");
+      if (!demo || mail.status().configured) {
+        const result = mail.reset(account);
+        db.prepare("DELETE FROM sessions WHERE user_id=?").run(account.id);
+        return result;
+      }
       const temporaryPassword = randomBytes(18).toString("base64url");
       password(account.id, temporaryPassword, true);
       db.prepare("DELETE FROM sessions WHERE user_id=?").run(account.id);
@@ -765,8 +842,18 @@ function command(s, u, kind, p) {
       if (account.id === u.id && !p.active)
         fail("You cannot deactivate your own account.");
       account.active = p.active;
-      if (!p.active)
+      if (!p.active) {
         db.prepare("DELETE FROM sessions WHERE user_id=?").run(account.id);
+        db.prepare("DELETE FROM password_resets WHERE user_id=?").run(
+          account.id,
+        );
+      }
+      return {};
+    }
+    case "notifications.preferences": {
+      if (typeof p.morningDigest !== "boolean")
+        fail("Choose a valid email preference.");
+      s.users.find((x) => x.id === u.id).morningDigest = p.morningDigest;
       return {};
     }
     case "password.change": {
@@ -785,6 +872,7 @@ function command(s, u, kind, p) {
       const pw = text(p.password, "New password", 200);
       if (pw.length < 12) fail("Use at least 12 characters.");
       password(u.id, pw);
+      db.prepare("DELETE FROM password_resets WHERE user_id=?").run(u.id);
       db.prepare("DELETE FROM sessions WHERE user_id=?").run(u.id);
       break;
     }
@@ -887,6 +975,40 @@ const server = http.createServer(async (req, res) => {
       if (path === "/api/health") {
         db.prepare("SELECT 1").get();
         return json(res, 200, { ok: true });
+      }
+      if (
+        ["/api/password/forgot", "/api/password/reset"].includes(path) &&
+        req.method === "POST"
+      ) {
+        const key = `reset:${req.socket.remoteAddress}`,
+          now = Date.now();
+        const record = attempts.get(key) || { count: 0, until: now + 600000 };
+        if (record.until < now) {
+          record.count = 0;
+          record.until = now + 600000;
+        }
+        record.count++;
+        attempts.set(key, record);
+        if (record.count > 10)
+          fail("Too many requests. Try again in 10 minutes.", 429);
+        const p = await body(req);
+        if (path.endsWith("/reset")) {
+          mail.redeem(p.token, p.password);
+          return json(res, 200, { ok: true });
+        }
+        if (!mail.status().configured)
+          fail(
+            "Password recovery email is not configured. Contact your administrator.",
+            503,
+          );
+        const account = get().users.find(
+          (u) => u.active && u.email === String(p.email).trim().toLowerCase(),
+        );
+        if (account) mail.reset(account);
+        return json(res, 200, {
+          message:
+            "If an active account matches that email, a reset link will be emailed shortly.",
+        });
       }
       if (path === "/api/login" && req.method === "POST") {
         const key = req.socket.remoteAddress,
@@ -995,6 +1117,10 @@ const server = http.createServer(async (req, res) => {
           "Change your temporary password before accessing workspace data.",
           403,
         );
+      if (path === "/api/email/status" && req.method === "GET") {
+        requireRole(u, ["Manager"]);
+        return json(res, 200, mail.status());
+      }
       if (path === "/api/admin/backups" && req.method === "GET") {
         requireRole(u, ["Manager"]);
         return json(res, 200, {
@@ -1155,12 +1281,14 @@ server.listen(PORT, "0.0.0.0", () =>
 );
 
 backups.start();
+mail.start();
 let closing = false;
 for (const signal of ["SIGTERM", "SIGINT"])
   process.on(signal, () => {
     if (closing) return;
     closing = true;
     backups.stop();
+    mail.stop();
     server.close(() => {
       db.close();
       process.exit(0);

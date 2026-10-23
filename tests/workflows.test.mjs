@@ -870,3 +870,118 @@ test("password reset and deactivation invalidate every old session and require a
     200,
   );
 });
+
+test("IQA sampling plans preselect KSBs and evidence, enforce coverage and hide plans from apprentices", async () => {
+  const iqaCookie = await login("iqa@archetype.demo");
+  const st = await state(iqaCookie),
+    learner = st.learners[0];
+  const evidence = st.evidence.find(
+    (e) =>
+      e.learnerId === learner.id &&
+      e.status === "Accepted" &&
+      (!e.standardId || e.standardId === learner.standardId),
+  );
+  const criteria = [evidence.criteria[0]];
+  let r = await command(
+    "sampling.save",
+    {
+      learnerId: learner.id,
+      title: "Quarterly risk sample",
+      date: "2026-11-10",
+      method: "Risk-based",
+      risk: "High",
+      criteria,
+      evidenceIds: [evidence.id],
+      notes: "Check assessor feedback against these KSBs.",
+    },
+    iqaCookie,
+  );
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const planId = r.data.result.samplingPlanId;
+  assert.equal(
+    (
+      await command(
+        "sampling.status",
+        { learnerId: learner.id, id: planId, status: "Completed" },
+        iqaCookie,
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await command(
+        "sampling.save",
+        {
+          learnerId: learner.id,
+          title: "Invalid",
+          date: "2026-11-10",
+          method: "Interim",
+          risk: "Low",
+          criteria: ["K999"],
+          evidenceIds: [],
+        },
+        iqaCookie,
+      )
+    ).status,
+    400,
+  );
+  r = await command(
+    "quality.add",
+    {
+      learnerId: learner.id,
+      evidenceId: evidence.id,
+      planId,
+      outcome: "Agreed",
+      notes: "Selected criteria demonstrated; assessment decision agreed.",
+    },
+    iqaCookie,
+  );
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.state.quality.at(-1).planId, planId);
+  assert.deepEqual(r.data.state.quality.at(-1).criteria, criteria);
+  assert.equal(
+    (
+      await command(
+        "sampling.status",
+        { learnerId: learner.id, id: planId, status: "Completed" },
+        iqaCookie,
+      )
+    ).status,
+    200,
+  );
+  await command("user.setActive", { id: "apprentice", active: true });
+  const apprenticeLogin = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: "NewLearnerPassword123!",
+    }),
+  });
+  assert.equal(apprenticeLogin.status, 200);
+  assert.deepEqual((await state(apprenticeLogin.cookie)).samplingPlans, []);
+  assert.equal(
+    (
+      await command(
+        "sampling.save",
+        { learnerId: learner.id },
+        apprenticeLogin.cookie,
+      )
+    ).status,
+    403,
+  );
+  const assessor = await login("assessor@archetype.demo");
+  assert.equal(
+    (await command("sampling.save", { learnerId: learner.id }, assessor))
+      .status,
+    403,
+  );
+  const other = await command("standard.save", {
+    name: "Business Administrator",
+    reference: "Another BA reference",
+    version: "2",
+    level: 3,
+    criteria: [{ code: "K1", type: "Knowledge", text: "Duplicate course" }],
+  });
+  assert.equal(other.status, 400);
+});

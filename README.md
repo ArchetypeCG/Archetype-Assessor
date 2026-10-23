@@ -2,7 +2,7 @@
 
 A connected apprenticeship portfolio and delivery workspace, modelled on the supplied **WBL Intelligence / Uploads / AutoTracking / Standards** HTML reference. The application uses the supplied model’s final deep-navy, bright-blue and cyan palette, rounded white cards and command-centre layout. It keeps Archetype branding and provides separate master-user, assessor, apprentice, IQA and employer experiences backed by a Node.js API and persistent SQLite database.
 
-![Master user command centre with fictional demo data](docs/dashboard.png)
+![Master user command centre](docs/dashboard.png)
 
 <details><summary>See the assessor dashboard</summary>
 
@@ -48,7 +48,7 @@ Open the Local address printed by Vite. The command starts both the frontend and
 
 ### Demo accounts
 
-On the sign-in screen, select a role then click **Sign in**. The password for the five original demo accounts is `ArchetypeDemo2026!`.
+Enter an account email and password on the sign-in screen. The public role-picker has been removed. The password for the five original demo accounts is `ArchetypeDemo2026!`.
 
 | Role                  | Account                   | Scope                                                               |
 | --------------------- | ------------------------- | ------------------------------------------------------------------- |
@@ -65,12 +65,14 @@ These are public demo credentials. Do not use the demo database for real learner
 - **Master dashboard:** the reference’s five KPI hero, portfolio health, priority queue, team pulse, quick actions, health score, 30-day milestones, programme intelligence and compliance radar.
 - **Assessor dashboard:** assigned caseload, assessment queue, pending learning logs, review planner and intervention priorities; no master account-management navigation.
 - **Apprentice dashboard:** personal progress ring, K/S/B coverage, upload-work and learning-log shortcuts, latest feedback, action plan and learning toolkit.
+- **IQA sampling plans:** preselect KSBs and accepted evidence, classify risk, schedule interim/summative/risk-based/follow-up samples in a visual monthly calendar, record linked findings, and require findings for all planned KSBs before completion.
+- **Email recovery and reminders:** one-hour single-use password-reset links for every role, manager-triggered reset emails, and an optional 08:00 Europe/London urgent-action digest with individual preferences, persistent delivery queue and retries. [Configure email in Render](docs/EMAIL.md).
 - **IQA and employer dashboards:** their own sampling priorities or employer cohort, scoped by the server.
 - **Individual progress report:** verified KSBs, criterion-level coverage, evidence, approved hours, review discussion, next steps and readiness; CSV export and browser print/save PDF.
 - **Apprentices:** add/edit records, assign assessor/IQA/standard, search, status/RAG filters, sorting and pagination.
 - **Portfolios:** evidence files and reflections; multiple KSB mappings; draft, submit, return, revise, accept or reject; feedback and decision history.
 - **Automatic tracking:** only accepted evidence contributes to KSB coverage. Approved logs calculate OTJ totals. Date and progress exceptions calculate RAG dynamically.
-- **Standards:** versioned standard library, pasted K/S/B text parsing, editable extraction preview and duplicate-code validation. Example criteria are explicitly illustrative. New standard versions are separate records. Use **Assign standard** from the learner profile or standard library to change a programme. Earlier evidence and hours are retained against the original standard, a history entry records the reason and actor, and gateway readiness resets. Matching KSB codes from different standards do not carry progress across automatically. The regular edit/import route blocks programme changes; use the dedicated assignment action to preserve history.
+- **Standards:** versioned standard library, pasted K/S/B text parsing, editable extraction preview and duplicate-code validation. Example criteria are explicitly illustrative. Only one standard per course can be created; duplicate course names and references are rejected. Use **Assign standard** from the learner profile or standard library to change a programme. Earlier evidence and hours are retained against the original standard, a history entry records the reason and actor, and gateway readiness resets. Matching KSB codes from different standards do not carry progress across automatically. The regular edit/import route blocks programme changes; use the dedicated assignment action to preserve history.
 - **Learning logs:** dated reflections and hours, assessor approval or return. New logs are capped at 24 hours/day per entry; historic sample logs are clearly identified.
 - **Reviews:** discussion, agreed actions, automatic last/next-review updates and separate authenticated participant acknowledgements.
 - **Actions and interventions:** owners, deadlines, overdue cohorts and completion/reopening.
@@ -125,3 +127,13 @@ The core workflows have server persistence and production deployment configurati
 Before real learner use, complete provider-specific requirements and a security/accessibility review, implement malware scanning, off-site backup configuration and retention policies, configure official versioned standards and applicable funding rules, and test the deployment. There is no multi-organisation tenancy, SSO/MFA, account invitation/reset email (master-managed password recovery is available), ILR/MIS/LMS integration, EPA-provider integration, email/SMS/push notifications, live video capture, plagiarism service, or qualified electronic signature. Review acknowledgements are recorded attestations, not qualified signatures. Gateway checks support provider judgement and do not certify funding or assessment eligibility. Automated risk uses configured rules; forecasting uses entered dates, not AI.
 
 See [docs/FEATURES.md](docs/FEATURES.md) for the functional map and remaining parity work.
+
+<details><summary>See the IQA sampling calendar</summary>
+
+![IQA sampling calendar](docs/iqa-sampling-calendar.png)
+
+</details>
+
+## Requested official KSB catalogue
+
+The four requested full current standards have **not** been imported as verified: Business Administrator L3, Digital Applications Technician L3, Team Leader L3 and Operations Manager L5. The official Skills England / IfATE sources returned network-access errors in the development environment on 23 October 2026. The uploaded reference includes only an incomplete Digital Applications Technician extract, so it is not sufficient for an authoritative import. Existing fictional learners and their example standard mappings are retained. Obtain the full official documents, confirm the current version and the digital pathway, then import the exact wording using **Standards & KSBs**. Do not treat existing training templates as the full occupational standards.
