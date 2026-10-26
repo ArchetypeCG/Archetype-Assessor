@@ -323,7 +323,7 @@ function visible(s, u) {
     (x) =>
       !x.standardId ||
       ls.some((l) => l.standardId === x.standardId) ||
-      u.role === "Manager",
+      staff.includes(u.role),
   );
   if (u.role === "Employer") {
     out.evidence = [];
@@ -788,7 +788,11 @@ function command(s, u, kind, p) {
         ? s.evidence.find((x) => x.id === p.id && x.learnerId === l.id)
         : null;
       if (p.id && !old) fail("Evidence not found.", 404);
-      if (old && !["Draft", "Changes requested"].includes(old.status))
+      if (
+        old &&
+        !editors.includes(u.role) &&
+        !["Draft", "Changes requested"].includes(old.status)
+      )
         fail("Only drafts or returned evidence can be edited.");
       if (old?.standardId && old.standardId !== l.standardId)
         fail("Archived programme evidence is read-only.");
@@ -824,6 +828,24 @@ function command(s, u, kind, p) {
         by: old?.by || u.id,
         updated: new Date().toISOString(),
         decisions: old?.decisions || [],
+        revisions: old
+          ? [
+              ...(old.revisions || []),
+              {
+                title: old.title,
+                type: old.type,
+                date: old.date,
+                description: old.description,
+                criteria: [...old.criteria],
+                files: [...old.files],
+                status: old.status,
+                feedback: old.feedback,
+                feedbackFiles: old.feedbackFiles || [],
+                by: u.id,
+                savedAt: new Date().toISOString(),
+              },
+            ]
+          : [],
       };
       if (item.files.length > 10) fail("Maximum 10 files per evidence item.");
       integrity.enqueue(item);
@@ -854,8 +876,8 @@ function command(s, u, kind, p) {
       const programmeLearner = learnerFor(s, u, e.learnerId);
       if (e.standardId && e.standardId !== programmeLearner.standardId)
         fail("Archived programme evidence is read-only.");
-      if (e.status !== "Submitted")
-        fail("Only submitted evidence can be assessed.");
+      if (!["Submitted", "Accepted", "Changes requested"].includes(e.status))
+        fail("Submit draft evidence before assessment.");
       e.status = choice(
         p.status,
         ["Accepted", "Changes requested"],
@@ -871,6 +893,12 @@ function command(s, u, kind, p) {
         status: e.status,
         feedback: e.feedback,
         files: e.feedbackFiles,
+        evidence: {
+          title: e.title,
+          description: e.description,
+          criteria: [...e.criteria],
+          files: [...e.files],
+        },
       });
       break;
     }

@@ -56,3 +56,11 @@ The built-in review analyses readable text for explicit AI-related expressions, 
 The queue persists across restarts and runs one memory-limited worker at a time, with a 45-second job timeout. Stored-work matching needs at least 50 readable words; internet and writing-pattern sampling need 80. PDF checks cover at most 100 pages and combined extracted text is limited to 100,000 characters. Unsupported files, unreadable scans and truncated text have explicit processing statuses. AI-writing analysis runs locally; external requests are search queries to the selected search provider.
 
 These changes preserve existing data, accounts and passwords and do not reset the workspace.
+
+## Standard resource libraries and evidence reassessment
+
+Resources → Resource library lists every standard automatically, including newly created standards with no resources yet. Select a standard and choose Add resource to preselect that standard. Shared resources have their own library. Renaming a standard preserves its library because resources use its stable ID. Assessment staff can maintain course resources; learners and employers retain access to resources for their assigned standards and shared materials.
+
+Open an evidence item to use Edit evidence & mapping. Master administrators and assigned assessors can edit current-programme evidence at any assessment stage. Apprentices can continue editing drafts and returned work. Saving an edit creates a version-history entry, retains uploaded files and assessment decisions, and returns the item to Draft or Submitted. Accepted KSB coverage is removed until the revised evidence is accepted again.
+
+Submitted, accepted and returned work can be assessed or reassessed by an authorised assessor or master administrator. Each decision appends to Assessment history and captures the evidence content, mappings and file references assessed. Existing historical records are preserved; earlier-standard evidence remains read-only.

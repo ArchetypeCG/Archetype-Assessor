@@ -2037,3 +2037,193 @@ test("Outlook subscriptions work without browser sessions, follow edits, and are
     403,
   );
 });
+
+test("standard libraries retain linked resources and staff can revise and reassess evidence without losing history", async () => {
+  const manager = await login("manager@archetype.demo");
+  let s = await state(manager);
+  const standard = {
+    name: "Resource library workflow",
+    reference: "ST9998",
+    version: "1.0",
+    level: 3,
+    criteria: [{ code: "K1", type: "Knowledge", text: "Demonstrate learning" }],
+  };
+  assert.equal((await command("standard.save", standard, manager)).status, 200);
+  s = await state(manager);
+  const created = s.standards.find((x) => x.reference === standard.reference);
+  assert(created);
+  assert.equal(
+    s.resources.filter((r) => r.standardId === created.id).length,
+    0,
+  );
+  assert.equal(
+    (
+      await command(
+        "resource.add",
+        {
+          title: "Course guide",
+          category: "Learning material",
+          standardId: created.id,
+          url: "https://example.com/guide",
+        },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await command(
+        "standard.save",
+        { ...created, name: "Updated library workflow" },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  s = await state(manager);
+  assert.equal(
+    s.resources.find((r) => r.title === "Course guide").standardId,
+    created.id,
+  );
+  const learner = s.learners[0],
+    st = s.standards.find((x) => x.id === learner.standardId);
+  const payload = {
+    learnerId: learner.id,
+    title: "Revision workflow",
+    type: "Work product",
+    date: today(),
+    description: "Original evidence content",
+    criteria: [st.criteria[0].code],
+    status: "Submitted",
+    files: [],
+  };
+  assert.equal((await command("evidence.save", payload, manager)).status, 200);
+  let evidence = (await state(manager)).evidence.find(
+    (e) => e.title === payload.title,
+  );
+  assert.equal(
+    (
+      await command(
+        "evidence.assess",
+        {
+          id: evidence.id,
+          status: "Accepted",
+          feedback: "Original decision",
+          files: [],
+        },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await command(
+        "evidence.assess",
+        {
+          id: evidence.id,
+          status: "Changes requested",
+          feedback: "Reassessment identifies a gap",
+          files: [],
+        },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  evidence = (await state(manager)).evidence.find((e) => e.id === evidence.id);
+  assert.equal(evidence.decisions.length, 2);
+  assert.equal(evidence.decisions[0].status, "Accepted");
+  assert.equal(evidence.decisions[1].evidence.description, payload.description);
+  assert.equal(
+    (
+      await command(
+        "evidence.assess",
+        {
+          id: evidence.id,
+          status: "Accepted",
+          feedback: "Gap resolved",
+          files: [],
+        },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await command(
+        "evidence.save",
+        {
+          ...payload,
+          id: evidence.id,
+          title: "Revised evidence",
+          description: "Updated evidence content",
+        },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  evidence = (await state(manager)).evidence.find((e) => e.id === evidence.id);
+  assert.equal(evidence.status, "Submitted");
+  assert.equal(evidence.revisions.at(-1).description, payload.description);
+  assert.equal(evidence.revisions.at(-1).status, "Accepted");
+  assert.equal(evidence.decisions.length, 3);
+  assert.equal(
+    (
+      await command(
+        "evidence.assess",
+        {
+          id: evidence.id,
+          status: "Accepted",
+          feedback: "Revised work accepted",
+          files: [],
+        },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  evidence = (await state(manager)).evidence.find((e) => e.id === evidence.id);
+  assert.equal(evidence.decisions.length, 4);
+  assert.equal(
+    evidence.decisions.at(-1).evidence.description,
+    "Updated evidence content",
+  );
+  const apprenticeLogin = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: "NewLearnerPassword123!",
+    }),
+  });
+  assert.equal(apprenticeLogin.status, 200);
+  const apprentice = apprenticeLogin.cookie;
+  const own = (await state(apprentice)).learners[0];
+  const ownEvidence = (await state(apprentice)).evidence.find(
+    (e) => e.learnerId === own.id && e.status === "Accepted",
+  );
+  if (ownEvidence)
+    assert.equal(
+      (
+        await command(
+          "evidence.save",
+          { ...ownEvidence, learnerId: own.id, status: "Submitted" },
+          apprentice,
+        )
+      ).status,
+      400,
+    );
+  assert.equal(
+    (
+      await command(
+        "evidence.assess",
+        { id: evidence.id, status: "Accepted", feedback: "Unauthorised" },
+        apprentice,
+      )
+    ).status,
+    403,
+  );
+});

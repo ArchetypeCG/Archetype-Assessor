@@ -2885,10 +2885,19 @@ function Standards() {
 function Resources() {
   const { s, user, setModal } = useApp(),
     [q, Q] = useState(""),
-    items = s.resources.filter((r) =>
-      `${r.title} ${r.description} ${r.category}`
-        .toLowerCase()
-        .includes(q.toLowerCase()),
+    [library, LIBRARY] = useState(""),
+    libraries = s.standards.filter(
+      (st) =>
+        ["Manager", "Assessor", "IQA"].includes(user.role) ||
+        s.learners.some((l) => l.standardId === st.id),
+    ),
+    items = s.resources.filter(
+      (r) =>
+        (!library ||
+          (library === "shared" ? !r.standardId : r.standardId === library)) &&
+        `${r.title} ${r.description} ${r.category}`
+          .toLowerCase()
+          .includes(q.toLowerCase()),
     );
   return (
     <Panel
@@ -2896,13 +2905,43 @@ function Resources() {
       subtitle="Guidance, learning materials, policies and EPA preparation"
       action={
         ["Manager", "Assessor", "IQA"].includes(user.role) && (
-          <Button onClick={() => setModal({ type: "resource" })}>
+          <Button
+            onClick={() =>
+              setModal({
+                type: "resource",
+                standardId: library === "shared" ? "" : library,
+              })
+            }
+          >
             <Plus size={15} />
             Add resource
           </Button>
         )
       }
     >
+      <label>
+        Resource library
+        <select
+          aria-label="Resource library"
+          value={library}
+          onChange={(e) => LIBRARY(e.target.value)}
+        >
+          <option value="">All libraries</option>
+          <option value="shared">Shared resources</option>
+          {libraries.map((st) => (
+            <option key={st.id} value={st.id}>
+              {st.name} ·{" "}
+              {s.resources.filter((r) => r.standardId === st.id).length}{" "}
+              resources
+            </option>
+          ))}
+        </select>
+      </label>
+      {library && library !== "shared" && (
+        <h3>
+          {libraries.find((st) => st.id === library)?.name} resource library
+        </h3>
+      )}
       <div className="searchbox resource-search">
         <Search size={17} />
         <input
@@ -2941,7 +2980,8 @@ function Resources() {
       </div>
       {!items.length && (
         <Empty>
-          Add the resources that help your learners take their next step.
+          This library is ready. Add learning materials, templates, links and
+          files for this standard.
         </Empty>
       )}
     </Panel>
@@ -4446,6 +4486,25 @@ function ModalHost() {
                     <Files files={item.feedbackFiles} />
                   </div>
                 )}
+                {item.revisions?.length > 0 && (
+                  <details>
+                    <summary>Evidence version history</summary>
+                    {item.revisions.map((r, i) => (
+                      <div className="decision-entry" key={i}>
+                        <strong>
+                          Version {i + 1} · {r.title} · {r.status}
+                        </strong>
+                        <p>
+                          Saved before edit by {nameOf(s, r.by)} ·{" "}
+                          {fmt(r.savedAt)}
+                        </p>
+                        <p className="preserve-text">{r.description}</p>
+                        <p>{r.criteria.join(", ")}</p>
+                        <Files files={r.files} />
+                      </div>
+                    ))}
+                  </details>
+                )}
                 {item.decisions?.length > 0 && (
                   <details>
                     <summary>Assessment history</summary>
@@ -4456,13 +4515,20 @@ function ModalHost() {
                         </strong>
                         <p>{d.feedback}</p>
                         <Files files={d.files} />
+                        {d.evidence && (
+                          <p>
+                            Evidence assessed: {d.evidence.title} ·{" "}
+                            {d.evidence.criteria.join(", ")}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </details>
                 )}
                 {(!item.standardId ||
                   item.standardId === learner?.standardId) &&
-                  ["Draft", "Changes requested"].includes(item.status) &&
+                  (["Manager", "Assessor"].includes(user.role) ||
+                    ["Draft", "Changes requested"].includes(item.status)) &&
                   ["Manager", "Assessor", "Apprentice"].includes(user.role) && (
                     <div className="button-row">
                       <Button
@@ -4474,37 +4540,44 @@ function ModalHost() {
                       >
                         Edit evidence & mapping
                       </Button>
-                      {item.criteria.length > 0 && (
-                        <Button
-                          type="button"
-                          disabled={pending}
-                          onClick={async () => {
-                            P(true);
-                            try {
-                              await command("evidence.submit", {
-                                id: item.id,
-                                learnerId: item.learnerId,
-                              });
-                              setModal(null);
-                            } catch (e) {
-                              E(e.message);
-                            } finally {
-                              P(false);
-                            }
-                          }}
-                        >
-                          Submit evidence <Send size={15} />
-                        </Button>
-                      )}
+                      {["Draft", "Changes requested"].includes(item.status) &&
+                        item.criteria.length > 0 && (
+                          <Button
+                            type="button"
+                            disabled={pending}
+                            onClick={async () => {
+                              P(true);
+                              try {
+                                await command("evidence.submit", {
+                                  id: item.id,
+                                  learnerId: item.learnerId,
+                                });
+                                setModal(null);
+                              } catch (e) {
+                                E(e.message);
+                              } finally {
+                                P(false);
+                              }
+                            }}
+                          >
+                            Submit evidence <Send size={15} />
+                          </Button>
+                        )}
                     </div>
                   )}
                 {(!item.standardId ||
                   item.standardId === learner?.standardId) &&
-                  item.status === "Submitted" &&
+                  ["Submitted", "Accepted", "Changes requested"].includes(
+                    item.status,
+                  ) &&
                   ["Manager", "Assessor"].includes(user.role) && (
                     <div className="assessment-form">
                       <Field
-                        label="Assessment decision"
+                        label={
+                          item.status === "Submitted"
+                            ? "Assessment decision"
+                            : "Reassessment decision"
+                        }
                         name="status"
                         type="select"
                         options={["Accepted", "Changes requested"]}
@@ -4514,6 +4587,7 @@ function ModalHost() {
                         name="feedback"
                         type="textarea"
                         rows={4}
+                        defaultValue={item.feedback}
                         required
                       />
                       <Field
@@ -4722,6 +4796,7 @@ function ModalHost() {
                   label="Standard"
                   name="standardId"
                   type="select"
+                  defaultValue={modal.standardId || ""}
                   options={[
                     { value: "", label: "All standards" },
                     ...standards,
@@ -5152,7 +5227,9 @@ function ModalHost() {
               type === "evidenceDetail" &&
               !(
                 (!item.standardId || item.standardId === learner?.standardId) &&
-                item.status === "Submitted" &&
+                ["Submitted", "Accepted", "Changes requested"].includes(
+                  item.status,
+                ) &&
                 ["Manager", "Assessor"].includes(user.role)
               )
             ) &&
