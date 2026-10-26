@@ -71,4 +71,4 @@ Open an apprentice’s profile and use Choose profile photo → Save profile pho
 
 Uploaded images are stored in the existing persistent SQLite files table and included in encrypted database backups. Their image endpoint requires authentication and the same learner access checks as the apprentice record, with private/no-store caching. Photos display on profiles, apprentice lists and dashboard learner rows; initials remain the fallback. Account login details and learning records are unchanged.
 
-Alex Rowan’s existing fictional profile uses an AI-generated sample portrait when no uploaded photo is present. It is labelled in the photo controls. Replacing or removing it takes precedence, and removal does not make the sample reappear. No real apprentice receives a generated portrait.
+All six existing fictional profiles (Alex Rowan, Taylor Vale, Morgan Ellis, Casey Linden, Jordan Ash and Riley Brook) use distinct AI-generated sample portraits when no uploaded photo is present. Each is labelled in the photo controls. Uploaded photos take precedence, and removal does not make a sample portrait reappear. No real apprentice receives a generated portrait.

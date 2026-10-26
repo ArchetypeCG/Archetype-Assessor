@@ -2,19 +2,28 @@ import React, { useEffect, useState } from "react";
 import { initials } from "./lib";
 import { sessionLink } from "./session";
 import samplePortrait from "./assets/fictional-apprentice.png";
-const sample = (learner) =>
-  learner.fictional &&
-  learner.name.startsWith("Alex Rowan") &&
-  !learner.photoHidden;
+import { fictionalPortraitKey } from "../server/profile-photo.mjs";
+import taylorPortrait from "./assets/fictional-taylor.png";
+import morganPortrait from "./assets/fictional-morgan.png";
+import caseyPortrait from "./assets/fictional-casey.png";
+import jordanPortrait from "./assets/fictional-jordan.png";
+import rileyPortrait from "./assets/fictional-riley.png";
+const portraits = {
+  alex: samplePortrait,
+  taylor: taylorPortrait,
+  morgan: morganPortrait,
+  casey: caseyPortrait,
+  jordan: jordanPortrait,
+  riley: rileyPortrait,
+};
+const sample = (learner) => portraits[fictionalPortraitKey(learner)] || "";
 export function LearnerAvatar({ learner, large = false }) {
   const [failed, F] = useState(false);
   const source = learner.photo
     ? sessionLink(
         `/api/learners/${learner.id}/photo?v=${encodeURIComponent(learner.photo.id)}`,
       )
-    : sample(learner)
-      ? samplePortrait
-      : "";
+    : sample(learner);
   useEffect(() => F(false), [source]);
   return (
     <span className={"avatar learner-avatar" + (large ? " large" : "")}>

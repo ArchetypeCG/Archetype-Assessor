@@ -22,3 +22,21 @@ export function validateProfilePhoto(file) {
     );
   return { body, type };
 }
+
+// Only the explicitly fictional practice records receive generated portraits.
+export function fictionalPortraitKey(learner) {
+  if (!learner?.fictional || learner.photoHidden) return "";
+  const name = String(learner.name || "")
+    .replace(/\s*\(fictional\)\s*$/, "")
+    .trim();
+  return (
+    {
+      "Alex Rowan": "alex",
+      "Taylor Vale": "taylor",
+      "Morgan Ellis": "morgan",
+      "Casey Linden": "casey",
+      "Jordan Ash": "jordan",
+      "Riley Brook": "riley",
+    }[name] || ""
+  );
+}
