@@ -1,6 +1,12 @@
 import { Worker } from "node:worker_threads";
 import { randomUUID } from "node:crypto";
-export function createIntegrityService({ db, get, put, enabled }) {
+export function createIntegrityService({
+  db,
+  get,
+  put,
+  enabled,
+  internet = { enabled: false },
+}) {
   db.exec(
     "CREATE TABLE IF NOT EXISTS integrity_jobs(evidence_id TEXT PRIMARY KEY,version TEXT NOT NULL,status TEXT NOT NULL);CREATE TABLE IF NOT EXISTS evidence_text(evidence_id TEXT PRIMARY KEY,text TEXT NOT NULL,checked_at TEXT NOT NULL)",
   );
@@ -14,11 +20,11 @@ export function createIntegrityService({ db, get, put, enabled }) {
     deadline;
   function enqueue(e) {
     if (!enabled) {
-      e.integrity = { status: "Not checked", aiStatus: "Not scored" };
+      e.integrity = { status: "Not checked", aiStatus: "Not checked" };
       return;
     }
     e.contentVersion = randomUUID();
-    e.integrity = { status: "Queued", aiStatus: "Not scored" };
+    e.integrity = { status: "Queued", aiStatus: "Queued" };
     db.prepare(
       "INSERT OR REPLACE INTO integrity_jobs VALUES(?,?,'Queued')",
     ).run(e.id, e.contentVersion);
@@ -73,7 +79,7 @@ export function createIntegrityService({ db, get, put, enabled }) {
         if (e?.contentVersion === job.version) {
           e.integrity = result?.report || {
             status: "Check unavailable",
-            aiStatus: "Not scored",
+            aiStatus: "Not checked",
             reason:
               "The internal text check could not finish. Try again or review the work manually.",
           };
@@ -92,7 +98,12 @@ export function createIntegrityService({ db, get, put, enabled }) {
       }
     }
     worker = new Worker(new URL("./integrity-worker.mjs", import.meta.url), {
-      workerData: { description: evidence.description, files, corpus },
+      workerData: {
+        description: evidence.description,
+        files,
+        corpus,
+        internet,
+      },
       resourceLimits: { maxOldGenerationSizeMb: 256 },
     });
     worker.once("message", finish);

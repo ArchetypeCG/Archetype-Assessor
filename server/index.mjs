@@ -445,6 +445,13 @@ const integrity = createIntegrityService({
   enabled:
     process.env.INTEGRITY_ENABLED === "1" ||
     (!demo && process.env.INTEGRITY_ENABLED !== "0"),
+  internet: {
+    enabled:
+      process.env.INTERNET_CHECK_ENABLED === "1" ||
+      (!demo && process.env.INTERNET_CHECK_ENABLED !== "0"),
+    provider: process.env.INTERNET_SEARCH_PROVIDER || "bing",
+    apiKey: process.env.BRAVE_SEARCH_API_KEY || "",
+  },
 });
 function courseName(value) {
   return String(value)

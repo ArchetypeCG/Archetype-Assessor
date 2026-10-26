@@ -24,14 +24,35 @@ The apprentice form includes English and maths upskill options. They appear on g
 
 Confidential learner notes are available on the portfolio only to the master user and the assigned assessor. Both dedicated note records and existing staff-note text are removed from apprentice, employer and IQA API responses. Tracker notes are likewise restricted to the master/assessor. Confidential notes are not included in EPA packs or learner-facing review content. Encrypted administrator backups still contain the full authorised workspace.
 
-## Internal similarity and AI review
+## Originality checks: stored work, internet sources and AI writing review
 
-New evidence uploads automatically queue a local text check in production. No learner work is sent to an external AI or plagiarism service. Set INTEGRITY_ENABLED=0 to disable checks, or =1 to enable them explicitly (including a training workspace). The queue persists across restarts and runs one worker at a time, without blocking the HTTP request. Existing evidence can be checked using Check internal similarity.
+New evidence uploads queue originality checks in production. Existing evidence can be checked with **Run originality checks**. Reports contain separate stored-work, internet-source and AI-writing sections. These checks do not automatically change assessment decisions, grades, KSB coverage or gateway readiness.
 
-The worker reads evidence commentary and readable TXT/Markdown/CSV, DOCX main-body text and PDF text. It compares normalised seven-word phrases with up to 2,000 recently checked stored submissions, within an eight-million-character comparison budget, excluding the same evidence item. The reported percentage is the highest matching share against a stored comparison text, not a verdict of plagiarism. It does not search the internet, publications or commercial reference databases and does not automatically index all historic evidence. Shared prompts, quotations and legitimate reuse can match. Other learners' names, text and file details are never disclosed in a result.
+### Stored work
 
-At least 50 readable words are needed for a percentage; no comparison source produces No comparison sources rather than a fabricated score. Images, scanned/password-protected PDFs and unsupported files require manual review. PDF text checks are limited to 100 pages and combined text to the first 100,000 characters. Work runs in a memory-limited worker with a 45-second timeout. Failures show Check unavailable instead of an invented result. Extracted comparison text is stored privately in SQLite, outside the API workspace; normal encrypted backups include it.
+Readable TXT/Markdown/CSV, DOCX main-body text and PDF text are compared using normalised seven-word phrases with up to 2,000 recently checked stored submissions, within an eight-million-character comparison budget. The same evidence item is excluded. Results show the matching share and number of documents compared. Extracted comparison text remains in private SQLite tables and is included in encrypted administrator backups.
 
-There is deliberately **no AI-authorship probability score**. Repeated-paragraph counts are review signals only, not evidence of AI use. Assessors should use discussion, drafts and workplace evidence to establish understanding. Similarity/AI review never automatically rejects evidence, changes a KSB decision or blocks gateway readiness.
+### Internet source matching
+
+Production checks also search up to four short, distributed passages using quoted exact-phrase queries. The report shows the provider, number of completed searches, matched passages, source URLs and matching search-result excerpts. Matching is confirmed against the returned excerpt before a source is listed. The reported percentage counts the sampled passages that matched, rather than estimating a percentage of the whole assignment. The application does not fetch or execute source-page content.
+
+Queries send short passages from the evidence to the selected search provider, not the complete file or learner-account metadata. Direct email addresses, web URLs and long numeric identifiers are removed before passage selection. Authorised administrators should configure internet checking according to the organisation's arrangements for learner work.
+
+| Render environment key | Value / purpose |
+| --- | --- |
+| INTEGRITY_ENABLED | 1 enables the complete pipeline; 0 disables it. Enabled by default in production. |
+| INTERNET_CHECK_ENABLED | 1 enables internet checks; 0 disables external searches. Enabled by default in production, off by default in a training workspace. |
+| INTERNET_SEARCH_PROVIDER | bing (default public RSS search) or brave (Brave Search API). |
+| BRAVE_SEARCH_API_KEY | A Brave Search API key, stored only in Render Environment when using brave. |
+
+Bing's public RSS service requires no application key. Availability depends on the provider accepting the server's requests. Brave supports a configured API subscription. Failed, blocked, malformed or timed-out searches show Search unavailable or Partly checked; the system never substitutes a zero-match result for a failed search. Invalid or missing provider configuration has its own status. Search calls have bounded response sizes and request timeouts. Search-provider credentials are never included in reports or logs.
+
+### AI-writing review
+
+The built-in review analyses readable text for explicit AI-related expressions, repeated stock transitions, very uniform sentence lengths and repeated paragraphs. Reports list the observed patterns, a follow-up recommendation and questions about the learner's explanation, drafts, workplace examples or source notes. The method is labelled Rule-based writing-pattern review. It produces review advice and observations, not an authorship probability. Short submissions display More text needed. The interface uses concise results/statuses in place of the previous generic boilerplate.
+
+### Processing and supported content
+
+The queue persists across restarts and runs one memory-limited worker at a time, with a 45-second job timeout. Stored-work matching needs at least 50 readable words; internet and writing-pattern sampling need 80. PDF checks cover at most 100 pages and combined extracted text is limited to 100,000 characters. Unsupported files, unreadable scans and truncated text have explicit processing statuses. AI-writing analysis runs locally; external requests are search queries to the selected search provider.
 
 These changes preserve existing data, accounts and passwords and do not reset the workspace.

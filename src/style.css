@@ -3585,3 +3585,7 @@ input[type="file"]::file-selector-button {
 .otj-status.planned > strong {
   color: #8a651c;
 }
+
+.feedback-box .decision-entry {
+  overflow-wrap: anywhere;
+}

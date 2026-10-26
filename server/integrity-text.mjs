@@ -1,3 +1,4 @@
+import { reviewAIWriting } from "./writing-review.mjs";
 import JSZip from "jszip";
 const normalise = (text) =>
   String(text)
@@ -27,6 +28,7 @@ export function compareText(text, corpus = []) {
     .split(/\n\s*\n/)
     .map((p) => p.trim())
     .filter((p) => p.length > 100);
+  const aiReview = reviewAIWriting(text);
   return {
     status:
       words.length < 50
@@ -38,12 +40,10 @@ export function compareText(text, corpus = []) {
       words.length >= 50 && compared ? Math.round(highest * 100) : null,
     wordCount: words.length,
     comparedDocuments: compared,
-    scope:
-      "Internal comparison with up to 2,000 recent stored evidence texts; no internet or external database search.",
+    scope: "Stored-work comparison with up to 2,000 recent evidence texts.",
     repeatedParagraphs: paragraphs.length - new Set(paragraphs).size,
-    aiStatus: "Not scored",
-    aiExplanation:
-      "Writing style cannot reliably establish AI authorship. Review the learner's understanding and drafting process; this is not an AI probability score.",
+    aiStatus: aiReview.status,
+    aiReview,
   };
 }
 const xmlText = (xml) =>

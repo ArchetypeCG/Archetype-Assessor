@@ -1448,6 +1448,13 @@ function Evidence({ learner }) {
                   : e.integrity?.status || "Not checked"}
               </small>
               <small>
+                Internet: {e.integrity?.internet?.status || "Not checked"} · AI
+                review:{" "}
+                {e.integrity?.aiReview?.recommendation ||
+                  e.integrity?.aiReview?.status ||
+                  "Not checked"}
+              </small>
+              <small>
                 {e.type} · {fmt(e.date)} · {e.files.length} files
                 {e.standardId && e.standardId !== learner.standardId
                   ? " · Earlier standard"

@@ -268,7 +268,8 @@ export function IntegrityReport({ evidence, onRecheck, busy }) {
   }, [report.status, evidence.id]);
   return (
     <section className="feedback-box">
-      <h3>Internal similarity check</h3>
+      <h3>Originality review</h3>
+      <h4>Stored-work similarity</h4>
       <p>
         {report.status}
         {report.similarity != null ? ` · ${report.similarity}% text match` : ""}
@@ -279,11 +280,33 @@ export function IntegrityReport({ evidence, onRecheck, busy }) {
           submissions compared.
         </p>
       )}
-      <p className="caption">
-        Internal matches only; no internet search. Similarity can include quoted
-        material and shared assignment wording. An assessor must review any
-        match.
+      <h4>Internet source check</h4>
+      <p>
+        {report.internet?.status || "Not checked"}
+        {report.internet?.provider ? ` · ${report.internet.provider}` : ""}
       </p>
+      {report.internet?.searchedPassages > 0 && (
+        <p>
+          {report.internet.matchedPassages} of{" "}
+          {report.internet.searchedPassages} searched passages matched.
+          {report.internet.requestedPassages
+            ? ` ${report.internet.searchedPassages} of ${report.internet.requestedPassages} planned searches completed.`
+            : ""}
+        </p>
+      )}
+      {report.internet?.status === "Checked" &&
+        !report.internet.matches?.length && (
+          <p>No matching passages returned.</p>
+        )}
+      {(report.internet?.matches || []).map((match, index) => (
+        <article className="decision-entry" key={match.url + index}>
+          <a href={match.url} target="_blank" rel="noreferrer noopener">
+            {match.title || match.url}
+          </a>
+          <p>{match.snippet}</p>
+          <small>Matched passage: {match.passage}</small>
+        </article>
+      ))}
       {report.unsupportedFiles?.length > 0 && (
         <p>
           Text could not be read from: {report.unsupportedFiles.join(", ")}.
@@ -293,16 +316,24 @@ export function IntegrityReport({ evidence, onRecheck, busy }) {
       {report.truncated && (
         <p>The text check covered the first 100,000 characters.</p>
       )}
-      <h4>AI authorship review</h4>
-      <p className="caption">
-        No reliable AI probability score is available. Use discussion, drafts
-        and workplace evidence to check the learner’s understanding.
-      </p>
-      {report.repeatedParagraphs > 0 && (
-        <p>
-          Review signal: {report.repeatedParagraphs} repeated paragraphs. This
-          is not evidence of AI use.
-        </p>
+      <h4>AI writing review</h4>
+      <p>{report.aiReview?.recommendation || "Not checked"}</p>
+      {report.aiReview?.method && <small>{report.aiReview.method}</small>}
+      {(report.aiReview?.signals || []).map((signal) => (
+        <div key={signal.name}>
+          <strong>{signal.name}</strong>
+          <p>{signal.detail}</p>
+        </div>
+      ))}
+      {report.aiReview?.questions?.length > 0 && (
+        <>
+          <h5>Suggested assessor questions</h5>
+          <ul>
+            {report.aiReview.questions.map((question) => (
+              <li key={question}>{question}</li>
+            ))}
+          </ul>
+        </>
       )}
       {onRecheck && (
         <button
@@ -311,7 +342,7 @@ export function IntegrityReport({ evidence, onRecheck, busy }) {
           disabled={busy || ["Queued", "Processing"].includes(report.status)}
           onClick={onRecheck}
         >
-          Check internal similarity
+          Run originality checks
         </button>
       )}
     </section>

@@ -40,7 +40,11 @@ test("internal similarity uses real text overlap, never invents an AI probabilit
   );
   assert.equal(compareText("short", [{ text: words }]).similarity, null);
   assert.equal(compareText(words, []).status, "No comparison sources");
-  assert.equal(compareText(words, [{ text: words }]).aiStatus, "Not scored");
+  assert.equal(compareText(words, [{ text: words }]).aiStatus, "Reviewed");
+  assert.equal(
+    compareText(words, [{ text: words }]).aiReview.method,
+    "Rule-based writing-pattern review",
+  );
   const zip = new JSZip();
   zip.file(
     "word/document.xml",
