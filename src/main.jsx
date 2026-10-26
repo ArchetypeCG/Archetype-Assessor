@@ -1,4 +1,4 @@
-import { LearnerAvatar, LearnerPhotoEditor } from "./learner-photo";
+import { LearnerPhotoEditor } from "./learner-photo";
 import {
   OTJProgress,
   PrivateLearnerNotes,
@@ -868,7 +868,7 @@ function FilterBar({ query, setQuery, filters = [], children }) {
   );
 }
 function Learners() {
-  const { s, openLearner, setModal, user, notify } = useApp(),
+  const { s, openLearner, setModal, user, notify, command, busy } = useApp(),
     [q, Q] = useState(""),
     [status, S] = useState(""),
     [rag, R] = useState(""),
@@ -973,18 +973,25 @@ function Learners() {
           {ls.slice((current - 1) * 12, current * 12).map((l) => (
             <tr key={l.id}>
               <td>
-                <button
-                  className="learner-cell"
-                  onClick={() => openLearner(l.id)}
-                >
-                  <LearnerAvatar learner={l} />
-                  <div>
+                <div className="learner-cell">
+                  <LearnerPhotoEditor
+                    learner={l}
+                    user={user}
+                    command={command}
+                    busy={busy}
+                    compact
+                  />
+                  <button
+                    type="button"
+                    className="learner-name-button"
+                    onClick={() => openLearner(l.id)}
+                  >
                     <strong>{l.name}</strong>
                     <small>
                       {l.ref} · {l.status}
                     </small>
-                  </div>
-                </button>
+                  </button>
+                </div>
               </td>
               <td>
                 <strong>{l.employer}</strong>
@@ -1115,7 +1122,13 @@ function LearnerProfile() {
         </div>
       )}
       <div className="learner-banner">
-        <LearnerAvatar learner={l} large />
+        <LearnerPhotoEditor
+          key={l.id}
+          learner={l}
+          user={user}
+          command={command}
+          busy={busy}
+        />
         <div>
           <h2>{l.name}</h2>
           <p>
@@ -1125,13 +1138,6 @@ function LearnerProfile() {
         <Tag>{l.rag}</Tag>
         <Tag>{l.status}</Tag>
       </div>
-      <LearnerPhotoEditor
-        key={l.id}
-        learner={l}
-        user={user}
-        command={command}
-        busy={busy}
-      />
       {l.tracker && ["Manager", "Assessor", "IQA"].includes(user.role) && (
         <Panel
           title="Imported WBL tracker"

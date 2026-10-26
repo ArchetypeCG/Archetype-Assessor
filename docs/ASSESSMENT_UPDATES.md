@@ -67,7 +67,7 @@ Submitted, accepted and returned work can be assessed or reassessed by an author
 
 ## Apprentice profile photos
 
-Open an apprentice’s profile and use Choose profile photo → Save profile photo. Master administrators, assigned assessors and apprentices on their own record can upload, replace or remove a photo. Choose JPG, PNG or WebP up to 5 MB. The browser previews the selection, centres a square crop and saves a resized JPEG without the original image metadata.
+Click an apprentice’s photo or initials in the apprentice list or profile to open the photo editor, then choose a photo and select Save profile photo. The overview has no permanent upload panel. Master administrators, assigned assessors and apprentices on their own record can upload, replace or remove a photo. Choose JPG, PNG or WebP up to 5 MB. The browser previews the selection, centres a square crop and saves a resized JPEG without the original image metadata.
 
 Uploaded images are stored in the existing persistent SQLite files table and included in encrypted database backups. Their image endpoint requires authentication and the same learner access checks as the apprentice record, with private/no-store caching. Photos display on profiles, apprentice lists and dashboard learner rows; initials remain the fallback. Account login details and learning records are unchanged.
 

@@ -3623,38 +3623,142 @@ input[type="file"]::file-selector-button {
   object-fit: cover;
   display: block;
 }
-.profile-photo-editor {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 18px 22px;
-  margin-bottom: 20px;
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #dce5e1);
-  border-radius: 14px;
+/* Profile photos open their editor from the avatar; no persistent upload panel. */
+.learner-avatar,
+.learner-cell .learner-avatar,
+.dash-person .learner-avatar {
+  width: 48px;
+  height: 48px;
+  font-size: 15px;
 }
-.profile-photo-editor p {
-  margin: 5px 0;
-  font-size: 12px;
+.learner-banner .learner-avatar.large,
+.profile-photo-dialog .learner-avatar.large {
+  width: 104px;
+  height: 104px;
+  font-size: 30px;
+}
+.profile-photo-trigger {
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.profile-photo-trigger:hover .learner-avatar {
+  box-shadow: 0 0 0 3px #418c83;
+}
+.profile-photo-trigger:focus-visible {
+  outline: 3px solid #267b70;
+  outline-offset: 5px;
+}
+.profile-photo-camera {
+  position: absolute;
+  right: 0;
+  bottom: 1px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #17685e;
+  color: white;
+  border: 2px solid white;
+}
+.profile-photo-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  padding: 26px;
+  box-sizing: border-box;
+  border: 1px solid #dce5e1;
+  border-radius: 22px;
+  background: #fff;
+  color: #253e3e;
+  box-shadow: 0 24px 80px #132f3940;
+}
+.profile-photo-dialog:not([open]) {
+  display: none;
+}
+.profile-photo-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.profile-photo-dialog::backdrop {
+  background: #132f3988;
+  backdrop-filter: blur(4px);
+}
+.photo-dialog-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.photo-dialog-heading h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+.photo-dialog-heading p {
+  margin: 0;
+  font-size: 13px;
+}
+.photo-dialog-preview {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
 }
 .photo-upload {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 13px;
   font-weight: 600;
   max-width: 100%;
 }
 .photo-upload input {
   max-width: 100%;
+  min-width: 0;
 }
 .photo-preview {
-  width: 70px;
-  height: 70px;
+  width: 140px;
+  height: 140px;
   object-fit: cover;
   border-radius: 50%;
 }
-.profile-photo-editor .form-error {
-  width: 100%;
+@media (max-width: 600px) {
+  .learner-banner .learner-avatar.large {
+    width: 80px;
+    height: 80px;
+    font-size: 24px;
+  }
+  .learner-banner > div:nth-child(2) {
+    flex-basis: calc(100% - 100px);
+    min-width: 0;
+  }
+  .profile-photo-dialog {
+    padding: 20px;
+  }
+}
+.learner-name-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.learner-name-button:focus-visible {
+  outline: 2px solid #267b70;
+  outline-offset: 4px;
+}
+.profile-photo-trigger.compact .profile-photo-camera {
+  width: 20px;
+  height: 20px;
+  right: -2px;
+  bottom: -2px;
+}
+.profile-photo-trigger.compact .profile-photo-camera svg {
+  width: 11px;
+  height: 11px;
 }
