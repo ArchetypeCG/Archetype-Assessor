@@ -1,3 +1,4 @@
+import { LearnerAvatar } from "./learner-photo";
 import React from "react";
 import {
   Users,
@@ -138,7 +139,7 @@ function Person({ learner, onClick, detail, children }) {
   return (
     <div className="dash-person">
       <button onClick={onClick}>
-        <span className="avatar">{initials(learner.name)}</span>
+        <LearnerAvatar learner={learner} />
         <span>
           <strong>{learner.name}</strong>
           <small>{detail || learner.employer}</small>

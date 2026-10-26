@@ -1,3 +1,4 @@
+import { LearnerAvatar, LearnerPhotoEditor } from "./learner-photo";
 import {
   OTJProgress,
   PrivateLearnerNotes,
@@ -976,7 +977,7 @@ function Learners() {
                   className="learner-cell"
                   onClick={() => openLearner(l.id)}
                 >
-                  <span className="avatar">{initials(l.name)}</span>
+                  <LearnerAvatar learner={l} />
                   <div>
                     <strong>{l.name}</strong>
                     <small>
@@ -1063,7 +1064,8 @@ function LearnerPicker() {
 }
 function LearnerProfile() {
   const ctx = useApp();
-  const { s, profile, setProfile, go, setModal, user } = useApp(),
+  const { s, profile, setProfile, go, setModal, user, command, busy } =
+      useApp(),
     l = s.learners.find((x) => x.id === profile.id);
   if (!l) return <Empty>Learner record unavailable.</Empty>;
   const tabs =
@@ -1113,7 +1115,7 @@ function LearnerProfile() {
         </div>
       )}
       <div className="learner-banner">
-        <div className="avatar large">{initials(l.name)}</div>
+        <LearnerAvatar learner={l} large />
         <div>
           <h2>{l.name}</h2>
           <p>
@@ -1123,6 +1125,13 @@ function LearnerProfile() {
         <Tag>{l.rag}</Tag>
         <Tag>{l.status}</Tag>
       </div>
+      <LearnerPhotoEditor
+        key={l.id}
+        learner={l}
+        user={user}
+        command={command}
+        busy={busy}
+      />
       {l.tracker && ["Manager", "Assessor", "IQA"].includes(user.role) && (
         <Panel
           title="Imported WBL tracker"

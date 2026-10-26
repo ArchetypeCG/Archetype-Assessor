@@ -2227,3 +2227,120 @@ test("standard libraries retain linked resources and staff can revise and reasse
     403,
   );
 });
+
+test("apprentice photos persist privately, can be replaced and removed, and enforce learner access", async () => {
+  const manager = await login("manager@archetype.demo"),
+    s = await state(manager),
+    learner = s.learners[0];
+  const png =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=";
+  const path = `/api/learners/${learner.id}/photo`;
+  assert.equal((await fetch(base + path)).status, 401);
+  assert.equal(
+    (
+      await command(
+        "learner.photo",
+        {
+          learnerId: learner.id,
+          file: { base64: Buffer.from("<svg></svg>").toString("base64") },
+        },
+        manager,
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await command(
+        "learner.photo",
+        { learnerId: learner.id, file: { base64: png } },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  let photo = (await state(manager)).learners.find(
+    (l) => l.id === learner.id,
+  ).photo;
+  assert(photo.id);
+  let response = await fetch(base + path, { headers: { cookie: manager } });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "image/png");
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  assert.deepEqual(
+    Buffer.from(await response.arrayBuffer()),
+    Buffer.from(png, "base64"),
+  );
+  assert.equal(
+    (
+      await command(
+        "learner.photo",
+        { learnerId: learner.id, file: { base64: png } },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  const replaced = (await state(manager)).learners.find(
+    (l) => l.id === learner.id,
+  ).photo;
+  assert.notEqual(replaced.id, photo.id);
+  const apprenticeLogin = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: "NewLearnerPassword123!",
+    }),
+  });
+  assert.equal(apprenticeLogin.status, 200);
+  const apprentice = apprenticeLogin.cookie,
+    own = (await state(apprentice)).learners[0];
+  const other = s.learners.find((l) => l.id !== own.id);
+  assert.equal(
+    (
+      await command(
+        "learner.photo",
+        { learnerId: other.id, file: { base64: png } },
+        apprentice,
+      )
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await fetch(base + `/api/learners/${other.id}/photo`, {
+        headers: { cookie: apprentice },
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await command(
+        "learner.photo",
+        { learnerId: own.id, file: { base64: png } },
+        apprentice,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await command(
+        "learner.photo",
+        { learnerId: learner.id, remove: true },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  const removed = (await state(manager)).learners.find(
+    (l) => l.id === learner.id,
+  );
+  assert.equal(removed.photo, null);
+  assert.equal(removed.photoHidden, true);
+  assert.equal(
+    (await fetch(base + path, { headers: { cookie: manager } })).status,
+    404,
+  );
+});

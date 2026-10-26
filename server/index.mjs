@@ -1,3 +1,4 @@
+import { validateProfilePhoto } from "./profile-photo.mjs";
 import http from "node:http";
 import { createCalendarSubscriptions } from "./calendar-subscriptions.mjs";
 import { createIntegrityService } from "./integrity.mjs";
@@ -590,6 +591,35 @@ function command(s, u, kind, p) {
         standardId,
         by: u.id,
       });
+      break;
+    }
+    case "learner.photo": {
+      requireRole(u, [...editors, "Apprentice"]);
+      if (!l) fail("Select an apprentice.");
+      if (p.remove === true) {
+        l.photo = null;
+        l.photoHidden = true;
+      } else {
+        let image;
+        try {
+          image = validateProfilePhoto(p.file);
+        } catch (error) {
+          fail(error.message);
+        }
+        const fid = id();
+        db.prepare("INSERT INTO files VALUES(?,?,?,?)").run(
+          fid,
+          l.id,
+          "profile-photo",
+          image.body,
+        );
+        l.photo = {
+          id: fid,
+          type: image.type,
+          updated: new Date().toISOString(),
+        };
+        l.photoHidden = false;
+      }
       break;
     }
     case "learner.save": {
@@ -1809,6 +1839,30 @@ const server = http.createServer(async (req, res) => {
           "Cache-Control": "no-store",
         });
         return res.end(calendarICS(visible(s, u)));
+      }
+      if (
+        /^\/api\/learners\/[^/]+\/photo$/.test(path) &&
+        req.method === "GET"
+      ) {
+        const learner = learnerFor(s, u, path.split("/")[3]);
+        const photo = learner.photo;
+        const file =
+          photo &&
+          db
+            .prepare("SELECT * FROM files WHERE id=? AND learner_id=?")
+            .get(photo.id, learner.id);
+        if (
+          !file ||
+          !["image/jpeg", "image/png", "image/webp"].includes(photo.type)
+        )
+          fail("Profile photo not found.", 404);
+        res.writeHead(200, {
+          "Content-Type": photo.type,
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Security-Policy": "default-src 'none'; sandbox",
+        });
+        return res.end(Buffer.from(file.body));
       }
       if (path.startsWith("/api/files/") && req.method === "GET") {
         const fileId = path.split("/").at(-1),

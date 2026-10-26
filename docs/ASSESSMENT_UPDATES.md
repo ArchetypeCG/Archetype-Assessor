@@ -64,3 +64,11 @@ Resources → Resource library lists every standard automatically, including new
 Open an evidence item to use Edit evidence & mapping. Master administrators and assigned assessors can edit current-programme evidence at any assessment stage. Apprentices can continue editing drafts and returned work. Saving an edit creates a version-history entry, retains uploaded files and assessment decisions, and returns the item to Draft or Submitted. Accepted KSB coverage is removed until the revised evidence is accepted again.
 
 Submitted, accepted and returned work can be assessed or reassessed by an authorised assessor or master administrator. Each decision appends to Assessment history and captures the evidence content, mappings and file references assessed. Existing historical records are preserved; earlier-standard evidence remains read-only.
+
+## Apprentice profile photos
+
+Open an apprentice’s profile and use Choose profile photo → Save profile photo. Master administrators, assigned assessors and apprentices on their own record can upload, replace or remove a photo. Choose JPG, PNG or WebP up to 5 MB. The browser previews the selection, centres a square crop and saves a resized JPEG without the original image metadata.
+
+Uploaded images are stored in the existing persistent SQLite files table and included in encrypted database backups. Their image endpoint requires authentication and the same learner access checks as the apprentice record, with private/no-store caching. Photos display on profiles, apprentice lists and dashboard learner rows; initials remain the fallback. Account login details and learning records are unchanged.
+
+Alex Rowan’s existing fictional profile uses an AI-generated sample portrait when no uploaded photo is present. It is labelled in the photo controls. Replacing or removing it takes precedence, and removal does not make the sample reappear. No real apprentice receives a generated portrait.
