@@ -1073,7 +1073,7 @@ function LearnerProfile() {
           "Evidence",
           "Learning plan",
           "KSB coverage",
-          "Learning hours",
+          "Off-the-job log",
           "Reviews",
           "Actions",
           "Compliance",
@@ -1251,7 +1251,7 @@ function LearnerProfile() {
         <LearningPlan {...ctx} learner={l} />
       ) : profile.tab === "KSB coverage" ? (
         <Coverage learner={l} />
-      ) : profile.tab === "Learning hours" ? (
+      ) : profile.tab === "Off-the-job log" ? (
         <OTJ learner={l} />
       ) : profile.tab === "Reviews" ? (
         <Reviews learner={l} />
@@ -1779,10 +1779,15 @@ function Tasks({ learner }) {
   );
 }
 function OTJ({ learner }) {
-  const { s, user, setModal, act } = useApp(),
+  const { s, user, setModal, act, learnerId, setLearnerId } = useApp(),
+    [selected, SELECT] = useState(learner?.id || learnerId || ""),
     [showHistory, SHOWHISTORY] = useState(false),
     [filter, F] = useState("");
-  const ls = learner ? [learner] : s.learners,
+  const selectedLearner =
+      learner ||
+      s.learners.find((l) => l.id === selected) ||
+      (user.role === "Apprentice" ? s.learners[0] : null),
+    ls = selectedLearner ? [selectedLearner] : s.learners,
     ids = new Set(ls.map((l) => l.id)),
     items = s.otj.filter(
       (x) =>
@@ -1792,6 +1797,29 @@ function OTJ({ learner }) {
     );
   return (
     <>
+      {!learner && user.role !== "Apprentice" && (
+        <label className="learner-picker">
+          Apprentice
+          <select
+            aria-label="Off-the-job log apprentice"
+            value={selected}
+            onChange={(e) => {
+              SELECT(e.target.value);
+              if (e.target.value) setLearnerId(e.target.value);
+            }}
+          >
+            <option value="">All apprentices</option>
+            {s.learners.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name} · {l.ref}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {selectedLearner && (
+        <OTJProgress key={selectedLearner.id} learner={selectedLearner} />
+      )}
       <div className="metrics three">
         <Metric
           label="Approved learning hours"
@@ -1820,11 +1848,15 @@ function OTJ({ learner }) {
         />
       </div>
       <Panel
-        title="Off-the-job learning logs"
+        title="Off-the-job log"
         subtitle="Capture learning, not routine work. Provider must verify eligibility against the applicable funding rules."
         action={
           ["Manager", "Assessor", "Apprentice"].includes(user.role) && (
-            <Button onClick={() => setModal({ type: "otj", learner })}>
+            <Button
+              onClick={() =>
+                setModal({ type: "otj", learner: selectedLearner })
+              }
+            >
               <Plus size={15} />
               Log learning
             </Button>

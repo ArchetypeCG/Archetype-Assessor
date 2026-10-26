@@ -31,6 +31,7 @@ export const dashboardTitle = {
   Employer: "Employer dashboard",
 };
 export function pageLabel(page, role) {
+  if (page === "Off-the-job learning") return "Off-the-job log";
   if (page === "Command centre") return dashboardTitle[role] || page;
   const labels = {
     Apprentice: {
