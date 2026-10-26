@@ -424,7 +424,12 @@ function App() {
           </div>
           <div className="nav-scroll">
             {navGroups.map(([group, items]) => {
-              const links = items.filter(
+              const sectionItems = user.role === "Assessor"
+                ? group === "COMMAND CENTRE"
+                  ? [...items, [CalendarDays, "Calendar"]]
+                  : items.filter(([, title]) => title !== "Calendar")
+                : items;
+              const links = sectionItems.filter(
                 ([, title]) => !allowed || allowed.includes(title),
               );
               return (
