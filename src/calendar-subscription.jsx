@@ -1,3 +1,4 @@
+import { OutlookConnection } from "./outlook-connection";
 import React, { useEffect, useRef, useState } from "react";
 import { sessionHeaders } from "./session";
 export function CalendarSubscription({ user, command, busy }) {
@@ -42,100 +43,104 @@ export function CalendarSubscription({ user, command, busy }) {
     }
   }
   return (
-    <section className="outlook-subscription">
-      <h3>Automatic Outlook calendar updates</h3>
-      <p>
-        Subscribe to your visible sessions and reviews. Changes are picked up on
-        Outlook’s refresh schedule.
-      </p>
-      {status && (
+    <>
+      <OutlookConnection user={user} />
+      <section className="outlook-subscription">
+        <h3>Subscribe as a separate Outlook calendar</h3>
         <p>
-          {status.enabled
-            ? "Private subscription enabled"
-            : "No active subscription"}
-          {status.lastFetched
-            ? ` · Last fetched ${new Date(status.lastFetched).toLocaleString("en-GB", { timeZone: "Europe/London" })}`
-            : ""}
+          Subscribe to your visible sessions and reviews. Changes are picked up
+          on Outlook’s refresh schedule.
         </p>
-      )}
-      <div className="button-row">
-        <button
-          type="button"
-          className="button"
-          disabled={busy || !status}
-          onClick={create}
-        >
-          {status?.enabled
-            ? "Replace subscription link"
-            : "Create subscription link"}
-        </button>
-        {status?.enabled && (
+        {status && (
+          <p>
+            {status.enabled
+              ? "Private subscription enabled"
+              : "No active subscription"}
+            {status.lastFetched
+              ? ` · Last fetched ${new Date(status.lastFetched).toLocaleString("en-GB", { timeZone: "Europe/London" })}`
+              : ""}
+          </p>
+        )}
+        <div className="button-row">
           <button
             type="button"
-            className="button secondary"
-            disabled={busy}
-            onClick={revoke}
+            className="button"
+            disabled={busy || !status}
+            onClick={create}
           >
-            Revoke subscription
+            {status?.enabled
+              ? "Replace subscription link"
+              : "Create subscription link"}
           </button>
-        )}
-      </div>
-      {status?.enabled && !url && (
-        <p>
-          The link is shown only when created. Replacing it disconnects the old
-          link.
-        </p>
-      )}
-      {url && (
-        <div>
-          <label>
-            Private Outlook subscription link
-            <input
-              ref={ref}
-              type="text"
-              aria-label="Private Outlook subscription link"
-              readOnly
-              value={url}
-              onFocus={(event) => event.target.select()}
-            />
-          </label>
-          <div className="button-row">
+          {status?.enabled && (
             <button
               type="button"
               className="button secondary"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(url);
-                  M("Subscription link copied.");
-                } catch {
-                  ref.current?.select();
-                  M("Link selected. Copy it and paste it into Outlook.");
-                }
-              }}
+              disabled={busy}
+              onClick={revoke}
             >
-              Copy link
+              Revoke subscription
             </button>
-            <button type="button" className="text-link" onClick={() => U("")}>
-              Hide link
-            </button>
-          </div>
-          <p>Keep this link private. Anyone with it can read the calendar.</p>
+          )}
         </div>
-      )}
-      <ol>
-        <li>In Outlook on the web, open Calendar → Add calendar.</li>
-        <li>Choose Subscribe from web and paste your private link.</li>
-        <li>Name the calendar and select Import.</li>
-      </ol>
-      <p>
-        Manage sessions in Archetype. This subscription is read-only in Outlook.
-      </p>
-      {message && <p role="status">{message}</p>}
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
+        {status?.enabled && !url && (
+          <p>
+            The link is shown only when created. Replacing it disconnects the
+            old link.
+          </p>
+        )}
+        {url && (
+          <div>
+            <label>
+              Private Outlook subscription link
+              <input
+                ref={ref}
+                type="text"
+                aria-label="Private Outlook subscription link"
+                readOnly
+                value={url}
+                onFocus={(event) => event.target.select()}
+              />
+            </label>
+            <div className="button-row">
+              <button
+                type="button"
+                className="button secondary"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    M("Subscription link copied.");
+                  } catch {
+                    ref.current?.select();
+                    M("Link selected. Copy it and paste it into Outlook.");
+                  }
+                }}
+              >
+                Copy link
+              </button>
+              <button type="button" className="text-link" onClick={() => U("")}>
+                Hide link
+              </button>
+            </div>
+            <p>Keep this link private. Anyone with it can read the calendar.</p>
+          </div>
+        )}
+        <ol>
+          <li>In Outlook on the web, open Calendar → Add calendar.</li>
+          <li>Choose Subscribe from web and paste your private link.</li>
+          <li>Name the calendar and select Import.</li>
+        </ol>
+        <p>
+          Manage sessions in Archetype. This subscription is read-only in
+          Outlook.
         </p>
-      )}
-    </section>
+        {message && <p role="status">{message}</p>}
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+    </>
   );
 }

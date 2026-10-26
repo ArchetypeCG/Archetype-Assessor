@@ -1,3 +1,6 @@
+import { Trophy } from "lucide-react";
+import { AssessorOneToOnes, SpotlightEditor } from "./staff-development";
+import { LearnerSupportFields, LearnerDocuments } from "./learner-support";
 import { LearnerPhotoEditor } from "./learner-photo";
 import {
   OTJProgress,
@@ -116,6 +119,8 @@ const navGroups = [
     "OPERATIONS",
     [
       [Target, "Interventions"],
+      [MessageSquare, "Assessor 1:1s"],
+      [Trophy, "Success stories"],
       [CalendarDays, "Reviews Hub"],
       [ShieldCheck, "Compliance Hub"],
       [GraduationCap, "Gateway & EPA"],
@@ -424,11 +429,12 @@ function App() {
           </div>
           <div className="nav-scroll">
             {navGroups.map(([group, items]) => {
-              const sectionItems = user.role === "Assessor"
-                ? group === "COMMAND CENTRE"
-                  ? [...items, [CalendarDays, "Calendar"]]
-                  : items.filter(([, title]) => title !== "Calendar")
-                : items;
+              const sectionItems =
+                user.role === "Assessor"
+                  ? group === "COMMAND CENTRE"
+                    ? [...items, [CalendarDays, "Calendar"]]
+                    : items.filter(([, title]) => title !== "Calendar")
+                  : items;
               const links = sectionItems.filter(
                 ([, title]) => !allowed || allowed.includes(title),
               );
@@ -778,6 +784,7 @@ function Table({ headers, children }) {
   );
 }
 function Page({ page }) {
+  const pageContext = useApp();
   switch (page) {
     case "Command centre":
       return <Dashboard />;
@@ -818,6 +825,10 @@ function Page({ page }) {
       return <Employers />;
     case "Forecasting":
       return <Forecast />;
+    case "Assessor 1:1s":
+      return <AssessorOneToOnes {...pageContext} />;
+    case "Success stories":
+      return <SpotlightEditor {...pageContext} />;
     case "Team & caseloads":
       return <Team />;
     case "Audit & quality":
@@ -3785,6 +3796,7 @@ function ModalHost() {
     } = useApp(),
     [error, E] = useState(""),
     [pending, P] = useState(false),
+    [learnerEditTab, LEARNER_TAB] = useState("Programme"),
     [criteria, C] = useState(modal.item?.criteria || []),
     [raw, RAW] = useState(
       modal.type === "standard"
@@ -3802,6 +3814,8 @@ function ModalHost() {
     [importError, IE] = useState("");
   const ref = useRef(null);
   const { type, item } = modal;
+  const supportRecord =
+    (s.learnerSupportRecords || []).find((r) => r.learnerId === item?.id) || {};
   const learner =
     s.learners.find((l) => l.id === modal.learner?.id) ||
     modal.learner ||
@@ -3879,6 +3893,16 @@ function ModalHost() {
   async function submit(e) {
     e.preventDefault();
     E("");
+    if (type === "learner" && !e.currentTarget.checkValidity()) {
+      const invalid = e.currentTarget.querySelector(":invalid");
+      LEARNER_TAB(
+        invalid?.closest("[data-learner-tab]")?.dataset.learnerTab ||
+          "Programme",
+      );
+      E("Complete the required apprentice details before saving.");
+      requestAnimationFrame(() => invalid?.focus());
+      return;
+    }
     P(true);
     try {
       const form = new FormData(e.currentTarget),
@@ -3888,6 +3912,9 @@ function ModalHost() {
       if (type === "learner") {
         p.englishUpskill = form.get("englishUpskill") === "on";
         p.mathsUpskill = form.get("mathsUpskill") === "on";
+        p.supportFiles = await filePayload(
+          form.getAll("supportFiles").filter((f) => f.size),
+        );
         kind = "learner.save";
         if (item) p.id = item.id;
       } else if (type === "evidence") {
@@ -4139,7 +4166,7 @@ function ModalHost() {
             <X size={20} />
           </button>
         </div>
-        <form onSubmit={submit}>
+        <form onSubmit={submit} noValidate={type === "learner"}>
           <div className="form-grid">
             {type === "assignStandard" && (
               <>
@@ -4195,175 +4222,226 @@ function ModalHost() {
             )}
             {type === "learner" && (
               <>
-                <Field
-                  label="Reference"
-                  name="ref"
-                  defaultValue={item?.ref}
-                  required
-                />
-                <Field
-                  label="Learner name"
-                  name="name"
-                  defaultValue={item?.name}
-                  required
-                />
-                <Field
-                  label="Email"
-                  name="email"
-                  type="email"
-                  defaultValue={item?.email}
-                />
-                <Field
-                  label="Employer"
-                  name="employer"
-                  defaultValue={item?.employer}
-                  required
-                />
-                {item && (
-                  <input
-                    type="hidden"
-                    name="standardId"
-                    value={item.standardId}
-                  />
-                )}
-                <Field
-                  label="Apprenticeship standard"
-                  name="standardId"
-                  type="select"
-                  options={[
-                    { value: "", label: "Choose standard" },
-                    ...standards,
-                  ]}
-                  defaultValue={item?.standardId}
-                  disabled={Boolean(item)}
-                  required
-                />
-                <Field
-                  label="Status"
-                  name="status"
-                  type="select"
-                  options={["Active", "Paused", "Withdrawn", "Completed"]}
-                  defaultValue={item?.status || "Active"}
-                />
-                <Field
-                  label="Assessor"
-                  name="assessorId"
-                  type="select"
-                  options={userOptions("Assessor")}
-                  defaultValue={item?.assessorId || user.id}
-                />
-                <Field
-                  label="IQA"
-                  name="iqaId"
-                  type="select"
-                  options={userOptions("IQA")}
-                  defaultValue={item?.iqaId}
-                />
-                <Field
-                  label="Target progress %"
-                  name="target"
-                  type="number"
-                  min="0"
-                  max="100"
-                  defaultValue={item?.target ?? 0}
-                  required
-                />
-                <Field
-                  label="OTJ target hours"
-                  name="otjTarget"
-                  type="number"
-                  min="1"
-                  max="10000"
-                  defaultValue={item?.otjTarget ?? 278}
-                  required
-                />
-                {user.role === "Manager" && (
-                  <div className="wide review-series-setup">
-                    <h3>Automatic 10-week reviews</h3>
-                    <Field
-                      label="Initial 10-week review date"
-                      name="initialReviewDate"
-                      type="date"
-                      defaultValue={
-                        item?.initialReviewDate ??
-                        (item?.nextReview &&
-                        item?.predictedEnd &&
-                        item.nextReview <= item.predictedEnd
-                          ? item.nextReview
-                          : "")
-                      }
-                    />
-                    <p className="caption">
-                      Creates a shared review on this date and every 70 days
-                      through the predicted end date. The assessor, apprentice
-                      and employer see the same calendar entries. Times and
-                      locations remain to be confirmed. Changing the initial
-                      date or predicted end updates the schedule; completed
-                      reviews are kept. Clear the initial date to stop the
-                      automatic series.
-                    </p>
-                  </div>
-                )}
-                {[
-                  ["startDate", "Start date"],
-                  ["plannedEnd", "Planned end date"],
-                  ["predictedEnd", "Predicted end date"],
-                  ["nextReview", "Next review due"],
-                  ["eliDue", "ELI expiry"],
-                  ["riskDue", "Risk assessment due"],
-                  ["employerDue", "Employer assessment due"],
-                  ["epaDate", "EPA date"],
-                ].map(([k, label]) => (
+                <div
+                  className="tabs learner-edit-tabs wide"
+                  role="tablist"
+                  aria-label="Apprentice details"
+                >
+                  {["Programme", "Personal & ALS", "Documents"].map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      role="tab"
+                      aria-selected={learnerEditTab === tab}
+                      className={learnerEditTab === tab ? "selected" : ""}
+                      onClick={() => LEARNER_TAB(tab)}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+                <div
+                  className="form-grid wide learner-edit-section"
+                  data-learner-tab="Programme"
+                  hidden={learnerEditTab !== "Programme"}
+                  role="tabpanel"
+                  aria-label="Programme"
+                >
                   <Field
-                    key={k}
-                    label={label}
-                    name={k}
-                    type="date"
-                    defaultValue={item?.[k]}
+                    label="Reference"
+                    name="ref"
+                    defaultValue={item?.ref}
+                    required
                   />
-                ))}
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    name="englishUpskill"
-                    defaultChecked={!!item?.englishUpskill}
+                  <Field
+                    label="Learner name"
+                    name="name"
+                    defaultValue={item?.name}
+                    required
                   />
-                  English functional skills upskill option
-                </label>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    name="mathsUpskill"
-                    defaultChecked={!!item?.mathsUpskill}
+                  <Field
+                    label="Email"
+                    name="email"
+                    type="email"
+                    defaultValue={item?.email}
                   />
-                  Maths functional skills upskill option
-                </label>
-                <Field
-                  label="English"
-                  name="english"
-                  type="select"
-                  options={["Pending", "Achieved", "Exempt"]}
-                  defaultValue={item?.english}
-                />
-                <Field
-                  label="Maths"
-                  name="maths"
-                  type="select"
-                  options={["Pending", "Achieved", "Exempt"]}
-                  defaultValue={item?.maths}
-                />
-                <Field
-                  label="Confidential staff notes (master admin and assessor)"
-                  name="notes"
-                  type="textarea"
-                  defaultValue={item?.notes}
-                  wide
-                />
-                <p className="caption wide">
-                  Progress is calculated from accepted evidence, not an editable
-                  percentage. Use Assign standard from the profile or standard
-                  library to change a programme and retain its history.
-                </p>
+                  <Field
+                    label="Employer"
+                    name="employer"
+                    defaultValue={item?.employer}
+                    required
+                  />
+                  {item && (
+                    <input
+                      type="hidden"
+                      name="standardId"
+                      value={item.standardId}
+                    />
+                  )}
+                  <Field
+                    label="Apprenticeship standard"
+                    name="standardId"
+                    type="select"
+                    options={[
+                      { value: "", label: "Choose standard" },
+                      ...standards,
+                    ]}
+                    defaultValue={item?.standardId}
+                    disabled={Boolean(item)}
+                    required
+                  />
+                  <Field
+                    label="Status"
+                    name="status"
+                    type="select"
+                    options={["Active", "Paused", "Withdrawn", "Completed"]}
+                    defaultValue={item?.status || "Active"}
+                  />
+                  <Field
+                    label="Assessor"
+                    name="assessorId"
+                    type="select"
+                    options={userOptions("Assessor")}
+                    defaultValue={item?.assessorId || user.id}
+                  />
+                  <Field
+                    label="IQA"
+                    name="iqaId"
+                    type="select"
+                    options={userOptions("IQA")}
+                    defaultValue={item?.iqaId}
+                  />
+                  <Field
+                    label="Target progress %"
+                    name="target"
+                    type="number"
+                    min="0"
+                    max="100"
+                    defaultValue={item?.target ?? 0}
+                    required
+                  />
+                  <Field
+                    label="OTJ target hours"
+                    name="otjTarget"
+                    type="number"
+                    min="1"
+                    max="10000"
+                    defaultValue={item?.otjTarget ?? 278}
+                    required
+                  />
+                  {user.role === "Manager" && (
+                    <div className="wide review-series-setup">
+                      <h3>Automatic 10-week reviews</h3>
+                      <Field
+                        label="Initial 10-week review date"
+                        name="initialReviewDate"
+                        type="date"
+                        defaultValue={
+                          item?.initialReviewDate ??
+                          (item?.nextReview &&
+                          item?.predictedEnd &&
+                          item.nextReview <= item.predictedEnd
+                            ? item.nextReview
+                            : "")
+                        }
+                      />
+                      <p className="caption">
+                        Creates a shared review on this date and every 70 days
+                        through the predicted end date. The assessor, apprentice
+                        and employer see the same calendar entries. Times and
+                        locations remain to be confirmed. Changing the initial
+                        date or predicted end updates the schedule; completed
+                        reviews are kept. Clear the initial date to stop the
+                        automatic series.
+                      </p>
+                    </div>
+                  )}
+                  {[
+                    ["startDate", "Start date"],
+                    ["plannedEnd", "Planned end date"],
+                    ["predictedEnd", "Predicted end date"],
+                    ["nextReview", "Next review due"],
+                    ["eliDue", "ELI expiry"],
+                    ["riskDue", "Risk assessment due"],
+                    ["employerDue", "Employer assessment due"],
+                    ["epaDate", "EPA date"],
+                  ].map(([k, label]) => (
+                    <Field
+                      key={k}
+                      label={label}
+                      name={k}
+                      type="date"
+                      defaultValue={item?.[k]}
+                    />
+                  ))}
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      name="englishUpskill"
+                      defaultChecked={!!item?.englishUpskill}
+                    />
+                    English functional skills upskill option
+                  </label>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      name="mathsUpskill"
+                      defaultChecked={!!item?.mathsUpskill}
+                    />
+                    Maths functional skills upskill option
+                  </label>
+                  <Field
+                    label="English"
+                    name="english"
+                    type="select"
+                    options={["Pending", "Achieved", "Exempt"]}
+                    defaultValue={item?.english}
+                  />
+                  <Field
+                    label="Maths"
+                    name="maths"
+                    type="select"
+                    options={["Pending", "Achieved", "Exempt"]}
+                    defaultValue={item?.maths}
+                  />
+                  <Field
+                    label="Confidential staff notes (master admin and assessor)"
+                    name="notes"
+                    type="textarea"
+                    defaultValue={item?.notes}
+                    wide
+                  />
+                  <p className="caption wide">
+                    Progress is calculated from accepted evidence, not an
+                    editable percentage. Use Assign standard from the profile or
+                    standard library to change a programme and retain its
+                    history.
+                  </p>
+                </div>
+                <div
+                  className="form-grid wide learner-edit-section"
+                  data-learner-tab="Personal & ALS"
+                  hidden={learnerEditTab !== "Personal & ALS"}
+                  role="tabpanel"
+                  aria-label="Personal & ALS"
+                >
+                  <LearnerSupportFields record={supportRecord} />
+                </div>
+                <div
+                  className="form-grid wide learner-edit-section"
+                  data-learner-tab="Documents"
+                  hidden={learnerEditTab !== "Documents"}
+                  role="tabpanel"
+                  aria-label="Documents"
+                >
+                  <LearnerDocuments
+                    record={supportRecord}
+                    learnerId={item?.id}
+                    command={command}
+                    busy={pending || busy}
+                    onError={E}
+                  />
+                </div>
               </>
             )}
             {type === "evidence" && (

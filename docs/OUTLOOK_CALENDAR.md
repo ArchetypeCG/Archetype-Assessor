@@ -9,3 +9,5 @@ Each account has one active private link. Keep it private: anyone holding it can
 Replace subscription link invalidates the previous link. Revoke subscription disables it. Password changes, password recovery, account security/access changes and backup restoration invalidate links; create a fresh subscription afterwards. Inactive accounts cannot serve a feed. Revoking a link prevents further fetches; remove old calendars from Outlook to clear previously downloaded appointments.
 
 Production requires the existing APP_ORIGIN configuration to contain the live HTTPS site address. No Microsoft application registration or additional provider credentials are needed.
+
+To place appointments directly in an existing work calendar instead, see [Microsoft 365 direct calendar connection](OUTLOOK_DIRECT.md). That option requires Microsoft application registration.

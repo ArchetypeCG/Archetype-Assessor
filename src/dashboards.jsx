@@ -1,3 +1,4 @@
+import { SuccessSpotlight } from "./staff-development";
 import { LearnerAvatar } from "./learner-photo";
 import React from "react";
 import {
@@ -581,6 +582,10 @@ function Assessor({ s, user, go, openLearner, setModal }) {
           </span>
         </div>
       </Hero>
+      <SuccessSpotlight
+        key={(s.successStories || []).find((story) => story.published)?.updated}
+        story={(s.successStories || []).find((story) => story.published)}
+      />
       <div className="role-stat-grid">
         <Kpi
           label="Evidence to assess"

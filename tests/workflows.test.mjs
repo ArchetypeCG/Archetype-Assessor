@@ -2344,3 +2344,357 @@ test("apprentice photos persist privately, can be replaced and removed, and enfo
     404,
   );
 });
+
+test("direct Outlook endpoints require staff authentication, fail safely without Microsoft setup, and expose no credentials", async () => {
+  const manager = await login("manager@archetype.demo");
+  assert.equal((await request("/api/outlook/status")).status, 401);
+  const status = await request("/api/outlook/status", { cookie: manager });
+  assert.equal(status.status, 200);
+  assert.equal(status.data.configured, false);
+  assert.equal(status.data.connected, false);
+  assert(!JSON.stringify(status.data).includes("CLIENT_SECRET_VALUE"));
+  assert.equal(
+    (
+      await request("/api/outlook/connect", {
+        cookie: manager,
+        method: "POST",
+        body: "{}",
+      })
+    ).status,
+    503,
+  );
+  const iqa = await login("iqa@archetype.demo");
+  assert.equal(
+    (await request("/api/outlook/status", { cookie: iqa })).status,
+    403,
+  );
+  const callback = await fetch(
+    base + "/api/outlook/callback?state=not-a-valid-state&code=secret-code",
+  );
+  assert.equal(callback.status, 400);
+  assert.equal(callback.headers.get("referrer-policy"), "no-referrer");
+  assert(!(await callback.text()).includes("secret-code"));
+});
+
+test("personal and ALS records and supporting documents are private to the manager and assigned assessor", async () => {
+  const manager = await login("manager@archetype.demo");
+  let s = await state(manager),
+    l = s.learners[0];
+  const payload = {
+    ...l,
+    id: l.id,
+    assessorId: s.users.find((u) => u.active && u.role === "Assessor").id,
+    iqaId: s.users.find((u) => u.active && u.role === "IQA").id,
+    address: "PRIVATE ADDRESS 42 Example Lane",
+    dateOfBirth: "2001-04-14",
+    alsStatus: "Support in place",
+    alsDetails: "PRIVATE ALS assessment",
+    reasonableAdjustments: "PRIVATE agreed adjustments",
+    supportReviewDate: today(),
+    documentCategory: "Medical information",
+    supportFiles: [
+      {
+        name: "synthetic-medical.txt",
+        base64: Buffer.from("PRIVATE MEDICAL FILE").toString("base64"),
+      },
+    ],
+  };
+  assert.equal((await command("learner.save", payload, manager)).status, 200);
+  s = await state(manager);
+  const support = s.learnerSupportRecords.find((r) => r.learnerId === l.id);
+  assert.equal(support.address, payload.address);
+  assert.equal(support.dateOfBirth, payload.dateOfBirth);
+  assert.equal(support.documents.length, 1);
+  const path = "/api/learner-documents/" + support.documents[0].id;
+  assert.equal((await fetch(base + path)).status, 401);
+  const downloaded = await fetch(base + path, { headers: { cookie: manager } });
+  assert.equal(downloaded.status, 200);
+  assert.equal(await downloaded.text(), "PRIVATE MEDICAL FILE");
+  assert.match(downloaded.headers.get("content-disposition"), /attachment/);
+  for (const email of ["iqa@archetype.demo", "employer@archetype.demo"]) {
+    const account = await login(email);
+    assert.equal((await state(account)).learnerSupportRecords.length, 0);
+    assert.equal(
+      (await fetch(base + path, { headers: { cookie: account } })).status,
+      403,
+    );
+  }
+  const learnerLogin = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: "NewLearnerPassword123!",
+    }),
+  });
+  assert.equal(learnerLogin.status, 200);
+  assert.equal(
+    (await state(learnerLogin.cookie)).learnerSupportRecords.length,
+    0,
+  );
+  assert.equal(
+    (await fetch(base + path, { headers: { cookie: learnerLogin.cookie } }))
+      .status,
+    403,
+  );
+  const future = { ...payload, dateOfBirth: "2099-01-01", supportFiles: [] };
+  assert.equal((await command("learner.save", future, manager)).status, 400);
+  assert.equal(
+    (
+      await command(
+        "learner.document.remove",
+        { learnerId: l.id, id: support.documents[0].id },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await fetch(base + path, { headers: { cookie: manager } })).status,
+    404,
+  );
+
+  // Access is tested with a newly created independent assessor below, without relying on changed fixture passwords.
+  const add = await command(
+    "user.add",
+    {
+      name: "Support record assessor",
+      email: "support-assessor@example.test",
+      role: "Assessor",
+      password: "Support assessor temporary 2026!",
+    },
+    manager,
+  );
+  assert.equal(add.status, 200);
+  const created = (await state(manager)).users.find(
+    (u) => u.email === "support-assessor@example.test",
+  );
+  const aLogin = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: created.email,
+      password: "Support assessor temporary 2026!",
+    }),
+  });
+  assert.equal(aLogin.status, 200);
+  assert.equal(
+    (
+      await command(
+        "password.change",
+        {
+          current: "Support assessor temporary 2026!",
+          password: "Support assessor chosen 2026!",
+        },
+        aLogin.cookie,
+      )
+    ).status,
+    200,
+  );
+  const aAgain = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: created.email,
+      password: "Support assessor chosen 2026!",
+    }),
+  });
+  assert.equal(aAgain.status, 200);
+  assert.equal((await state(aAgain.cookie)).learnerSupportRecords.length, 0);
+  const current = (await state(manager)).learners.find((x) => x.id === l.id);
+  assert.equal(
+    (
+      await command(
+        "learner.save",
+        { ...current, id: l.id, assessorId: created.id },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await state(aAgain.cookie)).learnerSupportRecords.find(
+      (r) => r.learnerId === l.id,
+    ).alsDetails,
+    payload.alsDetails,
+  );
+  assert.equal(
+    (
+      await command(
+        "learner.save",
+        {
+          ...current,
+          id: l.id,
+          assessorId: created.id,
+          address: "Updated assigned assessor address",
+        },
+        aAgain.cookie,
+      )
+    ).status,
+    200,
+  );
+});
+test("master-only assessor 1:1 logs preserve revisions and success stories publish only approved text to every assessor", async () => {
+  const manager = await login("manager@archetype.demo");
+  const s = await state(manager),
+    assessor = s.users.find((u) => u.role === "Assessor");
+  const record = {
+    assessorId: assessor.id,
+    title: "PRIVATE STAFF CONVERSATION",
+    date: today(),
+    status: "Completed",
+    summary: "PRIVATE SUMMARY",
+    performance: "PRIVATE PERFORMANCE",
+    wellbeing: "PRIVATE WELLBEING",
+    development: "PRIVATE CPD",
+    actions: "PRIVATE ACTIONS",
+    confidentialNotes: "PRIVATE MANAGEMENT NOTES",
+    nextDate: today(),
+  };
+  assert.equal(
+    (await command("assessor.oneToOne.save", record, manager)).status,
+    200,
+  );
+  let records = (await state(manager)).assessorOneToOnes;
+  const item = records.find((r) => r.title === record.title);
+  assert(item);
+  assert.equal(
+    (
+      await command(
+        "assessor.oneToOne.save",
+        { ...record, id: item.id, summary: "Updated private summary" },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  records = (await state(manager)).assessorOneToOnes;
+  assert.equal(
+    records.find((r) => r.id === item.id).history[0].summary,
+    "PRIVATE SUMMARY",
+  );
+  const loginResult = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "support-assessor@example.test",
+      password: "Support assessor chosen 2026!",
+    }),
+  });
+  assert.equal(loginResult.status, 200);
+  const a = loginResult.cookie;
+  assert.equal((await state(a)).assessorOneToOnes.length, 0);
+  assert.equal(
+    (await command("assessor.oneToOne.save", record, a)).status,
+    403,
+  );
+  const story = {
+    kind: "Learner success",
+    personName: "Fictional Achievement",
+    title: "A milestone worth sharing",
+    achievement: "Completed a workplace project",
+    story: "Public success story chosen by the manager.",
+    quote: "I can see how far I have come.",
+    published: false,
+  };
+  assert.equal((await command("spotlight.save", story, manager)).status, 200);
+  assert.equal((await state(a)).successStories.length, 0);
+  let draft = (await state(manager)).successStories.find(
+    (x) => x.title === story.title,
+  );
+  assert.equal(
+    (
+      await command(
+        "spotlight.save",
+        { ...story, id: draft.id, published: true },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  const visibleStories = (await state(a)).successStories;
+  assert.equal(visibleStories.length, 1);
+  assert.equal(visibleStories[0].title, story.title);
+  assert(!JSON.stringify(visibleStories).includes("PRIVATE"));
+  const iqa = await login("iqa@archetype.demo");
+  assert.equal((await state(iqa)).successStories.length, 0);
+  assert.equal(
+    (await command("spotlight.save", { ...story, published: true }, a)).status,
+    403,
+  );
+  assert.equal(
+    (
+      await command(
+        "spotlight.save",
+        {
+          ...story,
+          title: "Assessor achievement",
+          kind: "Assessor success",
+          published: true,
+        },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  assert.equal((await state(a)).successStories.length, 1);
+  assert.equal(
+    (await state(a)).successStories[0].title,
+    "Assessor achievement",
+  );
+});
+
+test("personal support records, protected documents, supervision logs and published stories survive a server restart", async () => {
+  const manager = await login("manager@archetype.demo");
+  let s = await state(manager);
+  const l = s.learners[0];
+  assert.equal(
+    (
+      await command(
+        "learner.save",
+        {
+          ...l,
+          id: l.id,
+          supportFiles: [
+            {
+              name: "persistent-certificate.txt",
+              base64: Buffer.from("Persistent synthetic certificate").toString(
+                "base64",
+              ),
+            },
+          ],
+          documentCategory: "Certificate",
+        },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  const before = await state(manager);
+  const document = before.learnerSupportRecords
+    .find((r) => r.learnerId === l.id)
+    .documents.find((d) => d.name === "persistent-certificate.txt");
+  assert(document);
+  proc.kill();
+  await new Promise((resolve) => proc.once("exit", resolve));
+  proc = spawn(process.execPath, ["server/index.mjs"], {
+    env: {
+      ...process.env,
+      PORT: new URL(base).port,
+      DATA_DIR: dir,
+      DEMO_MODE: "1",
+    },
+    stdio: "ignore",
+  });
+  for (let i = 0; i < 100; i++) {
+    try {
+      if ((await request("/api/health")).status === 200) break;
+    } catch {}
+    await pause(50);
+  }
+  s = await state(manager);
+  assert.deepEqual(s.learnerSupportRecords, before.learnerSupportRecords);
+  assert.deepEqual(s.assessorOneToOnes, before.assessorOneToOnes);
+  assert.deepEqual(s.successStories, before.successStories);
+  const download = await fetch(base + "/api/learner-documents/" + document.id, {
+    headers: { cookie: manager },
+  });
+  assert.equal(download.status, 200);
+  assert.equal(await download.text(), "Persistent synthetic certificate");
+});

@@ -29,10 +29,14 @@ try {
       .get()
   )
     db.exec("DELETE FROM calendar_subscriptions");
+  for (const table of ["outlook_connections", "outlook_oauth"]) {
+    if (db.prepare("SELECT name FROM sqlite_master WHERE name=?").get(table))
+      db.exec(`DELETE FROM ${table}`);
+  }
   db.close();
   db = null;
   console.log(
-    "Backup restored and verified to the new data directory. All previous login sessions and calendar subscription links were invalidated. Stop the live app before changing DATA_DIR to this directory.",
+    "Backup restored and verified to the new data directory. All previous login sessions, calendar subscription links and Microsoft 365 connections were invalidated. Stop the live app before changing DATA_DIR to this directory.",
   );
 } catch (e) {
   db?.close();

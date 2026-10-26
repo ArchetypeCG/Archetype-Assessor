@@ -1,3 +1,13 @@
+import {
+  peopleTables,
+  peopleCommand,
+  saveLearnerSupport,
+} from "./people-records.mjs";
+import {
+  createOutlook,
+  outlookTables,
+  revokeOutlookAccess,
+} from "./outlook.mjs";
 import { installExtraPractice } from "./extra-practice.mjs";
 import { validateProfilePhoto } from "./profile-photo.mjs";
 import http from "node:http";
@@ -89,15 +99,21 @@ const get = () =>
     s.learningTemplates ||= [];
     s.privateLearnerNotes ||= [];
     s.samplingPlans ||= [];
+    s.learnerSupportRecords ||= [];
+    s.assessorOneToOnes ||= [];
+    s.successStories ||= [];
     return s;
   })();
 const put = (s) =>
   db
     .prepare("INSERT OR REPLACE INTO workspace(id,data) VALUES(1,?)")
     .run(JSON.stringify(s));
+outlookTables(db);
+peopleTables(db);
 function password(userId, pw, mustChange = false) {
   pw = validateNewPassword(pw);
   db.prepare("DELETE FROM calendar_subscriptions WHERE user_id=?").run(userId);
+  revokeOutlookAccess(db, userId);
   const salt = randomBytes(16).toString("hex");
   db.prepare(
     "INSERT OR REPLACE INTO credentials(user_id,salt,hash,must_change) VALUES(?,?,?,?)",
@@ -310,6 +326,16 @@ function visible(s, u) {
     audit: staff.includes(u.role)
       ? s.audit.filter((x) => u.role === "Manager" || ids.has(x.learnerId))
       : [],
+    learnerSupportRecords: editors.includes(u.role)
+      ? (s.learnerSupportRecords || []).filter((r) => ids.has(r.learnerId))
+      : [],
+    assessorOneToOnes: u.role === "Manager" ? s.assessorOneToOnes || [] : [],
+    successStories:
+      u.role === "Manager"
+        ? s.successStories || []
+        : u.role === "Assessor"
+          ? (s.successStories || []).filter((story) => story.published)
+          : [],
     privateLearnerNotes: ["Manager", "Assessor"].includes(u.role)
       ? (s.privateLearnerNotes || []).filter((n) => ids.has(n.learnerId))
       : [],
@@ -461,6 +487,11 @@ const calendarSubscriptions = createCalendarSubscriptions({
   get,
   origin: origins.primary || (demo ? `http://127.0.0.1:${PORT}` : undefined),
 });
+const outlook = createOutlook({
+  db,
+  get,
+  origin: origins.primary || (demo ? `http://127.0.0.1:${PORT}` : undefined),
+});
 const mail = createMailService({ db, get, password, canSee });
 const integrity = createIntegrityService({
   db,
@@ -523,6 +554,21 @@ function command(s, u, kind, p) {
     canSee,
   });
   if (scheduleResult !== null) return scheduleResult;
+  const peopleResult = peopleCommand({
+    s,
+    u,
+    kind,
+    p,
+    l,
+    fail,
+    requireRole,
+    id,
+    text,
+    optional,
+    date,
+    choice,
+  });
+  if (peopleResult !== null) return peopleResult;
   switch (kind) {
     case "calendar.subscribe": {
       return calendarSubscriptions.create(u);
@@ -651,6 +697,19 @@ function command(s, u, kind, p) {
       if (u.role === "Assessor" && item.assessorId !== u.id)
         fail("Assessors can only create or retain their own caseload.", 403);
       setReviewSeries(s, item, old, p, u, { date, fail });
+      saveLearnerSupport({
+        s,
+        u,
+        p,
+        learner: item,
+        db,
+        id,
+        optional,
+        text,
+        date,
+        choice,
+        fail,
+      });
       if (old) Object.assign(old, item);
       else s.learners.push(item);
       return { learnerId: item.id };
@@ -1342,8 +1401,9 @@ function command(s, u, kind, p) {
       const securityChanged =
         email !== account.email ||
         role !== account.role ||
-        p.learnerId !== (account.learnerId || "") ||
-        p.employer !== (account.employer || "");
+        (role === "Apprentice" ? p.learnerId : "") !==
+          (account.learnerId || "") ||
+        (role === "Employer" ? p.employer : "") !== (account.employer || "");
       Object.assign(account, { name, email, role });
       delete account.learnerId;
       delete account.employer;
@@ -1361,6 +1421,7 @@ function command(s, u, kind, p) {
         db.prepare("DELETE FROM calendar_subscriptions WHERE user_id=?").run(
           account.id,
         );
+        revokeOutlookAccess(db, account.id);
         db.prepare("DELETE FROM password_resets WHERE user_id=?").run(
           account.id,
         );
@@ -1379,6 +1440,7 @@ function command(s, u, kind, p) {
         db.prepare("DELETE FROM calendar_subscriptions WHERE user_id=?").run(
           account.id,
         );
+        revokeOutlookAccess(db, account.id);
         return result;
       }
       const temporaryPassword = randomBytes(18).toString("base64url");
@@ -1387,6 +1449,7 @@ function command(s, u, kind, p) {
       db.prepare("DELETE FROM calendar_subscriptions WHERE user_id=?").run(
         account.id,
       );
+      revokeOutlookAccess(db, account.id);
       return { temporaryPassword };
     }
     case "user.setActive": {
@@ -1403,6 +1466,7 @@ function command(s, u, kind, p) {
         db.prepare("DELETE FROM calendar_subscriptions WHERE user_id=?").run(
           account.id,
         );
+        revokeOutlookAccess(db, account.id);
         db.prepare("DELETE FROM password_resets WHERE user_id=?").run(
           account.id,
         );
@@ -1453,7 +1517,13 @@ function command(s, u, kind, p) {
       const { users, audit, revision, snapshots } = s;
       Object.assign(
         s,
-        { learningPlans: [], ...JSON.parse(JSON.stringify(snap.data)) },
+        {
+          learningPlans: [],
+          learnerSupportRecords: [],
+          assessorOneToOnes: [],
+          successStories: [],
+          ...JSON.parse(JSON.stringify(snap.data)),
+        },
         {
           users,
           audit,
@@ -1542,6 +1612,42 @@ const server = http.createServer(async (req, res) => {
           !origins.allows(req.headers.origin, req.headers.host)
         )
           fail(origins.rejection(req.headers.origin), 403);
+      }
+      if (path === "/api/outlook/callback" && req.method === "GET") {
+        let result;
+        try {
+          result = await outlook.complete(
+            requestUrl.searchParams,
+            req.headers.cookie,
+          );
+        } catch (error) {
+          result = {
+            ok: false,
+            message: error.status
+              ? error.message
+              : "Outlook could not be connected. Return to Archetype and try again.",
+          };
+        }
+        if (result.cookieName)
+          res.setHeader(
+            "Set-Cookie",
+            `${result.cookieName}=; HttpOnly; SameSite=Lax; Path=/api/outlook/callback; Max-Age=0${process.env.COOKIE_SECURE === "1" ? "; Secure" : ""}`,
+          );
+        const safe = String(result.message)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+        res.writeHead(result.ok ? 200 : 400, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "Referrer-Policy": "no-referrer",
+          "Content-Security-Policy":
+            "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'",
+        });
+        return res.end(
+          `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Archetype · Outlook connection</title><body style="font-family:system-ui;max-width:36rem;margin:12vh auto;padding:24px;color:#163e3a"><h1>${result.ok ? "Outlook connected" : "Outlook connection"}</h1><p>${safe}</p><p>You can close this window and return to your existing Archetype tab.</p></body></html>`,
+        );
       }
       if (path === "/api/health") {
         db.prepare("SELECT 1").get();
@@ -1700,6 +1806,24 @@ const server = http.createServer(async (req, res) => {
           "Change your temporary password before accessing workspace data.",
           403,
         );
+      if (path.startsWith("/api/outlook/")) {
+        if (passwordRequired)
+          fail("Change your temporary password first.", 403);
+        if (path === "/api/outlook/status" && req.method === "GET")
+          return json(res, 200, outlook.status(u));
+        if (path === "/api/outlook/connect" && req.method === "POST") {
+          const result = outlook.begin(u, session.token);
+          res.setHeader(
+            "Set-Cookie",
+            `${result.cookieName}=${result.cookie}; HttpOnly; SameSite=Lax; Path=/api/outlook/callback; Max-Age=600${process.env.COOKIE_SECURE === "1" ? "; Secure" : ""}`,
+          );
+          return json(res, 200, { url: result.url });
+        }
+        if (path === "/api/outlook/disconnect" && req.method === "POST")
+          return json(res, 200, await outlook.disconnect(u));
+        if (path === "/api/outlook/sync" && req.method === "POST")
+          return json(res, 200, await outlook.sync(u));
+      }
       if (path === "/api/calendar/subscription" && req.method === "GET")
         return json(res, 200, calendarSubscriptions.status(u));
       if (path === "/api/email/status" && req.method === "GET") {
@@ -1880,6 +2004,29 @@ const server = http.createServer(async (req, res) => {
         });
         return res.end(Buffer.from(file.body));
       }
+      if (path.startsWith("/api/learner-documents/") && req.method === "GET") {
+        requireRole(u, editors);
+        const fileId = path.split("/").at(-1);
+        const record = (s.learnerSupportRecords || []).find((r) =>
+          r.documents.some((d) => d.id === fileId),
+        );
+        if (!record) fail("Document not found.", 404);
+        learnerFor(s, u, record.learnerId);
+        const file = db
+          .prepare(
+            "SELECT * FROM learner_documents WHERE id=? AND learner_id=?",
+          )
+          .get(fileId, record.learnerId);
+        if (!file) fail("Document not found.", 404);
+        res.writeHead(200, {
+          "Content-Type": "application/octet-stream",
+          "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Security-Policy": "sandbox; default-src 'none'",
+        });
+        return res.end(Buffer.from(file.body));
+      }
       if (path.startsWith("/api/files/") && req.method === "GET") {
         const fileId = path.split("/").at(-1),
           f = db.prepare("SELECT * FROM files WHERE id=?").get(fileId);
@@ -1971,7 +2118,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, {
       "Content-Type": mime[extname(file)] || "application/octet-stream",
       "Content-Security-Policy":
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'",
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'",
     });
     res.end(req.method === "HEAD" ? undefined : readFileSync(file));
   } catch (e) {
@@ -1992,6 +2139,7 @@ server.listen(PORT, "0.0.0.0", () =>
 backups.start();
 mail.start();
 integrity.start();
+outlook.start();
 let closing = false;
 for (const signal of ["SIGTERM", "SIGINT"])
   process.on(signal, () => {
@@ -2000,6 +2148,7 @@ for (const signal of ["SIGTERM", "SIGINT"])
     backups.stop();
     mail.stop();
     integrity.stop();
+    outlook.stop();
     server.close(() => {
       db.close();
       process.exit(0);

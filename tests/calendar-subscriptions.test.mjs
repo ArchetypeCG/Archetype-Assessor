@@ -1,3 +1,4 @@
+import { outlookTables } from "../server/outlook.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
@@ -162,6 +163,10 @@ test("restoring an encrypted backup invalidates calendar capabilities as well as
       origin: "https://example.test",
     });
     service.create(s.users[0]);
+    outlookTables(db);
+    db.exec(
+      "INSERT INTO outlook_connections(user_id,generation,role,account_id,address,display_name,token,expires) VALUES('master','generation','Manager','account','work@example.test','Work','encrypted-token',9999999999999); INSERT INTO outlook_oauth VALUES('state','master','session','cookie','hash','encrypted-verifier',9999999999999); INSERT INTO outlook_events(user_id,account_id,appointment_id,event_id,transaction_id) VALUES('master','account','session','event','transaction')",
+    );
     const key = "test-only-calendar-backup-key-2026-long-secret",
       backups = createBackupService(db, dir, { BACKUP_ENCRYPTION_KEY: key });
     const backup = await backups.create(),
@@ -187,6 +192,18 @@ test("restoring an encrypted backup invalidates calendar capabilities as well as
       restored.prepare("SELECT COUNT(*) AS n FROM calendar_subscriptions").get()
         .n,
       0,
+    );
+    assert.equal(
+      restored.prepare("SELECT COUNT(*) n FROM outlook_connections").get().n,
+      0,
+    );
+    assert.equal(
+      restored.prepare("SELECT COUNT(*) n FROM outlook_oauth").get().n,
+      0,
+    );
+    assert.equal(
+      restored.prepare("SELECT COUNT(*) n FROM outlook_events").get().n,
+      1,
     );
     restored.close();
   } finally {

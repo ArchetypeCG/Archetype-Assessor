@@ -201,31 +201,47 @@ export function FunctionalSkillsChecks({
   );
 }
 export function LearningTemplates({ s, user, learner, setModal }) {
+  const [selected, SELECT] = useState("");
+  useEffect(() => SELECT(""), [learner.id, learner.standardId]);
   if (!["Manager", "Assessor"].includes(user.role)) return null;
   const templates = (s.learningTemplates || []).filter(
     (t) => t.standardId === learner.standardId,
   );
+  const chosen = templates.find((t) => t.id === selected);
   return (
     <section className="panel">
       <h3>Reusable learning activities</h3>
       <p className="caption">
-        Remove learner-specific details from the wording before saving or
-        reusing an activity.
+        Choose a saved activity for this programme, then review it before adding
+        it to the apprentice’s learning plan.
       </p>
       {templates.length ? (
-        templates.map((t) => (
-          <div className="button-row" key={t.id}>
-            <span>
-              {t.title} · {t.method}
-            </span>
+        <>
+          <div className="reusable-activity-picker">
+            <label>
+              Saved learning activity
+              <select
+                aria-label="Reusable learning activity"
+                value={selected}
+                onChange={(e) => SELECT(e.target.value)}
+              >
+                <option value="">Select an activity…</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title} · {t.method}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               className="button secondary"
+              disabled={!chosen}
               onClick={() =>
                 setModal({
                   type: "plan",
                   learner,
                   prefill: {
-                    ...t,
+                    ...chosen,
                     id: undefined,
                     status: "Planned",
                     startDate: localDate(),
@@ -235,10 +251,23 @@ export function LearningTemplates({ s, user, learner, setModal }) {
                 })
               }
             >
-              Use activity
+              Use selected activity
             </button>
           </div>
-        ))
+          {chosen && (
+            <div className="reusable-activity-summary">
+              <strong>{chosen.title}</strong>
+              <p>{chosen.description}</p>
+              <small>
+                {chosen.method} · {chosen.plannedHours} planned hours ·{" "}
+                {(chosen.criteria || []).join(", ")}
+              </small>
+            </div>
+          )}
+          <p className="caption">
+            Remove learner-specific details before reusing an activity.
+          </p>
+        </>
       ) : (
         <p>
           Save an activity below as a template to reuse it with other
