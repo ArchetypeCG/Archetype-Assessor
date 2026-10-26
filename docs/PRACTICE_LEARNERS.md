@@ -1,0 +1,9 @@
+# Additional fictional apprentices
+
+The requested October 2026 expansion adds 20 fictional apprentices on the first startup of this version. It preserves the existing six practice learners, standards, resources, accounts, passwords and learning records. A persistent migration marker prevents duplicates and prevents subsequent restarts from resetting edits made to these examples.
+
+Search the apprentice list for PRACTICE-001 through PRACTICE-020, or the fictional names. Existing reference collisions are handled without overwriting any record. Courses are drawn from the workspace's existing standards with KSB criteria; no extra standard versions are created. Records are assigned across active assessors and IQAs. If those roles have no active accounts, the master administrator can allocate the unassigned records later.
+
+Scenarios include new starters, ahead/behind OTJ progress, submitted and returned evidence, overdue reviews and employer checks, maths/English upskill, exemptions, outstanding actions, paused and withdrawn programmes, EPA preparation, gateway readiness and completion. Each example has its own dates, target hours, approved/pending or returned logs, mapped evidence, learning plan, review history, actions and scheduled sessions. Some include planned IQA samples when an IQA account is available. Progress and OTJ figures are calculated normally from these individual records.
+
+All names, employers, activities and assessment decisions are invented and marked fictional. No learner login accounts, contact email addresses, uploaded work or outgoing messages are created. Existing morning-email logic excludes fictional learners from urgent reminders. Existing uploaded photos are untouched; the additional records initially use their initials and support click-to-upload photos like other apprentices.

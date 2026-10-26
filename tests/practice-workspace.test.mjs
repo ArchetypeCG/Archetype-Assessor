@@ -164,7 +164,7 @@ test("production upgrade backs up imported records and files before replacing th
     const current = await (
       await fetch(base + "/api/state", { headers: { cookie } })
     ).json();
-    assert.equal(current.state.learners.length, 6);
+    assert.equal(current.state.learners.length, 26);
     assert.ok(current.state.learners.every((l) => l.fictional));
     const file = await fetch(base + "/api/files/imported-file", {
       headers: { cookie },

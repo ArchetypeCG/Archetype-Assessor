@@ -1,3 +1,4 @@
+import { installExtraPractice } from "./extra-practice.mjs";
 import { validateProfilePhoto } from "./profile-photo.mjs";
 import http from "node:http";
 import { createCalendarSubscriptions } from "./calendar-subscriptions.mjs";
@@ -234,6 +235,21 @@ if (!demo && practiceRestoreNeeded(get())) {
         }
       put(s);
       console.log("Requested fictional practice workspace restored.");
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+// Requested additive practice expansion. Its marker prevents duplicates or resets.
+if (!demo) {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const s = get();
+    if (installExtraPractice(s)) {
+      put(s);
+      console.log("Twenty additional fictional apprentices added.");
     }
     db.exec("COMMIT");
   } catch (error) {
