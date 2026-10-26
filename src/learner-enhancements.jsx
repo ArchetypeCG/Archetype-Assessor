@@ -1,19 +1,23 @@
 import { sessionHeaders } from "./session";
 import React, { useState, useEffect } from "react";
-import { expectedOtjHours } from "../server/otj-target.mjs";
+import { otjProgress } from "../server/otj-target.mjs";
 import { fmt, localDate } from "./lib";
-export function OTJProgress({ learner, initialDate }) {
+export function OTJProgress({ learner, logs = [], initialDate }) {
   const [date, D] = useState(initialDate || localDate());
-  const expected = expectedOtjHours(learner, date),
-    hours = learner.hours || 0,
-    difference =
-      expected == null ? null : Math.round((hours - expected) * 10) / 10;
+  const {
+    approved: hours,
+    expected,
+    variance: difference,
+  } = otjProgress(learner, logs, date);
   return (
     <section className="panel">
       <div className="panel-header">
         <div>
           <h2>Off-the-job progress</h2>
           <p>Approved log hours compared with the programme training target.</p>
+          <p>
+            <strong>{learner.name}</strong> · {learner.ref}
+          </p>
         </div>
         <label>
           Target date
@@ -65,10 +69,17 @@ export function OTJProgress({ learner, initialDate }) {
         </div>
       </div>
       <p className="caption">
-        Expected hours are spread evenly from the programme start to the planned
-        training end date. Adjust the programme dates and total OTJ target for
-        the agreed training plan. Planned activities do not count until their
-        OTJ log hours are approved.
+        Programme: {fmt(learner.startDate)} –{" "}
+        {fmt(learner.plannedEnd || learner.predictedEnd)} · Total OTJ target:{" "}
+        {learner.otjTarget || "Not set"}h
+      </p>
+      <p className="caption">
+        Approved hours use only this apprentice’s approved log entries dated on
+        or before the target date, for their current programme. Expected hours
+        are spread evenly from the programme start to the planned training end
+        date. Adjust the programme dates and total OTJ target for the agreed
+        training plan. Planned activities do not count until their OTJ log hours
+        are approved.
       </p>
     </section>
   );

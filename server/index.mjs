@@ -1,4 +1,5 @@
 import http from "node:http";
+import { createCalendarSubscriptions } from "./calendar-subscriptions.mjs";
 import { createIntegrityService } from "./integrity.mjs";
 import JSZip from "jszip";
 import {
@@ -65,7 +66,7 @@ assertRenderStorage(process.env, dataDir);
 mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 const db = new DatabaseSync(resolve(dataDir, "archetype.sqlite"));
 db.exec(
-  "PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS workspace (id INTEGER PRIMARY KEY, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS credentials (user_id TEXT PRIMARY KEY, salt TEXT NOT NULL, hash TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY,learner_id TEXT,name TEXT NOT NULL,body BLOB NOT NULL);",
+  "PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS workspace (id INTEGER PRIMARY KEY, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS credentials (user_id TEXT PRIMARY KEY, salt TEXT NOT NULL, hash TEXT NOT NULL); CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS calendar_subscriptions(user_id TEXT PRIMARY KEY,token_hash TEXT NOT NULL UNIQUE,issued_role TEXT NOT NULL,created TEXT NOT NULL,last_fetched TEXT); CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY,learner_id TEXT,name TEXT NOT NULL,body BLOB NOT NULL);",
 );
 if (
   !db
@@ -94,6 +95,7 @@ const put = (s) =>
     .run(JSON.stringify(s));
 function password(userId, pw, mustChange = false) {
   pw = validateNewPassword(pw);
+  db.prepare("DELETE FROM calendar_subscriptions WHERE user_id=?").run(userId);
   const salt = randomBytes(16).toString("hex");
   db.prepare(
     "INSERT OR REPLACE INTO credentials(user_id,salt,hash,must_change) VALUES(?,?,?,?)",
@@ -437,6 +439,11 @@ function uploadFiles(files, learnerId) {
     return { id: fid, name, size: b.length };
   });
 }
+const calendarSubscriptions = createCalendarSubscriptions({
+  db,
+  get,
+  origin: origins.primary || (demo ? `http://127.0.0.1:${PORT}` : undefined),
+});
 const mail = createMailService({ db, get, password, canSee });
 const integrity = createIntegrityService({
   db,
@@ -500,6 +507,12 @@ function command(s, u, kind, p) {
   });
   if (scheduleResult !== null) return scheduleResult;
   switch (kind) {
+    case "calendar.subscribe": {
+      return calendarSubscriptions.create(u);
+    }
+    case "calendar.unsubscribe": {
+      return calendarSubscriptions.revoke(u);
+    }
     case "learner.privateNote": {
       requireRole(u, editors);
       if (!l) fail("Select a learner.");
@@ -1271,6 +1284,9 @@ function command(s, u, kind, p) {
       }
       if (securityChanged) {
         db.prepare("DELETE FROM sessions WHERE user_id=?").run(account.id);
+        db.prepare("DELETE FROM calendar_subscriptions WHERE user_id=?").run(
+          account.id,
+        );
         db.prepare("DELETE FROM password_resets WHERE user_id=?").run(
           account.id,
         );
@@ -1286,11 +1302,17 @@ function command(s, u, kind, p) {
       if (!demo || mail.status().configured) {
         const result = mail.reset(account);
         db.prepare("DELETE FROM sessions WHERE user_id=?").run(account.id);
+        db.prepare("DELETE FROM calendar_subscriptions WHERE user_id=?").run(
+          account.id,
+        );
         return result;
       }
       const temporaryPassword = randomBytes(18).toString("base64url");
       password(account.id, temporaryPassword, true);
       db.prepare("DELETE FROM sessions WHERE user_id=?").run(account.id);
+      db.prepare("DELETE FROM calendar_subscriptions WHERE user_id=?").run(
+        account.id,
+      );
       return { temporaryPassword };
     }
     case "user.setActive": {
@@ -1304,6 +1326,9 @@ function command(s, u, kind, p) {
       syncReviewParticipants(s);
       if (!p.active) {
         db.prepare("DELETE FROM sessions WHERE user_id=?").run(account.id);
+        db.prepare("DELETE FROM calendar_subscriptions WHERE user_id=?").run(
+          account.id,
+        );
         db.prepare("DELETE FROM password_resets WHERE user_id=?").run(
           account.id,
         );
@@ -1410,6 +1435,27 @@ const server = http.createServer(async (req, res) => {
       ? sessionCookieName(req.headers, requestUrl, req.method)
       : "archetype_session";
     if (path.startsWith("/api/")) {
+      if (
+        path.startsWith("/api/calendar/subscription/") &&
+        ["GET", "HEAD"].includes(req.method)
+      ) {
+        const token = path
+          .slice("/api/calendar/subscription/".length)
+          .replace(/\.ics$/, "");
+        const calendar = calendarSubscriptions.read(token, {
+          head: req.method === "HEAD",
+        });
+        res.setHeader("Referrer-Policy", "no-referrer");
+        res.setHeader("X-Robots-Tag", "noindex, nofollow");
+        res.setHeader("Cache-Control", "private, no-store");
+        if (!calendar)
+          return json(res, 404, { error: "Calendar subscription not found." });
+        res.writeHead(200, {
+          "Content-Type": "text/calendar; charset=utf-8",
+          "Content-Disposition": 'inline; filename="archetype-calendar.ics"',
+        });
+        return res.end(req.method === "HEAD" ? undefined : calendar);
+      }
       if (req.method !== "GET") {
         if (
           !String(req.headers["content-type"] || "").startsWith(
@@ -1580,6 +1626,8 @@ const server = http.createServer(async (req, res) => {
           "Change your temporary password before accessing workspace data.",
           403,
         );
+      if (path === "/api/calendar/subscription" && req.method === "GET")
+        return json(res, 200, calendarSubscriptions.status(u));
       if (path === "/api/email/status" && req.method === "GET") {
         requireRole(u, ["Manager"]);
         return json(res, 200, mail.status());

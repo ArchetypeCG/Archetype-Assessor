@@ -1877,3 +1877,163 @@ test("EPA folder selection supports uploaded work before assessment and survives
     false,
   );
 });
+
+test("Outlook subscriptions work without browser sessions, follow edits, and are revoked by account security changes", async () => {
+  const email = "outlook-assessor@example.test",
+    temporary = "Outlook initial password 2026!",
+    chosen = "Outlook chosen password 2026!";
+  assert.equal(
+    (
+      await command("user.add", {
+        name: "Outlook Assessor",
+        email,
+        role: "Assessor",
+        password: temporary,
+      })
+    ).status,
+    200,
+  );
+  let signed = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password: temporary }),
+  });
+  assert.equal(signed.status, 200);
+  assert.equal(
+    (
+      await command(
+        "password.change",
+        { current: temporary, password: chosen },
+        signed.cookie,
+      )
+    ).status,
+    200,
+  );
+  signed = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password: chosen }),
+  });
+  let cookie = signed.cookie;
+  let s = await state(),
+    assessor = s.users.find((u) => u.email === email),
+    learner = s.learners[0];
+  const account = {
+    id: assessor.id,
+    name: assessor.name,
+    email,
+    role: "Assessor",
+    learnerId: "",
+    employer: "",
+    caseload: [learner.id],
+  };
+  assert.equal((await command("user.update", account)).status, 200);
+  const sessionPayload = {
+    learnerId: learner.id,
+    title: "Outlook subscribed session",
+    type: "Teaching session",
+    date: addDays(today(), 7),
+    time: "10:00",
+    endTime: "11:00",
+    delivery: "Online",
+    meetingUrl: "https://example.org/session",
+    location: "Online",
+    description: "PRIVATE session description",
+    notes: "PRIVATE session discussion",
+    staffNotes: "PRIVATE STAFF INFORMATION",
+    objectives: "PRIVATE objectives",
+    preparation: "PRIVATE preparation",
+    criteria: [],
+    resources: [],
+    participants: [assessor.id],
+    status: "Planned",
+  };
+  let created = await command("session.save", sessionPayload, cookie);
+  assert.equal(created.status, 200);
+  const appointment = created.data.state.appointments.find(
+    (a) => a.title === sessionPayload.title,
+  );
+  let subscription = await command("calendar.subscribe", {}, cookie);
+  assert.equal(subscription.status, 200);
+  const url = new URL(subscription.data.result.url);
+  assert.match(
+    url.pathname,
+    /\/api\/calendar\/subscription\/[A-Za-z0-9_-]{43}\.ics$/,
+  );
+  const read = (path) => fetch(base + path);
+  let response = await read(url.pathname);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /text\/calendar/);
+  assert.match(response.headers.get("cache-control"), /no-store/);
+  let text = await response.text();
+  assert.ok(text.includes("Outlook subscribed session"));
+  assert.ok(!text.includes("PRIVATE "));
+  assert.ok(text.includes(`UID:session-${appointment.id}@archetype`));
+  assert.equal((await read("/api/state")).status, 401);
+  const head = await fetch(base + url.pathname, { method: "HEAD" });
+  assert.equal(head.status, 200);
+  assert.equal(await head.text(), "");
+  const status = await request("/api/calendar/subscription", { cookie });
+  assert.equal(status.status, 200);
+  assert.equal(status.data.enabled, true);
+  assert.ok(status.data.lastFetched);
+  assert.ok(
+    !JSON.stringify(status.data).includes(url.pathname.split("/").at(-1)),
+  );
+  let changed = await command(
+    "session.save",
+    {
+      ...sessionPayload,
+      id: appointment.id,
+      title: "Outlook updated session",
+      status: "Cancelled",
+      cancellationReason: "Rescheduled for the subscription test",
+    },
+    cookie,
+  );
+  assert.equal(changed.status, 200);
+  text = await (await read(url.pathname)).text();
+  assert.ok(text.includes("Outlook updated session"));
+  assert.ok(text.includes("STATUS:CANCELLED"));
+  assert.ok(text.includes(`UID:session-${appointment.id}@archetype`));
+  subscription = await command("calendar.subscribe", {}, cookie);
+  let currentPath = new URL(subscription.data.result.url).pathname;
+  assert.equal((await read(url.pathname)).status, 404);
+  assert.equal((await read(currentPath)).status, 200);
+  assert.equal((await command("calendar.unsubscribe", {}, cookie)).status, 200);
+  assert.equal((await read(currentPath)).status, 404);
+  subscription = await command("calendar.subscribe", {}, cookie);
+  currentPath = new URL(subscription.data.result.url).pathname;
+  assert.equal(
+    (await command("user.setActive", { id: assessor.id, active: false }))
+      .status,
+    200,
+  );
+  assert.equal((await read(currentPath)).status, 404);
+  assert.equal(
+    (await command("user.setActive", { id: assessor.id, active: true })).status,
+    200,
+  );
+  assert.equal((await read(currentPath)).status, 404);
+  signed = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password: chosen }),
+  });
+  cookie = signed.cookie;
+  subscription = await command("calendar.subscribe", {}, cookie);
+  currentPath = new URL(subscription.data.result.url).pathname;
+  assert.equal(
+    (
+      await command(
+        "password.change",
+        { current: chosen, password: "Another Outlook password 2026!" },
+        cookie,
+      )
+    ).status,
+    200,
+  );
+  assert.equal((await read(currentPath)).status, 404);
+  const iqa = await login("iqa@archetype.demo");
+  assert.equal(
+    (await command("calendar.subscribe", { userId: assessor.id }, iqa)).status,
+    403,
+  );
+});

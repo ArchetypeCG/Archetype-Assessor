@@ -1,3 +1,4 @@
+import { CalendarSubscription } from "./calendar-subscription";
 import { expectedOtjHours } from "../server/otj-target.mjs";
 import { OTJProgress, LearningTemplates } from "./learner-enhancements";
 import { sessionLink } from "./session";
@@ -133,8 +134,16 @@ function SessionCard({ a, s, setModal }) {
     </button>
   );
 }
-export function SchedulingWorkspace({ s, user, setModal, openLearner }) {
-  const [month, M] = useState(localDate().slice(0, 7)),
+export function SchedulingWorkspace({
+  s,
+  user,
+  setModal,
+  openLearner,
+  command,
+  busy,
+}) {
+  const [outlook, OUTLOOK] = useState(false),
+    [month, M] = useState(localDate().slice(0, 7)),
     [selected, S] = useState(""),
     [query, Q] = useState(""),
     [learnerId, L] = useState(""),
@@ -200,6 +209,9 @@ export function SchedulingWorkspace({ s, user, setModal, openLearner }) {
             </a>
             {staff(user) && (
               <>
+                <Button secondary onClick={() => OUTLOOK((value) => !value)}>
+                  Link to Outlook
+                </Button>
                 <Button
                   secondary
                   onClick={() =>
@@ -231,6 +243,9 @@ export function SchedulingWorkspace({ s, user, setModal, openLearner }) {
           </div>
         }
       >
+        {outlook && staff(user) && (
+          <CalendarSubscription user={user} command={command} busy={busy} />
+        )}
         <div className="filterbar">
           <div className="searchbox">
             <input
@@ -518,7 +533,7 @@ export function LearningPlan({
           <p>Open a session for full details and preparation</p>
         </div>
       </div>
-      <OTJProgress learner={l} />
+      <OTJProgress key={l.id} learner={l} logs={s.otj} />
       <LearningTemplates s={s} user={user} learner={l} setModal={setModal} />
       <Panel
         title="Your learning activities"
@@ -916,7 +931,14 @@ export function ScheduleDialog({
         </div>
         {!editing ? (
           <>
-            {l && <OTJProgress learner={l} initialDate={item.date} />}
+            {l && (
+              <OTJProgress
+                key={l.id + ":" + item.id}
+                learner={l}
+                logs={s.otj}
+                initialDate={item.date}
+              />
+            )}
             <div className="session-detail-cover">
               <span className="eyebrow">
                 {item.type || "Teaching session"} ·{" "}

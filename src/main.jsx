@@ -1318,7 +1318,7 @@ function PortfolioHub() {
               icon={ClipboardCheck}
             />
           </div>
-          <OTJProgress learner={l} />
+          <OTJProgress key={l.id} learner={l} logs={s.otj} />
           <Evidence learner={l} />
           <PrivateLearnerNotes key={l.id} {...ctx} learner={l} />
           <Coverage learner={l} />
@@ -1835,7 +1835,11 @@ function OTJ({ learner }) {
         </label>
       )}
       {selectedLearner && (
-        <OTJProgress key={selectedLearner.id} learner={selectedLearner} />
+        <OTJProgress
+          key={selectedLearner.id}
+          learner={selectedLearner}
+          logs={s.otj}
+        />
       )}
       <div className="metrics three">
         <Metric

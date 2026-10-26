@@ -21,10 +21,18 @@ try {
   if (!s.users.some((u) => u.active && u.role === "Manager"))
     throw Error("Backup has no active manager account.");
   db.exec("DELETE FROM sessions");
+  if (
+    db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE name='calendar_subscriptions'",
+      )
+      .get()
+  )
+    db.exec("DELETE FROM calendar_subscriptions");
   db.close();
   db = null;
   console.log(
-    "Backup restored and verified to the new data directory. All previous login sessions were invalidated. Stop the live app before changing DATA_DIR to this directory.",
+    "Backup restored and verified to the new data directory. All previous login sessions and calendar subscription links were invalidated. Stop the live app before changing DATA_DIR to this directory.",
   );
 } catch (e) {
   db?.close();

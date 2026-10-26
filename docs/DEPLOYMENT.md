@@ -47,7 +47,7 @@ If you use a custom domain, configure it in Render, then add `APP_ORIGIN=https:/
 - Staff-only session notes are excluded from apprentice and employer API responses.
 - Edit, complete or cancel a session while retaining its record. Record a cancellation reason. Review appointments can update the learner's next review due date.
 - From a scheduled review, select **Record completed review** to save the discussion, learner/employer feedback, shared wellbeing/support notes, agreed actions and next objectives. Completing the review links the records and updates last/next review dates.
-- Download **Export calendar** to import an authenticated snapshot into Outlook, Google Calendar or Apple Calendar. Exported times use correct UK daylight-saving offsets. This is an ICS download, not a public subscription feed or email invitation service.
+- Download **Export calendar** to import an authenticated snapshot into Outlook, Google Calendar or Apple Calendar. Exported times use correct UK daylight-saving offsets. This exports a snapshot. For automatic Outlook updates, use **Link to Outlook** to create a private subscription instead; see [Outlook calendar subscriptions](OUTLOOK_CALENDAR.md).
 - Planned hours and completed learning-plan activities do not automatically count as verified KSBs or approved OTJ hours. Evidence assessment and learning-hour approval remain separate workflows.
 
 ## 5. Backups and recovery

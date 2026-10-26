@@ -141,3 +141,83 @@ test("PDF uploads contribute actual readable document text to the internal check
   assert.ok(result.text.includes("word99"));
   assert.equal(compareText(result.text, [{ text: words }]).similarity, 100);
 });
+
+test("each apprentice's OTJ comparison uses their own dated approved log and own programme, not a cached/shared total", async () => {
+  const { otjProgress } = await import("../server/otj-target.mjs");
+  const a = {
+    id: "a",
+    name: "A",
+    standardId: "a-course",
+    startDate: "2026-01-01",
+    plannedEnd: "2026-01-11",
+    otjTarget: 100,
+    hours: 45,
+  };
+  const b = {
+    id: "b",
+    name: "B",
+    standardId: "b-course",
+    startDate: "2026-01-01",
+    plannedEnd: "2026-01-21",
+    otjTarget: 300,
+    hours: 45,
+  };
+  const logs = [
+    {
+      learnerId: "a",
+      standardId: "a-course",
+      date: "2026-01-03",
+      status: "Approved",
+      hours: 10,
+    },
+    {
+      learnerId: "a",
+      standardId: "a-course",
+      date: "2026-01-04",
+      status: "Approved",
+      hours: "0.25",
+    },
+    {
+      learnerId: "a",
+      standardId: "a-course",
+      date: "2026-01-03",
+      status: "Pending",
+      hours: 99,
+    },
+    {
+      learnerId: "a",
+      standardId: "old-course",
+      date: "2026-01-03",
+      status: "Approved",
+      hours: 50,
+    },
+    {
+      learnerId: "a",
+      standardId: "a-course",
+      date: "2026-01-08",
+      status: "Approved",
+      hours: 25,
+    },
+    {
+      learnerId: "b",
+      standardId: "b-course",
+      date: "2026-01-03",
+      status: "Approved",
+      hours: 33,
+    },
+  ];
+  assert.deepEqual(otjProgress(a, logs, "2026-01-06"), {
+    approved: 10.25,
+    expected: 50,
+    variance: -39.75,
+  });
+  assert.deepEqual(otjProgress(b, logs, "2026-01-06"), {
+    approved: 33,
+    expected: 75,
+    variance: -42,
+  });
+  logs[0].hours = 20;
+  assert.equal(otjProgress(a, logs, "2026-01-06").approved, 20.25);
+  assert.equal(otjProgress(b, logs, "2026-01-06").approved, 33);
+  assert.equal(otjProgress(a, logs, "2026-01-11").approved, 45.25);
+});

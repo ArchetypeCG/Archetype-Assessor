@@ -3589,3 +3589,26 @@ input[type="file"]::file-selector-button {
 .feedback-box .decision-entry {
   overflow-wrap: anywhere;
 }
+
+.outlook-subscription {
+  background: #f3f8f5;
+  border: 1px solid #d4e4db;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.outlook-subscription > h3 {
+  margin-top: 0;
+}
+.outlook-subscription label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.outlook-subscription input {
+  width: 100%;
+  min-width: 0;
+}
+.outlook-subscription li {
+  margin: 6px 0;
+}

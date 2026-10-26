@@ -1,4 +1,4 @@
-import { expectedOtjHours } from "./otj-target.mjs";
+import { expectedOtjHours, approvedOtjHours } from "./otj-target.mjs";
 import { randomUUID } from "node:crypto";
 export const id = () => randomUUID();
 export const today = () =>
@@ -29,14 +29,7 @@ export function derive(l, s, now = today()) {
           100,
       )
     : 0;
-  const hours = s.otj
-    .filter(
-      (x) =>
-        x.learnerId === l.id &&
-        x.status === "Approved" &&
-        (!x.standardId || x.standardId === l.standardId),
-    )
-    .reduce((n, x) => n + x.hours, 0);
+  const hours = approvedOtjHours(l, s.otj, now);
   const exceptions = [];
   if (l.status === "Active") {
     if (l.nextReview && l.nextReview < now)
@@ -135,7 +128,7 @@ export function derive(l, s, now = today()) {
     otjVariance:
       expectedOtjHours(l, now) == null
         ? null
-        : Math.round((hours - expectedOtjHours(l, now)) * 10) / 10,
+        : Math.round((hours - expectedOtjHours(l, now)) * 100) / 100,
     variance: progress - l.target,
     rag,
     exceptions,

@@ -75,7 +75,14 @@ function fold(line) {
   }
   return out;
 }
-export function calendarICS(state) {
+export function calendarICS(
+  state,
+  {
+    privateEvents = false,
+    subscription = false,
+    name = "Archetype Learning Calendar",
+  } = {},
+) {
   const now = stamp(Date.now()),
     lines = [
       "BEGIN:VCALENDAR",
@@ -83,12 +90,20 @@ export function calendarICS(state) {
       "PRODID:-//Archetype//Learning Calendar//EN",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
-      "X-WR-CALNAME:Archetype Learning Calendar",
+      `X-WR-CALNAME:${escape(name)}`,
+      ...(subscription
+        ? [
+            "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+            "X-PUBLISHED-TTL:PT1H",
+            "X-WR-TIMEZONE:Europe/London",
+          ]
+        : []),
     ];
   for (const a of state.appointments) {
     const learner = state.learners.find((l) => l.id === a.learnerId);
     lines.push(
       "BEGIN:VEVENT",
+      ...(privateEvents ? ["CLASS:PRIVATE"] : []),
       `UID:session-${a.id}@archetype`,
       `DTSTAMP:${now}`,
       `LAST-MODIFIED:${stamp(Date.parse(a.updated || a.created || new Date().toISOString()))}`,
