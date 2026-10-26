@@ -10,6 +10,26 @@ import morganPortrait from "./assets/fictional-morgan.png";
 import caseyPortrait from "./assets/fictional-casey.png";
 import jordanPortrait from "./assets/fictional-jordan.png";
 import rileyPortrait from "./assets/fictional-riley.png";
+import harperPortrait from "./assets/fictional-harper.png";
+import elliotPortrait from "./assets/fictional-elliot.png";
+import siennaPortrait from "./assets/fictional-sienna.png";
+import nathanPortrait from "./assets/fictional-nathan.png";
+import amaraPortrait from "./assets/fictional-amara.png";
+import lucasPortrait from "./assets/fictional-lucas.png";
+import zaraPortrait from "./assets/fictional-zara.png";
+import dylanPortrait from "./assets/fictional-dylan.png";
+import mayaPortrait from "./assets/fictional-maya.png";
+import tobyPortrait from "./assets/fictional-toby.png";
+import leilaPortrait from "./assets/fictional-leila.png";
+import oscarPortrait from "./assets/fictional-oscar.png";
+import ninaPortrait from "./assets/fictional-nina.png";
+import felixPortrait from "./assets/fictional-felix.png";
+import isabelPortrait from "./assets/fictional-isabel.png";
+import reubenPortrait from "./assets/fictional-reuben.png";
+import esmePortrait from "./assets/fictional-esme.png";
+import adamPortrait from "./assets/fictional-adam.png";
+import claraPortrait from "./assets/fictional-clara.png";
+import samirPortrait from "./assets/fictional-samir.png";
 const portraits = {
   alex: samplePortrait,
   taylor: taylorPortrait,
@@ -17,6 +37,26 @@ const portraits = {
   casey: caseyPortrait,
   jordan: jordanPortrait,
   riley: rileyPortrait,
+  harper: harperPortrait,
+  elliot: elliotPortrait,
+  sienna: siennaPortrait,
+  nathan: nathanPortrait,
+  amara: amaraPortrait,
+  lucas: lucasPortrait,
+  zara: zaraPortrait,
+  dylan: dylanPortrait,
+  maya: mayaPortrait,
+  toby: tobyPortrait,
+  leila: leilaPortrait,
+  oscar: oscarPortrait,
+  nina: ninaPortrait,
+  felix: felixPortrait,
+  isabel: isabelPortrait,
+  reuben: reubenPortrait,
+  esme: esmePortrait,
+  adam: adamPortrait,
+  clara: claraPortrait,
+  samir: samirPortrait,
 };
 const sample = (learner) => portraits[fictionalPortraitKey(learner)] || "";
 export function LearnerAvatar({ learner, large = false }) {

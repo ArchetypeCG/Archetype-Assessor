@@ -23,20 +23,70 @@ export function validateProfilePhoto(file) {
   return { body, type };
 }
 
-// Only the explicitly fictional practice records receive generated portraits.
+const practicePortraits = [
+  "harper",
+  "elliot",
+  "sienna",
+  "nathan",
+  "amara",
+  "lucas",
+  "zara",
+  "dylan",
+  "maya",
+  "toby",
+  "leila",
+  "oscar",
+  "nina",
+  "felix",
+  "isabel",
+  "reuben",
+  "esme",
+  "adam",
+  "clara",
+  "samir",
+];
+const namedPortraits = {
+  "Alex Rowan": "alex",
+  "Taylor Vale": "taylor",
+  "Morgan Ellis": "morgan",
+  "Casey Linden": "casey",
+  "Jordan Ash": "jordan",
+  "Riley Brook": "riley",
+  "Harper Wren": "harper",
+  "Elliot Finch": "elliot",
+  "Sienna Blake": "sienna",
+  "Nathan Reed": "nathan",
+  "Amara Stone": "amara",
+  "Lucas Hart": "lucas",
+  "Zara Quinn": "zara",
+  "Dylan Frost": "dylan",
+  "Maya Rivers": "maya",
+  "Toby Lane": "toby",
+  "Leila Hayes": "leila",
+  "Oscar Birch": "oscar",
+  "Nina Wells": "nina",
+  "Felix Meadow": "felix",
+  "Isabel Crane": "isabel",
+  "Reuben Fox": "reuben",
+  "Esme Dale": "esme",
+  "Adam Westbrook": "adam",
+  "Clara Moss": "clara",
+  "Samir Oak": "samir",
+};
+// Only explicitly fictional records receive generated portraits. Stable practice references
+// retain their portrait when a name is edited; uploaded and removed photos take priority.
 export function fictionalPortraitKey(learner) {
   if (!learner?.fictional || learner.photoHidden) return "";
+  if (
+    learner.practiceBatch ===
+    "twenty-additional-fictional-apprentices-2026-10-26-v1"
+  ) {
+    const match = /^PRACTICE-(\d{3})(?:-|$)/.exec(learner.ref || "");
+    if (match && practicePortraits[Number(match[1]) - 1])
+      return practicePortraits[Number(match[1]) - 1];
+  }
   const name = String(learner.name || "")
     .replace(/\s*\(fictional\)\s*$/, "")
     .trim();
-  return (
-    {
-      "Alex Rowan": "alex",
-      "Taylor Vale": "taylor",
-      "Morgan Ellis": "morgan",
-      "Casey Linden": "casey",
-      "Jordan Ash": "jordan",
-      "Riley Brook": "riley",
-    }[name] || ""
-  );
+  return Object.hasOwn(namedPortraits, name) ? namedPortraits[name] : "";
 }

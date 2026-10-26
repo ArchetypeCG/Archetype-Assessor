@@ -56,3 +56,31 @@ test("all six fictional apprentices receive distinct portraits without overridin
   );
   assert.equal(fictionalPortraitKey(null), "");
 });
+
+test("the twenty added practice records retain distinct portrait identities after edits and respect photo removal", async () => {
+  const { seed } = await import("../server/model.mjs");
+  const { installExtraPractice, EXTRA_PRACTICE_VERSION } =
+    await import("../server/extra-practice.mjs");
+  const s = seed();
+  installExtraPractice(s, { day: "2026-10-26" });
+  const learners = s.learners.filter(
+    (l) => l.practiceBatch === EXTRA_PRACTICE_VERSION,
+  );
+  const keys = learners.map(fictionalPortraitKey);
+  assert.equal(keys.length, 20);
+  assert.equal(new Set(keys).size, 20);
+  assert(keys.every(Boolean));
+  for (const learner of learners) {
+    const key = fictionalPortraitKey(learner);
+    assert.equal(
+      fictionalPortraitKey({ ...learner, name: "Edited practice name" }),
+      key,
+    );
+    assert.equal(fictionalPortraitKey({ ...learner, fictional: false }), "");
+    assert.equal(fictionalPortraitKey({ ...learner, photoHidden: true }), "");
+  }
+  assert.equal(
+    fictionalPortraitKey({ name: "constructor", fictional: true }),
+    "",
+  );
+});
