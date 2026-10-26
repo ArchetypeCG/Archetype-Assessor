@@ -317,3 +317,34 @@ export function IntegrityReport({ evidence, onRecheck, busy }) {
     </section>
   );
 }
+
+export function EPASelection({ evidence, allowed, command, busy, notify }) {
+  const [selected, S] = useState(!!evidence.epaSelected);
+  useEffect(
+    () => S(!!evidence.epaSelected),
+    [evidence.id, evidence.epaSelected],
+  );
+  if (!allowed)
+    return <span>{selected ? "Selected for EPA" : "Not selected"}</span>;
+  return (
+    <label className="checkbox-label">
+      <input
+        type="checkbox"
+        aria-label={`Include ${evidence.title} in EPA folder`}
+        checked={selected}
+        disabled={busy}
+        onChange={async (event) => {
+          const value = event.target.checked;
+          S(value);
+          try {
+            await command("evidence.epa", { id: evidence.id, selected: value });
+          } catch (error) {
+            S(!value);
+            notify(error.message);
+          }
+        }}
+      />
+      {selected ? "Selected for EPA" : "Include in EPA"}
+    </label>
+  );
+}

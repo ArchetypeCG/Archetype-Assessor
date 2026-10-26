@@ -3,6 +3,7 @@ import {
   PrivateLearnerNotes,
   FunctionalSkillsChecks,
   IntegrityReport,
+  EPASelection,
 } from "./learner-enhancements";
 import { sessionHeaders, sessionLink, rotateSessionTab } from "./session";
 import {
@@ -1329,7 +1330,7 @@ function PortfolioHub() {
   );
 }
 function Evidence({ learner }) {
-  const { s, user, setModal, act } = useApp(),
+  const { s, user, setModal, command, busy, notify } = useApp(),
     [epa, EPA] = useState(false),
     [history, HISTORY] = useState(false),
     [q, Q] = useState(""),
@@ -1337,7 +1338,7 @@ function Evidence({ learner }) {
   const items = s.evidence.filter(
     (x) =>
       x.learnerId === learner.id &&
-      !!x.epaSelected === epa &&
+      (!epa || !!x.epaSelected) &&
       (history || activeRecord(s, x)) &&
       (!status || x.status === status) &&
       `${x.title} ${x.description}`.toLowerCase().includes(q.toLowerCase()),
@@ -1347,7 +1348,7 @@ function Evidence({ learner }) {
       title="Evidence & assessment"
       subtitle={
         epa
-          ? "Accepted evidence selected for end-point assessment. Export includes the work and assessor feedback."
+          ? "Choose the evidence for this apprentice’s EPA folder. Export includes accepted work and assessor feedback."
           : "Draft → Submitted → Assessed · only accepted evidence verifies KSBs"
       }
       action={
@@ -1418,7 +1419,16 @@ function Evidence({ learner }) {
           ))}
         </select>
       </div>
-      <Table headers={["Evidence", "KSB mapping", "Status", "Feedback", ""]}>
+      <Table
+        headers={[
+          "Evidence",
+          "KSB mapping",
+          "Status",
+          "Feedback",
+          "EPA folder",
+          "",
+        ]}
+      >
         {items.map((e) => (
           <tr key={e.id}>
             <td>
@@ -1431,21 +1441,6 @@ function Evidence({ learner }) {
                 <FileText size={16} />
                 {e.title}
               </button>
-              {e.status === "Accepted" &&
-                activeRecord(s, e) &&
-                ["Manager", "Assessor", "Apprentice"].includes(user.role) && (
-                  <button
-                    className="text-link"
-                    onClick={() =>
-                      act("evidence.epa", {
-                        id: e.id,
-                        selected: !e.epaSelected,
-                      })
-                    }
-                  >
-                    {e.epaSelected ? "Remove from EPA" : "Use for EPA"}
-                  </button>
-                )}
               <small>
                 Similarity:{" "}
                 {e.integrity?.status === "Checked"
@@ -1473,6 +1468,21 @@ function Evidence({ learner }) {
               {e.feedback || "Awaiting feedback"}
             </td>
             <td>
+              <EPASelection
+                evidence={e}
+                allowed={
+                  activeRecord(s, e) &&
+                  ["Manager", "Assessor", "Apprentice"].includes(user.role)
+                }
+                command={command}
+                busy={busy}
+                notify={notify}
+              />
+              {e.epaSelected && e.status !== "Accepted" && (
+                <small>Awaiting acceptance before export</small>
+              )}
+            </td>
+            <td>
               <button
                 className="text-link"
                 onClick={() =>
@@ -1492,7 +1502,7 @@ function Evidence({ learner }) {
       {!items.length && (
         <Empty>
           {epa
-            ? "Accepted items selected with Use for EPA appear here."
+            ? "Tick the EPA folder checkbox beside the evidence you want to include."
             : "No evidence matches. Add evidence or change the filters."}
         </Empty>
       )}

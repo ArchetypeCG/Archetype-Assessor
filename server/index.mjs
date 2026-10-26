@@ -532,12 +532,9 @@ function command(s, u, kind, p) {
       const e = s.evidence.find((e) => e.id === p.id);
       if (!e) fail("Evidence not found.", 404);
       const owner = learnerFor(s, u, e.learnerId);
-      if (
-        e.status !== "Accepted" ||
-        (e.standardId && e.standardId !== owner.standardId)
-      )
+      if (e.standardId && e.standardId !== owner.standardId)
         fail(
-          "Only accepted evidence for the current programme can be selected for EPA.",
+          "Select evidence from the apprentice's current programme for EPA.",
         );
       if (typeof p.selected !== "boolean")
         fail("Choose a valid EPA selection.");
@@ -801,7 +798,7 @@ function command(s, u, kind, p) {
         description: text(p.description, "Reflection", 20000),
         criteria: [...new Set(p.criteria)],
         status,
-        epaSelected: false,
+        epaSelected: old?.epaSelected || false,
         feedback: old?.feedback || "",
         files: [...(old?.files || []), ...uploadFiles(p.files || [], l.id)],
         by: old?.by || u.id,

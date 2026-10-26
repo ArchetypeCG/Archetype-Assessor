@@ -1787,3 +1787,93 @@ test("review targets create linked learning-plan activities and optional functio
     ),
   );
 });
+
+test("EPA folder selection supports uploaded work before assessment and survives edits without exporting unaccepted work", async () => {
+  const r = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: "NewLearnerPassword123!",
+    }),
+  });
+  assert.equal(r.status, 200);
+  const cookie = r.cookie,
+    learner = (await state(cookie)).learners[0],
+    s = await state(),
+    standard = s.standards.find((st) => st.id === learner.standardId);
+  const payload = {
+    learnerId: learner.id,
+    title: "EPA chosen upload",
+    type: "Reflective account",
+    date: today(),
+    description: "Draft work chosen for the EPA folder",
+    criteria: [standard.criteria[0].code],
+    status: "Draft",
+    files: [],
+  };
+  let created = await command("evidence.save", payload, cookie);
+  assert.equal(created.status, 200);
+  const evidence = created.data.state.evidence.find(
+    (e) => e.title === payload.title,
+  );
+  assert.equal(
+    (await command("evidence.epa", { id: evidence.id, selected: true }, cookie))
+      .status,
+    200,
+  );
+  const saved = await command(
+    "evidence.save",
+    {
+      ...payload,
+      id: evidence.id,
+      description: "Updated selected evidence",
+      status: "Submitted",
+    },
+    cookie,
+  );
+  assert.equal(saved.status, 200);
+  assert.equal(
+    saved.data.state.evidence.find((e) => e.id === evidence.id).epaSelected,
+    true,
+  );
+  const pack = await fetch(base + "/api/epa/" + learner.id + ".zip", {
+    headers: { cookie },
+  });
+  assert.equal(pack.status, 200);
+  const { default: JSZip } = await import("jszip");
+  const zip = await JSZip.loadAsync(await pack.arrayBuffer());
+  assert.ok(
+    !(await zip.file("portfolio.json").async("string")).includes(payload.title),
+  );
+  const foreign = s.evidence.find((e) => e.learnerId !== learner.id);
+  assert.equal(
+    (await command("evidence.epa", { id: foreign.id, selected: true }, cookie))
+      .status,
+    404,
+  );
+  assert.equal(
+    (
+      await command("evidence.assess", {
+        id: evidence.id,
+        status: "Accepted",
+        feedback: "Selected work accepted",
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await command(
+        "evidence.epa",
+        { id: evidence.id, selected: false },
+        cookie,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await state(cookie)).evidence.find((e) => e.id === evidence.id)
+      .epaSelected,
+    false,
+  );
+});
