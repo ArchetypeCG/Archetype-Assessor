@@ -18,6 +18,22 @@ export function urgentItems(s, u, canSee, day = today()) {
     items.push(
       `Action: ${t.title || t.text || "Outstanding task"} (due ${t.due})`,
     );
+  if (["Manager", "Assessor"].includes(u.role))
+    for (const action of (s.assessorActions || []).filter(
+      (action) =>
+        action.status === "Open" &&
+        action.due &&
+        action.due <= day &&
+        (u.role === "Manager" || action.owner === u.id) &&
+        (s.assessorOneToOnes || []).some(
+          (record) =>
+            record.id === action.oneToOneId && record.status !== "Draft",
+        ) &&
+        (!action.learnerId ||
+          !s.learners.find((learner) => learner.id === action.learnerId)
+            ?.fictional),
+    ))
+      items.push(`Assessor 1:1 action: ${action.title} (due ${action.due})`);
   for (const a of (s.appointments || []).filter(
     (a) =>
       ids.has(a.learnerId) &&

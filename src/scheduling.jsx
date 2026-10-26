@@ -62,6 +62,9 @@ function Tag({ children }) {
         "tag " +
         ({
           Completed: "green",
+          Attended: "green",
+          "Did not attend": "red",
+          Rescheduled: "amber",
           Cancelled: "red",
           "In progress": "blue",
           Planned: "blue",
@@ -80,58 +83,125 @@ function Empty({ children }) {
     </div>
   );
 }
-function SessionCard({ a, s, setModal }) {
+function SessionCard({ a, s, setModal, user, command, busy }) {
+  const [pending, PENDING] = useState(false),
+    [error, ERROR] = useState("");
+  const editable =
+    staff(user) &&
+    a.status !== "Cancelled" &&
+    (!a.standardId ||
+      s.learners.find((l) => l.id === a.learnerId)?.standardId ===
+        a.standardId);
+  const future = a.date > localDate();
+  async function attendance(value) {
+    ERROR("");
+    PENDING(true);
+    try {
+      await command("session.attendance", {
+        id: a.id,
+        learnerId: a.learnerId,
+        attendance: value,
+      });
+    } catch (error) {
+      ERROR(error.message);
+    } finally {
+      PENDING(false);
+    }
+  }
   return (
-    <button
-      className={
-        "session-card " + (a.status === "Cancelled" ? "cancelled" : "")
-      }
-      onClick={() =>
-        setModal({
-          type: "sessionDetail",
-          item: a,
-          learner: s.learners.find((l) => l.id === a.learnerId),
-        })
-      }
-    >
-      <span className="session-date">
-        <CalendarDays size={21} />
-        <b>{fmt(a.date)}</b>
-        <small>
-          {a.allDay ? "Time to be confirmed" : a.time}
-          {a.endTime ? " – " + a.endTime : ""}
-        </small>
-      </span>
-      <div>
-        <span className="eyebrow">
-          {a.type || "Teaching session"} · {a.delivery || "In person"}
+    <article className="session-entry">
+      <button
+        className={
+          "session-card " + (a.status === "Cancelled" ? "cancelled" : "")
+        }
+        onClick={() =>
+          setModal({
+            type: "sessionDetail",
+            item: a,
+            learner: s.learners.find((l) => l.id === a.learnerId),
+          })
+        }
+      >
+        <span className="session-date">
+          <CalendarDays size={21} />
+          <b>{fmt(a.date)}</b>
+          <small>
+            {a.allDay ? "Time to be confirmed" : a.time}
+            {a.endTime ? " – " + a.endTime : ""}
+          </small>
         </span>
-        <h3>{a.title}</h3>
-        <p>
-          {s.learners.find((l) => l.id === a.learnerId)?.name} ·{" "}
-          {a.location || "Location to be confirmed"}
-        </p>
-        <p>
-          Expected OTJ by this session:{" "}
-          {expectedOtjHours(
-            s.learners.find((l) => l.id === a.learnerId) || {},
-            a.date,
-          ) == null
-            ? "Target not set"
-            : `${expectedOtjHours(s.learners.find((l) => l.id === a.learnerId) || {}, a.date)}h`}
-        </p>
-        {a.objectives && <p className="session-preview">{a.objectives}</p>}
-        <div className="session-codes">
-          {(a.criteria || []).map((c) => (
-            <span key={c}>{c}</span>
-          ))}
+        <div>
+          <span className="eyebrow">
+            {a.type || "Teaching session"} · {a.delivery || "In person"}
+          </span>
+          <h3>{a.title}</h3>
+          <p>
+            {s.learners.find((l) => l.id === a.learnerId)?.name} ·{" "}
+            {a.location || "Location to be confirmed"}
+          </p>
+          <p>
+            Expected OTJ by this session:{" "}
+            {expectedOtjHours(
+              s.learners.find((l) => l.id === a.learnerId) || {},
+              a.date,
+            ) == null
+              ? "Target not set"
+              : `${expectedOtjHours(s.learners.find((l) => l.id === a.learnerId) || {}, a.date)}h`}
+          </p>
+          {a.objectives && <p className="session-preview">{a.objectives}</p>}
+          <div className="session-codes">
+            {(a.criteria || []).map((c) => (
+              <span key={c}>{c}</span>
+            ))}
+          </div>
         </div>
-      </div>
-      <span className="session-card-end">
-        <Tag>{a.status || "Planned"}</Tag>
-        <ArrowUpRight size={17} />
-      </span>
-    </button>
+        <span className="session-card-end">
+          <Tag>{a.status || "Planned"}</Tag>
+          <Tag>{a.attendance || "Not recorded"}</Tag>
+          <ArrowUpRight size={17} />
+        </span>
+      </button>
+      {editable && (
+        <div className="session-quick-actions">
+          <button
+            type="button"
+            className="button secondary"
+            disabled={pending || busy || future || a.attendance === "Attended"}
+            title={
+              future ? "Attendance is available on the session date" : undefined
+            }
+            onClick={() => attendance("Attended")}
+          >
+            <Check size={15} />
+            {a.attendance === "Attended" ? "Attended" : "Mark attended"}
+          </button>
+          <label>
+            Attendance
+            <select
+              aria-label={`Attendance for ${a.title}`}
+              value={a.attendance || "Not recorded"}
+              disabled={pending || busy || future}
+              onChange={(event) => attendance(event.target.value)}
+            >
+              {[
+                "Not recorded",
+                "Attended",
+                "Did not attend",
+                "Rescheduled",
+              ].map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </select>
+          </label>
+          {future && <small>Available on the session date</small>}
+        </div>
+      )}
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+    </article>
   );
 }
 export function SchedulingWorkspace({
@@ -345,7 +415,7 @@ export function SchedulingWorkspace({
             ? "Schedule · " + fmt(selected)
             : "This month’s sessions & reviews"
         }
-        subtitle="Open a session to see the agenda, preparation, learning outcomes, participants and resources."
+        subtitle="Record attendance here or open a session for full details. Attendance does not complete a review or approve OTJ hours."
       >
         {shown.map((a) =>
           a.source === "deadline" ? (
@@ -386,7 +456,15 @@ export function SchedulingWorkspace({
               )}
             </div>
           ) : (
-            <SessionCard key={a.id} a={a} s={s} setModal={setModal} />
+            <SessionCard
+              key={a.id}
+              a={a}
+              s={s}
+              setModal={setModal}
+              user={user}
+              command={command}
+              busy={busy}
+            />
           ),
         )}
         {!shown.length && (
@@ -408,6 +486,7 @@ export function LearningPlan({
   setLearnerId,
   setModal,
   learner,
+  busy,
 }) {
   const l =
       learner || s.learners.find((x) => x.id === learnerId) || s.learners[0],
@@ -698,7 +777,15 @@ export function LearningPlan({
         subtitle="Sessions are shared with the same apprentice and authorised staff accounts"
       >
         {sessions.map((a) => (
-          <SessionCard key={a.id} a={a} s={s} setModal={setModal} />
+          <SessionCard
+            key={a.id}
+            a={a}
+            s={s}
+            setModal={setModal}
+            user={user}
+            command={command}
+            busy={busy}
+          />
         ))}
         {!sessions.length && (
           <Empty>No sessions have been scheduled for this learner.</Empty>

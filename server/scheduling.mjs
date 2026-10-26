@@ -1,3 +1,4 @@
+import { today } from "./model.mjs";
 import {
   addDays,
   REVIEW_SERIES_SOURCE,
@@ -170,6 +171,42 @@ export function schedulingCommand({
       fail("Select resources available for this standard.");
     return [...new Set(p.resources || [])];
   };
+  if (kind === "session.attendance") {
+    requireRole(u, editors);
+    if (!l) fail("Select an apprentice.");
+    const appointment = s.appointments.find(
+      (a) => a.id === p.id && a.learnerId === l.id,
+    );
+    if (!appointment) fail("Session not found.", 404);
+    if (appointment.standardId && appointment.standardId !== l.standardId)
+      fail("Sessions from an earlier programme are read-only.");
+    if (appointment.status === "Cancelled")
+      fail("Cancelled sessions cannot have attendance updated.");
+    const attendance = choice(
+      p.attendance,
+      ["Not recorded", "Attended", "Did not attend", "Rescheduled"],
+      "attendance",
+    );
+    if (
+      ["Attended", "Did not attend"].includes(attendance) &&
+      appointment.date > today()
+    )
+      fail("Attendance can be recorded on or after the session date.");
+    const previous = appointment.attendance || "Not recorded";
+    if (previous !== attendance) {
+      appointment.attendance = attendance;
+      appointment.updated = new Date().toISOString();
+      appointment.sequence = (appointment.sequence || 0) + 1;
+      appointment.attendanceHistory ||= [];
+      appointment.attendanceHistory.push({
+        from: previous,
+        to: attendance,
+        by: u.id,
+        date: appointment.updated,
+      });
+    }
+    return { sessionId: appointment.id };
+  }
   if (["appointment.add", "session.save"].includes(kind)) {
     requireRole(u, editors);
     if (!l) fail("Select a learner.");

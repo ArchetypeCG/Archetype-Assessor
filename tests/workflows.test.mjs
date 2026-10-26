@@ -2531,7 +2531,7 @@ test("personal and ALS records and supporting documents are private to the manag
     200,
   );
 });
-test("master-only assessor 1:1 logs preserve revisions and success stories publish only approved text to every assessor", async () => {
+test("master-managed assessor 1:1 logs preserve revisions and success stories publish approved text to every assessor", async () => {
   const manager = await login("manager@archetype.demo");
   const s = await state(manager),
     assessor = s.users.find((u) => u.role === "Assessor");
@@ -2633,10 +2633,11 @@ test("master-only assessor 1:1 logs preserve revisions and success stories publi
     ).status,
     200,
   );
-  assert.equal((await state(a)).successStories.length, 1);
-  assert.equal(
-    (await state(a)).successStories[0].title,
-    "Assessor achievement",
+  assert.equal((await state(a)).successStories.length, 2);
+  assert(
+    (await state(a)).successStories.some(
+      (post) => post.title === "Assessor achievement",
+    ),
   );
 });
 
@@ -2697,4 +2698,778 @@ test("personal support records, protected documents, supervision logs and publis
   });
   assert.equal(download.status, 200);
   assert.equal(await download.text(), "Persistent synthetic certificate");
+});
+
+test("success stories can be unpublished and deleted only by master administrators without changing other stories", async () => {
+  const manager = await login("manager@archetype.demo");
+  const before = await state(manager),
+    published = before.successStories.find((story) => story.published);
+  assert(published);
+  const aLogin = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "support-assessor@example.test",
+      password: "Support assessor chosen 2026!",
+    }),
+  });
+  assert.equal(aLogin.status, 200);
+  assert.equal(
+    (await command("spotlight.unpublish", { id: published.id }, aLogin.cookie))
+      .status,
+    403,
+  );
+  assert.equal(
+    (await command("spotlight.unpublish", { id: published.id }, manager))
+      .status,
+    200,
+  );
+  let s = await state(manager);
+  assert.equal(s.successStories.length, before.successStories.length);
+  assert.equal(
+    s.successStories.find((story) => story.id === published.id).story,
+    published.story,
+  );
+  assert(
+    !(await state(aLogin.cookie)).successStories.some(
+      (post) => post.id === published.id,
+    ),
+  );
+  assert.equal(
+    (
+      await command(
+        "spotlight.save",
+        { ...published, published: true },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  assert(
+    (await state(aLogin.cookie)).successStories.some(
+      (post) => post.id === published.id,
+    ),
+  );
+  const untouched = s.successStories.filter(
+    (story) => story.id !== published.id,
+  );
+  assert.equal(
+    (await command("spotlight.delete", { id: published.id }, aLogin.cookie))
+      .status,
+    403,
+  );
+  assert.equal(
+    (await command("spotlight.delete", { id: published.id }, manager)).status,
+    200,
+  );
+  s = await state(manager);
+  assert.deepEqual(s.successStories, untouched);
+  assert(
+    !(await state(aLogin.cookie)).successStories.some(
+      (post) => post.id === published.id,
+    ),
+  );
+  assert.equal(
+    (await command("spotlight.delete", { id: published.id }, manager)).status,
+    404,
+  );
+});
+test("quick session and review attendance is scoped, reversible and separate from completion and OTJ approval", async () => {
+  const manager = await login("manager@archetype.demo"),
+    s = await state(manager),
+    l = s.learners[0];
+  const beforeReviews = s.reviews.length,
+    beforeHours = l.hours,
+    beforeNextReview = l.nextReview;
+  const basePayload = {
+    learnerId: l.id,
+    date: today(),
+    time: "09:00",
+    endTime: "10:00",
+    delivery: "Online",
+    location: "Fictional training room",
+    description: "Quick attendance test",
+    criteria: [],
+    resources: [],
+    participants: ["manager"],
+    status: "Planned",
+    updateReviewDue: false,
+  };
+  for (const type of ["Teaching session", "Progress review"]) {
+    const title = "Quick attendance · " + type;
+    assert.equal(
+      (await command("session.save", { ...basePayload, title, type }, manager))
+        .status,
+      200,
+    );
+    let a = (await state(manager)).appointments.find((a) => a.title === title);
+    assert.equal(
+      (
+        await command(
+          "session.attendance",
+          { learnerId: l.id, id: a.id, attendance: "Attended" },
+          manager,
+        )
+      ).status,
+      200,
+    );
+    a = (await state(manager)).appointments.find((x) => x.id === a.id);
+    assert.equal(a.attendance, "Attended");
+    assert.equal(a.status, "Planned");
+    assert.equal(a.attendanceHistory.length, 1);
+    assert.equal(
+      (
+        await command(
+          "session.attendance",
+          { learnerId: l.id, id: a.id, attendance: "Attended" },
+          manager,
+        )
+      ).status,
+      200,
+    );
+    assert.equal(
+      (await state(manager)).appointments.find((x) => x.id === a.id)
+        .attendanceHistory.length,
+      1,
+    );
+    assert.equal(
+      (
+        await command(
+          "session.attendance",
+          { learnerId: l.id, id: a.id, attendance: "Did not attend" },
+          manager,
+        )
+      ).status,
+      200,
+    );
+    assert.equal(
+      (
+        await command(
+          "session.attendance",
+          { learnerId: l.id, id: a.id, attendance: "Not recorded" },
+          manager,
+        )
+      ).status,
+      200,
+    );
+    assert.equal(
+      (await state(manager)).appointments.find((x) => x.id === a.id).attendance,
+      "Not recorded",
+    );
+    const iqa = await login("iqa@archetype.demo");
+    const denied = await command(
+      "session.attendance",
+      { learnerId: l.id, id: a.id, attendance: "Attended" },
+      iqa,
+    );
+    assert([403, 404].includes(denied.status));
+  }
+  const after = await state(manager);
+  assert.equal(after.reviews.length, beforeReviews);
+  assert.equal(after.learners.find((x) => x.id === l.id).hours, beforeHours);
+  assert.equal(
+    after.learners.find((x) => x.id === l.id).nextReview,
+    beforeNextReview,
+  );
+  const future = addDays(today(), 1);
+  assert.equal(
+    (
+      await command(
+        "session.save",
+        {
+          ...basePayload,
+          title: "Future attendance guard",
+          type: "Teaching session",
+          date: future,
+        },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  let a = (await state(manager)).appointments.find(
+    (a) => a.title === "Future attendance guard",
+  );
+  assert.equal(
+    (
+      await command(
+        "session.attendance",
+        { learnerId: l.id, id: a.id, attendance: "Attended" },
+        manager,
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await command(
+        "session.save",
+        {
+          ...basePayload,
+          id: a.id,
+          title: "Future attendance guard",
+          type: "Teaching session",
+          date: future,
+          status: "Cancelled",
+          cancellationReason: "Fictional cancellation",
+        },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await command(
+        "session.attendance",
+        { learnerId: l.id, id: a.id, attendance: "Not recorded" },
+        manager,
+      )
+    ).status,
+    400,
+  );
+  const aLogin = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "support-assessor@example.test",
+      password: "Support assessor chosen 2026!",
+    }),
+  });
+  const other = s.learners.find(
+    (x) => x.id !== l.id && x.assessorId !== l.assessorId,
+  );
+  assert(other);
+  assert.equal(
+    (
+      await command(
+        "session.save",
+        {
+          ...basePayload,
+          learnerId: other.id,
+          title: "Other caseload attendance",
+          type: "Teaching session",
+        },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  a = (await state(manager)).appointments.find(
+    (x) => x.title === "Other caseload attendance",
+  );
+  assert.equal(
+    (
+      await command(
+        "session.attendance",
+        { learnerId: other.id, id: a.id, attendance: "Attended" },
+        aLogin.cookie,
+      )
+    ).status,
+    404,
+  );
+});
+
+test("Success and updates supports multiple posts with explicit assessor, learner and shared audiences", async () => {
+  const manager = await login("manager@archetype.demo"),
+    aLogin = await request("/api/login", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "support-assessor@example.test",
+        password: "Support assessor chosen 2026!",
+      }),
+    }),
+    lLogin = await request("/api/login", {
+      method: "POST",
+      body: JSON.stringify({
+        email: "apprentice@archetype.demo",
+        password: "NewLearnerPassword123!",
+      }),
+    });
+  assert.equal(aLogin.status, 200);
+  assert.equal(lLogin.status, 200);
+  const ids = [];
+  for (const audience of ["Assessors", "Learners", "Assessors and learners"]) {
+    const result = await command(
+      "spotlight.save",
+      {
+        kind: "Update",
+        title: "News for " + audience,
+        story: "An announcement published by the master administrator.",
+        audience,
+        published: true,
+      },
+      manager,
+    );
+    assert.equal(result.status, 200);
+    ids.push(result.data.result.storyId);
+  }
+  let a = (await state(aLogin.cookie)).successStories,
+    l = (await state(lLogin.cookie)).successStories;
+  assert(a.some((p) => p.id === ids[0]));
+  assert(!a.some((p) => p.id === ids[1]));
+  assert(a.some((p) => p.id === ids[2]));
+  assert(!l.some((p) => p.id === ids[0]));
+  assert(l.some((p) => p.id === ids[1]));
+  assert(l.some((p) => p.id === ids[2]));
+  assert(
+    l
+      .filter((p) => ids.includes(p.id))
+      .every((p) => p.personName === "Archetype team"),
+  );
+  const draft = await command(
+    "spotlight.save",
+    {
+      kind: "Update",
+      title: "Private draft announcement",
+      story: "Not published yet",
+      audience: "Assessors and learners",
+      published: false,
+    },
+    manager,
+  );
+  assert.equal(draft.status, 200);
+  assert(
+    !(await state(aLogin.cookie)).successStories.some(
+      (p) => p.id === draft.data.result.storyId,
+    ),
+  );
+  assert(
+    !(await state(lLogin.cookie)).successStories.some(
+      (p) => p.id === draft.data.result.storyId,
+    ),
+  );
+  const invalid = await command(
+    "spotlight.save",
+    {
+      kind: "Update",
+      title: "Invalid audience",
+      story: "Private",
+      audience: "Everyone",
+      published: true,
+    },
+    manager,
+  );
+  assert.equal(invalid.status, 400);
+  assert.equal(
+    (
+      await command(
+        "spotlight.save",
+        {
+          kind: "Update",
+          title: "Not authorised",
+          story: "No",
+          audience: "Learners",
+          published: true,
+        },
+        lLogin.cookie,
+      )
+    ).status,
+    403,
+  );
+  const shared = (await state(manager)).successStories.find(
+    (p) => p.id === ids[2],
+  );
+  assert.equal(
+    (
+      await command(
+        "spotlight.save",
+        { ...shared, audience: "Learners" },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  assert(
+    !(await state(aLogin.cookie)).successStories.some((p) => p.id === ids[2]),
+  );
+  assert(
+    (await state(lLogin.cookie)).successStories.some((p) => p.id === ids[2]),
+  );
+  assert.equal(
+    (await command("spotlight.unpublish", { id: ids[2] }, manager)).status,
+    200,
+  );
+  assert(
+    !(await state(lLogin.cookie)).successStories.some((p) => p.id === ids[2]),
+  );
+  assert.equal(
+    (await command("spotlight.delete", { id: ids[2] }, manager)).status,
+    200,
+  );
+  assert(!(await state(manager)).successStories.some((p) => p.id === ids[2]));
+  const employer = await login("employer@archetype.demo");
+  assert.equal((await state(employer)).successStories.length, 0);
+});
+
+test("assessors can maintain their own CPD with private attachments while other accounts cannot read or modify it", async () => {
+  const manager = await login("manager@archetype.demo"),
+    s = await state(manager),
+    owner = s.users.find((u) => u.email === "support-assessor@example.test"),
+    other = s.users.find(
+      (u) => u.active && u.role === "Assessor" && u.id !== owner.id,
+    );
+  const loginResult = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: owner.email,
+      password: "Support assessor chosen 2026!",
+    }),
+  });
+  assert.equal(loginResult.status, 200);
+  const assessor = loginResult.cookie;
+  const payload = {
+    title: "Professional development workshop",
+    date: today(),
+    type: "Workshop",
+    hours: 2.5,
+    status: "Completed",
+    description: "CPD activity details",
+    reflection: "Applied new coaching methods",
+    impact: "More effective feedback",
+    nextSteps: "Practise the approach",
+    files: [
+      {
+        name: "cpd-certificate.txt",
+        base64: Buffer.from("Private CPD certificate").toString("base64"),
+      },
+    ],
+  };
+  const created = await command("cpd.save", payload, assessor);
+  assert.equal(created.status, 200);
+  let record = (await state(assessor)).cpdRecords.find(
+    (r) => r.id === created.data.result.recordId,
+  );
+  assert.equal(record.assessorId, owner.id);
+  assert.equal(record.hours, 2.5);
+  assert.equal(record.files.length, 1);
+  const path = "/api/cpd-files/" + record.files[0].id;
+  assert.equal((await fetch(base + path)).status, 401);
+  assert.equal(
+    await (await fetch(base + path, { headers: { cookie: assessor } })).text(),
+    "Private CPD certificate",
+  );
+  assert.equal(
+    (
+      await command(
+        "cpd.save",
+        { ...payload, id: record.id, hours: 3.5, files: [] },
+        assessor,
+      )
+    ).status,
+    200,
+  );
+  record = (await state(assessor)).cpdRecords.find((r) => r.id === record.id);
+  assert.equal(record.hours, 3.5);
+  assert.equal(record.files.length, 1);
+  const another = await command(
+    "cpd.save",
+    { ...payload, assessorId: other.id, title: "Another assessor CPD" },
+    manager,
+  );
+  assert.equal(another.status, 200);
+  const otherRecord = (await state(manager)).cpdRecords.find(
+    (r) => r.id === another.data.result.recordId,
+  );
+  assert(
+    !(await state(assessor)).cpdRecords.some((r) => r.id === otherRecord.id),
+  );
+  assert.equal(
+    (
+      await fetch(base + "/api/cpd-files/" + otherRecord.files[0].id, {
+        headers: { cookie: assessor },
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await command(
+        "cpd.save",
+        { ...payload, id: otherRecord.id, assessorId: owner.id },
+        assessor,
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (await command("cpd.delete", { id: otherRecord.id }, assessor)).status,
+    403,
+  );
+  for (const email of ["iqa@archetype.demo", "employer@archetype.demo"]) {
+    const account = await login(email);
+    assert.equal((await state(account)).cpdRecords.length, 0);
+    assert.equal(
+      (await fetch(base + path, { headers: { cookie: account } })).status,
+      403,
+    );
+  }
+  assert.equal(
+    (
+      await command(
+        "cpd.save",
+        { ...payload, date: addDays(today(), 1), files: [] },
+        assessor,
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await command(
+        "cpd.save",
+        {
+          ...payload,
+          title: "Planned CPD",
+          date: addDays(today(), 7),
+          status: "Planned",
+          reflection: "",
+          files: [],
+        },
+        assessor,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await command("cpd.delete", { id: record.id }, assessor)).status,
+    200,
+  );
+  assert.equal(
+    (await fetch(base + path, { headers: { cookie: assessor } })).status,
+    404,
+  );
+});
+test("shared 1:1 records link apprentices and add assessor-owned action-plan items without exposing confidential notes or drafts", async () => {
+  const manager = await login("manager@archetype.demo"),
+    s = await state(manager),
+    owner = s.users.find((u) => u.email === "support-assessor@example.test"),
+    learner = s.learners.find((l) => l.assessorId === owner.id),
+    other = s.users.find(
+      (u) => u.active && u.role === "Assessor" && u.id !== owner.id,
+    );
+  assert(learner);
+  const loginResult = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: owner.email,
+      password: "Support assessor chosen 2026!",
+    }),
+  });
+  const assessor = loginResult.cookie;
+  const payload = {
+    assessorId: owner.id,
+    learnerId: learner.id,
+    title: "Shared assessor development conversation",
+    date: today(),
+    status: "Completed",
+    summary: "Shared supervision summary",
+    performance: "Discussed learner support and caseload",
+    actions: "Agreed next steps",
+    confidentialNotes: "MANAGER-ONLY-SENTINEL",
+    actionItems: [
+      {
+        title: "Complete coaching CPD",
+        due: addDays(today(), 7),
+        status: "Open",
+      },
+      {
+        title: "Review linked apprentice progress",
+        due: addDays(today(), 3),
+        status: "Open",
+      },
+    ],
+  };
+  const created = await command("assessor.oneToOne.save", payload, manager);
+  assert.equal(created.status, 200);
+  let record = (await state(manager)).assessorOneToOnes.find(
+    (r) => r.id === created.data.result.recordId,
+  );
+  assert.equal(record.learnerId, learner.id);
+  assert.equal(record.actionIds.length, 2);
+  let shared = (await state(assessor)).assessorOneToOnes.find(
+    (r) => r.id === record.id,
+  );
+  assert(shared);
+  assert.equal(shared.confidentialNotes, undefined);
+  assert.equal(shared.learnerName, learner.name);
+  let actions = (await state(assessor)).assessorActions.filter(
+    (action) => action.oneToOneId === record.id,
+  );
+  assert.equal(actions.length, 2);
+  assert(
+    actions.every(
+      (action) => action.owner === owner.id && action.learnerId === learner.id,
+    ),
+  );
+  const ordinaryCount = (await state(manager)).tasks.length;
+  assert.equal(
+    (
+      await command(
+        "assessor.action.setStatus",
+        { id: actions[0].id, status: "Complete" },
+        assessor,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await state(manager)).assessorActions.find(
+      (action) => action.id === actions[0].id,
+    ).status,
+    "Complete",
+  );
+  assert.equal((await state(manager)).tasks.length, ordinaryCount);
+  const edit = {
+    ...payload,
+    id: record.id,
+    summary: "Updated shared summary",
+    actionItems: actions.map((action) => ({
+      id: action.id,
+      title: action.title,
+      due: action.due,
+      status: "Open",
+      originalStatus: "Open",
+    })),
+  };
+  assert.equal(
+    (await command("assessor.oneToOne.save", edit, manager)).status,
+    200,
+  );
+  const updated = await state(assessor);
+  shared = updated.assessorOneToOnes.find((r) => r.id === record.id);
+  assert.equal(shared.history.length, 1);
+  assert(!JSON.stringify(shared).includes("MANAGER-ONLY-SENTINEL"));
+  actions = updated.assessorActions.filter(
+    (action) => action.oneToOneId === record.id,
+  );
+  assert.equal(actions.length, 2);
+  assert.equal(actions[0].status, "Complete");
+  const draft = await command(
+    "assessor.oneToOne.save",
+    {
+      ...payload,
+      learnerId: "",
+      title: "Private manager draft",
+      status: "Draft",
+      actionItems: [{ title: "Draft action", due: today(), status: "Open" }],
+    },
+    manager,
+  );
+  assert.equal(draft.status, 200);
+  const draftRecord = (await state(manager)).assessorOneToOnes.find(
+    (r) => r.id === draft.data.result.recordId,
+  );
+  assert(
+    !(await state(assessor)).assessorOneToOnes.some(
+      (r) => r.id === draftRecord.id,
+    ),
+  );
+  assert(
+    !(await state(assessor)).assessorActions.some(
+      (a) => a.oneToOneId === draftRecord.id,
+    ),
+  );
+  assert.equal(
+    (
+      await command(
+        "assessor.action.setStatus",
+        { id: draftRecord.actionIds[0], status: "Complete" },
+        assessor,
+      )
+    ).status,
+    404,
+  );
+  const foreign = await command(
+    "assessor.oneToOne.save",
+    {
+      ...payload,
+      assessorId: other.id,
+      learnerId: "",
+      title: "Other assessor conversation",
+      actionItems: [
+        { title: "Other private staff action", due: today(), status: "Open" },
+      ],
+    },
+    manager,
+  );
+  assert.equal(foreign.status, 200);
+  const foreignRecord = (await state(manager)).assessorOneToOnes.find(
+    (r) => r.id === foreign.data.result.recordId,
+  );
+  assert.equal(
+    (
+      await command(
+        "assessor.action.setStatus",
+        { id: foreignRecord.actionIds[0], status: "Complete" },
+        assessor,
+      )
+    ).status,
+    404,
+  );
+  const apprenticeLogin = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: "NewLearnerPassword123!",
+    }),
+  });
+  const learnerState = await state(apprenticeLogin.cookie);
+  assert.equal(learnerState.assessorActions.length, 0);
+  assert.equal(learnerState.assessorOneToOnes.length, 0);
+  assert.equal(
+    (
+      await command(
+        "assessor.oneToOne.save",
+        { ...payload, id: record.id },
+        assessor,
+      )
+    ).status,
+    403,
+  );
+});
+
+test("CPD evidence and assessor 1:1 actions remain stored after restart with the same visibility boundaries", async () => {
+  const manager = await login("manager@archetype.demo"),
+    before = await state(manager);
+  assert(before.cpdRecords.some((record) => record.files.length));
+  assert(before.assessorActions.length);
+  proc.kill();
+  await new Promise((resolve) => proc.once("exit", resolve));
+  proc = spawn(process.execPath, ["server/index.mjs"], {
+    env: {
+      ...process.env,
+      PORT: new URL(base).port,
+      DATA_DIR: dir,
+      DEMO_MODE: "1",
+    },
+    stdio: "ignore",
+  });
+  for (let i = 0; i < 100; i++) {
+    try {
+      if ((await request("/api/health")).status === 200) break;
+    } catch {}
+    await pause(50);
+  }
+  const restored = await state(manager);
+  assert.deepEqual(restored.cpdRecords, before.cpdRecords);
+  assert.deepEqual(restored.assessorActions, before.assessorActions);
+  assert.deepEqual(restored.assessorOneToOnes, before.assessorOneToOnes);
+  const file = restored.cpdRecords.find((record) => record.files.length)
+    .files[0];
+  const download = await fetch(base + "/api/cpd-files/" + file.id, {
+    headers: { cookie: manager },
+  });
+  assert.equal(download.status, 200);
+  assert.equal(await download.text(), "Private CPD certificate");
+  const learner = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: "NewLearnerPassword123!",
+    }),
+  });
+  assert.equal(learner.status, 200);
+  const visible = await state(learner.cookie);
+  assert.equal(visible.cpdRecords.length, 0);
+  assert.equal(visible.assessorActions.length, 0);
+  assert.equal(visible.assessorOneToOnes.length, 0);
 });

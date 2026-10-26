@@ -1,3 +1,4 @@
+import { CPDLog } from "./cpd-log";
 import { Trophy } from "lucide-react";
 import { AssessorOneToOnes, SpotlightEditor } from "./staff-development";
 import { LearnerSupportFields, LearnerDocuments } from "./learner-support";
@@ -120,6 +121,7 @@ const navGroups = [
     [
       [Target, "Interventions"],
       [MessageSquare, "Assessor 1:1s"],
+      [BookOpen, "CPD log"],
       [Trophy, "Success stories"],
       [CalendarDays, "Reviews Hub"],
       [ShieldCheck, "Compliance Hub"],
@@ -379,6 +381,8 @@ function App() {
               "Interventions",
               "Reviews Hub",
               "Calendar",
+              "Assessor 1:1s",
+              "CPD log",
               "Gateway & EPA",
             ]
           : user.role === "IQA"
@@ -432,8 +436,18 @@ function App() {
               const sectionItems =
                 user.role === "Assessor"
                   ? group === "COMMAND CENTRE"
-                    ? [...items, [CalendarDays, "Calendar"]]
-                    : items.filter(([, title]) => title !== "Calendar")
+                    ? [
+                        ...items,
+                        [CalendarDays, "Calendar"],
+                        [MessageSquare, "Assessor 1:1s"],
+                        [BookOpen, "CPD log"],
+                      ]
+                    : items.filter(
+                        ([, title]) =>
+                          !["Calendar", "Assessor 1:1s", "CPD log"].includes(
+                            title,
+                          ),
+                      )
                   : items;
               const links = sectionItems.filter(
                 ([, title]) => !allowed || allowed.includes(title),
@@ -825,6 +839,8 @@ function Page({ page }) {
       return <Employers />;
     case "Forecasting":
       return <Forecast />;
+    case "CPD log":
+      return <CPDLog {...pageContext} />;
     case "Assessor 1:1s":
       return <AssessorOneToOnes {...pageContext} />;
     case "Success stories":
@@ -1728,7 +1744,15 @@ function Alerts({ interventions = false }) {
 function Tasks({ learner }) {
   const { s, user, command, notify, busy, setModal } = useApp(),
     [filter, F] = useState("All");
-  const items = s.tasks.filter(
+  const staffActions = learner
+    ? []
+    : (s.assessorActions || []).filter((action) =>
+        (s.assessorOneToOnes || []).some(
+          (record) =>
+            record.id === action.oneToOneId && record.status !== "Draft",
+        ),
+      );
+  const items = [...s.tasks, ...staffActions].filter(
     (x) =>
       (!learner || x.learnerId === learner.id) &&
       (filter === "All" || filter === "Overdue"
@@ -1738,7 +1762,11 @@ function Tasks({ learner }) {
   return (
     <Panel
       title="Action plans"
-      subtitle="Owned actions linked to each apprentice"
+      subtitle={
+        learner
+          ? "Owned actions linked to each apprentice"
+          : "Learner actions and assessor development actions from 1:1s"
+      }
       action={
         ["Manager", "Assessor"].includes(user.role) && (
           <Button onClick={() => setModal({ type: "task", learner })}>
@@ -1767,6 +1795,9 @@ function Tasks({ learner }) {
               {t.description && (
                 <small className="preserve-text">{t.description}</small>
               )}
+              {t.source === "assessor-one-to-one" && (
+                <small>Assessor action from a 1:1</small>
+              )}
               {t.reviewId && (
                 <small>
                   SMART target from a progress review · {t.category}
@@ -1774,7 +1805,12 @@ function Tasks({ learner }) {
               )}
             </td>
             <td>
-              <LearnerLink id={t.learnerId} />
+              {t.learnerId &&
+              s.learners.some((learner) => learner.id === t.learnerId) ? (
+                <LearnerLink id={t.learnerId} />
+              ) : (
+                t.learnerName || "Assessor development"
+              )}
             </td>
             <td>{nameOf(s, t.owner)}</td>
             <td
@@ -1798,11 +1834,18 @@ function Tasks({ learner }) {
                     const status =
                       t.status === "Complete" ? "Open" : "Complete";
                     try {
-                      await command("task.setStatus", {
-                        id: t.id,
-                        learnerId: t.learnerId,
-                        status,
-                      });
+                      await command(
+                        t.source === "assessor-one-to-one"
+                          ? "assessor.action.setStatus"
+                          : "task.setStatus",
+                        {
+                          id: t.id,
+                          ...(t.source === "assessor-one-to-one"
+                            ? {}
+                            : { learnerId: t.learnerId }),
+                          status,
+                        },
+                      );
                       F("All");
                       notify(
                         status === "Complete"

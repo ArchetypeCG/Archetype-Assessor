@@ -102,6 +102,8 @@ const get = () =>
     s.learnerSupportRecords ||= [];
     s.assessorOneToOnes ||= [];
     s.successStories ||= [];
+    s.cpdRecords ||= [];
+    s.assessorActions ||= [];
     return s;
   })();
 const put = (s) =>
@@ -329,12 +331,62 @@ function visible(s, u) {
     learnerSupportRecords: editors.includes(u.role)
       ? (s.learnerSupportRecords || []).filter((r) => ids.has(r.learnerId))
       : [],
-    assessorOneToOnes: u.role === "Manager" ? s.assessorOneToOnes || [] : [],
+    assessorOneToOnes:
+      u.role === "Manager"
+        ? s.assessorOneToOnes || []
+        : u.role === "Assessor"
+          ? (s.assessorOneToOnes || [])
+              .filter(
+                (record) =>
+                  record.assessorId === u.id &&
+                  ["Completed", "Planned"].includes(record.status),
+              )
+              .map((record) => {
+                const { confidentialNotes, history, ...shared } = record;
+                return {
+                  ...shared,
+                  history: (history || [])
+                    .filter((version) =>
+                      ["Completed", "Planned"].includes(version.status),
+                    )
+                    .map((version) => {
+                      const { confidentialNotes, ...safe } = version;
+                      return safe;
+                    }),
+                };
+              })
+          : [],
+    assessorActions:
+      u.role === "Manager"
+        ? s.assessorActions || []
+        : u.role === "Assessor"
+          ? (s.assessorActions || []).filter(
+              (action) =>
+                action.owner === u.id &&
+                (s.assessorOneToOnes || []).some(
+                  (record) =>
+                    record.id === action.oneToOneId &&
+                    record.status !== "Draft",
+                ),
+            )
+          : [],
+    cpdRecords:
+      u.role === "Manager"
+        ? s.cpdRecords || []
+        : u.role === "Assessor"
+          ? (s.cpdRecords || []).filter((record) => record.assessorId === u.id)
+          : [],
     successStories:
       u.role === "Manager"
         ? s.successStories || []
-        : u.role === "Assessor"
-          ? (s.successStories || []).filter((story) => story.published)
+        : ["Assessor", "Apprentice"].includes(u.role)
+          ? (s.successStories || []).filter(
+              (post) =>
+                post.published &&
+                ((post.audience || "Assessors") === "Assessors and learners" ||
+                  (post.audience || "Assessors") ===
+                    (u.role === "Assessor" ? "Assessors" : "Learners")),
+            )
           : [],
     privateLearnerNotes: ["Manager", "Assessor"].includes(u.role)
       ? (s.privateLearnerNotes || []).filter((n) => ids.has(n.learnerId))
@@ -555,6 +607,7 @@ function command(s, u, kind, p) {
   });
   if (scheduleResult !== null) return scheduleResult;
   const peopleResult = peopleCommand({
+    db,
     s,
     u,
     kind,
@@ -1522,6 +1575,8 @@ function command(s, u, kind, p) {
           learnerSupportRecords: [],
           assessorOneToOnes: [],
           successStories: [],
+          cpdRecords: [],
+          assessorActions: [],
           ...JSON.parse(JSON.stringify(snap.data)),
         },
         {
@@ -2001,6 +2056,29 @@ const server = http.createServer(async (req, res) => {
           "Cache-Control": "private, no-store",
           "X-Content-Type-Options": "nosniff",
           "Content-Security-Policy": "default-src 'none'; sandbox",
+        });
+        return res.end(Buffer.from(file.body));
+      }
+      if (path.startsWith("/api/cpd-files/") && req.method === "GET") {
+        requireRole(u, editors);
+        const fileId = path.split("/").at(-1),
+          record = (s.cpdRecords || []).find((record) =>
+            record.files.some((file) => file.id === fileId),
+          );
+        if (!record || (u.role !== "Manager" && record.assessorId !== u.id))
+          fail("CPD attachment not found.", 404);
+        const file = db
+          .prepare(
+            "SELECT * FROM assessor_cpd_files WHERE id=? AND assessor_id=?",
+          )
+          .get(fileId, record.assessorId);
+        if (!file) fail("CPD attachment not found.", 404);
+        res.writeHead(200, {
+          "Content-Type": "application/octet-stream",
+          "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Security-Policy": "sandbox; default-src 'none'",
         });
         return res.end(Buffer.from(file.body));
       }

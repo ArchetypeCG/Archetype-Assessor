@@ -1,4 +1,4 @@
-import { SuccessSpotlight } from "./staff-development";
+import { SuccessAndUpdates } from "./staff-development";
 import { LearnerAvatar } from "./learner-photo";
 import React from "react";
 import {
@@ -45,11 +45,13 @@ export function pageLabel(page, role) {
       "Action plans": "My action plan",
     },
     Assessor: {
+      "Assessor 1:1s": "My 1:1s",
       Apprentices: "My caseload",
       Portfolios: "Assessment & portfolios",
       Resources: "Resource library",
     },
     Manager: {
+      "Success stories": "Success and updates",
       Resources: "Resource library",
       "Team & caseloads": "Accounts & caseloads",
     },
@@ -582,10 +584,7 @@ function Assessor({ s, user, go, openLearner, setModal }) {
           </span>
         </div>
       </Hero>
-      <SuccessSpotlight
-        key={(s.successStories || []).find((story) => story.published)?.updated}
-        story={(s.successStories || []).find((story) => story.published)}
-      />
+      <SuccessAndUpdates stories={s.successStories || []} />
       <div className="role-stat-grid">
         <Kpi
           label="Evidence to assess"
@@ -842,6 +841,7 @@ function Apprentice({ s, user, go, setModal }) {
           </div>
         </div>
       </Hero>
+      <SuccessAndUpdates stories={s.successStories || []} />
       <div className="role-stat-grid">
         <Kpi
           label="Portfolio evidence"
