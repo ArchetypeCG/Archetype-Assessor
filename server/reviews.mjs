@@ -142,7 +142,12 @@ export function normalizeReview(
         "target: how achievement will be demonstrated",
         4000,
       ),
-      why: text(target.why, "target: why this matters", 2000),
+      why:
+        typeof target.why === "string" ? target.why.trim().slice(0, 2000) : "",
+      hours:
+        target.hours === undefined || target.hours === ""
+          ? 0
+          : number(target.hours, "Planned OTJ hours", 0, 1000),
       owner: owner.id,
       ownerName: owner.name,
       due,

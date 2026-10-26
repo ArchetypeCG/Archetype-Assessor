@@ -1,3 +1,4 @@
+import { expectedOtjHours } from "./otj-target.mjs";
 import { randomUUID } from "node:crypto";
 export const id = () => randomUUID();
 export const today = () =>
@@ -84,7 +85,8 @@ export function derive(l, s, now = today()) {
     if (
       l.plannedEnd &&
       l.plannedEnd <= offset(60) &&
-      (l.english === "Pending" || l.maths === "Pending")
+      ((l.english === "Pending" && !l.englishNotRequired) ||
+        (l.maths === "Pending" && !l.mathsNotRequired))
     )
       exceptions.push({
         severity: "Amber",
@@ -100,8 +102,22 @@ export function derive(l, s, now = today()) {
   const gatewayChecks = [
     ["KSB coverage", criteria.length > 0 && progress === 100],
     ["Off-the-job target", hours >= l.otjTarget && l.otjTarget > 0],
-    ["English", l.english === "Achieved" || l.english === "Exempt"],
-    ["Maths", l.maths === "Achieved" || l.maths === "Exempt"],
+    [
+      "English" +
+        (l.englishUpskill ? " (upskill)" : "") +
+        (l.englishNotRequired ? " — not required" : ""),
+      l.english === "Achieved" ||
+        l.english === "Exempt" ||
+        l.englishNotRequired === true,
+    ],
+    [
+      "Maths" +
+        (l.mathsUpskill ? " (upskill)" : "") +
+        (l.mathsNotRequired ? " — not required" : ""),
+      l.maths === "Achieved" ||
+        l.maths === "Exempt" ||
+        l.mathsNotRequired === true,
+    ],
     [
       "Review and compliance",
       !!l.nextReview &&
@@ -115,6 +131,11 @@ export function derive(l, s, now = today()) {
     ...l,
     progress,
     hours,
+    otjExpected: expectedOtjHours(l, now),
+    otjVariance:
+      expectedOtjHours(l, now) == null
+        ? null
+        : Math.round((hours - expectedOtjHours(l, now)) * 10) / 10,
     variance: progress - l.target,
     rag,
     exceptions,

@@ -1,3 +1,9 @@
+import {
+  OTJProgress,
+  PrivateLearnerNotes,
+  FunctionalSkillsChecks,
+  IntegrityReport,
+} from "./learner-enhancements";
 import { sessionHeaders, sessionLink, rotateSessionTab } from "./session";
 import {
   parseTrackerSheet,
@@ -1272,7 +1278,8 @@ function IndividualReport() {
   return <ProgressReport {...ctx} />;
 }
 function PortfolioHub() {
-  const { s, learnerId, user } = useApp(),
+  const ctx = useApp();
+  const { s, learnerId, user } = ctx,
     l = s.learners.find((x) => x.id === learnerId);
   return (
     <>
@@ -1310,7 +1317,9 @@ function PortfolioHub() {
               icon={ClipboardCheck}
             />
           </div>
+          <OTJProgress learner={l} />
           <Evidence learner={l} />
+          <PrivateLearnerNotes key={l.id} {...ctx} learner={l} />
           <Coverage learner={l} />
         </>
       ) : (
@@ -1320,13 +1329,15 @@ function PortfolioHub() {
   );
 }
 function Evidence({ learner }) {
-  const { s, user, setModal } = useApp(),
+  const { s, user, setModal, act } = useApp(),
+    [epa, EPA] = useState(false),
     [history, HISTORY] = useState(false),
     [q, Q] = useState(""),
     [status, S] = useState("");
   const items = s.evidence.filter(
     (x) =>
       x.learnerId === learner.id &&
+      !!x.epaSelected === epa &&
       (history || activeRecord(s, x)) &&
       (!status || x.status === status) &&
       `${x.title} ${x.description}`.toLowerCase().includes(q.toLowerCase()),
@@ -1334,7 +1345,11 @@ function Evidence({ learner }) {
   return (
     <Panel
       title="Evidence & assessment"
-      subtitle="Draft → Submitted → Assessed · only accepted evidence verifies KSBs"
+      subtitle={
+        epa
+          ? "Accepted evidence selected for end-point assessment. Export includes the work and assessor feedback."
+          : "Draft → Submitted → Assessed · only accepted evidence verifies KSBs"
+      }
       action={
         ["Manager", "Assessor", "Apprentice"].includes(user.role) && (
           <Button onClick={() => setModal({ type: "evidence", learner })}>
@@ -1344,6 +1359,30 @@ function Evidence({ learner }) {
         )
       }
     >
+      <div className="tabs">
+        <button className={!epa ? "selected" : ""} onClick={() => EPA(false)}>
+          Portfolio evidence
+        </button>
+        <button className={epa ? "selected" : ""} onClick={() => EPA(true)}>
+          EPA portfolio
+        </button>
+        {epa &&
+          user.role !== "Employer" &&
+          s.evidence.some(
+            (e) =>
+              e.learnerId === learner.id &&
+              e.epaSelected &&
+              e.status === "Accepted" &&
+              activeRecord(s, e),
+          ) && (
+            <a
+              className="button secondary"
+              href={sessionLink("/api/epa/" + learner.id + ".zip")}
+            >
+              Export EPA portfolio
+            </a>
+          )}
+      </div>
       <div className="filterbar">
         <label className="history-toggle">
           <input
@@ -1392,6 +1431,27 @@ function Evidence({ learner }) {
                 <FileText size={16} />
                 {e.title}
               </button>
+              {e.status === "Accepted" &&
+                activeRecord(s, e) &&
+                ["Manager", "Assessor", "Apprentice"].includes(user.role) && (
+                  <button
+                    className="text-link"
+                    onClick={() =>
+                      act("evidence.epa", {
+                        id: e.id,
+                        selected: !e.epaSelected,
+                      })
+                    }
+                  >
+                    {e.epaSelected ? "Remove from EPA" : "Use for EPA"}
+                  </button>
+                )}
+              <small>
+                Similarity:{" "}
+                {e.integrity?.status === "Checked"
+                  ? `${e.integrity.similarity}% internal match`
+                  : e.integrity?.status || "Not checked"}
+              </small>
               <small>
                 {e.type} · {fmt(e.date)} · {e.files.length} files
                 {e.standardId && e.standardId !== learner.standardId
@@ -1430,7 +1490,11 @@ function Evidence({ learner }) {
         ))}
       </Table>
       {!items.length && (
-        <Empty>No evidence matches. Add evidence or change the filters.</Empty>
+        <Empty>
+          {epa
+            ? "Accepted items selected with Use for EPA appear here."
+            : "No evidence matches. Add evidence or change the filters."}
+        </Empty>
       )}
     </Panel>
   );
@@ -2130,8 +2194,16 @@ function Gateway({ learner }) {
                 {l.hours} / {l.otjTarget}h
               </td>
               <td>
-                <small>English: {l.english}</small>
-                <small>Maths: {l.maths}</small>
+                <small>
+                  English: {l.english}
+                  {l.englishUpskill ? " · Upskill" : ""}
+                  {l.englishNotRequired ? " · Not required" : ""}
+                </small>
+                <small>
+                  Maths: {l.maths}
+                  {l.mathsUpskill ? " · Upskill" : ""}
+                  {l.mathsNotRequired ? " · Not required" : ""}
+                </small>
               </td>
               <td>
                 <Tag tone={ready ? "green" : "amber"}>
@@ -3617,7 +3689,10 @@ function ModalHost() {
     [importError, IE] = useState("");
   const ref = useRef(null);
   const { type, item } = modal;
-  const learner = modal.learner || s.learners.find((l) => l.id === learnerId);
+  const learner =
+    s.learners.find((l) => l.id === modal.learner?.id) ||
+    modal.learner ||
+    s.learners.find((l) => l.id === learnerId);
   const title = {
     learner: item ? "Edit apprentice" : "Add apprentice",
     evidence: item ? "Edit & resubmit evidence" : "Add portfolio evidence",
@@ -3698,6 +3773,8 @@ function ModalHost() {
       if (modal.learner) p.learnerId = modal.learner.id;
       let kind;
       if (type === "learner") {
+        p.englishUpskill = form.get("englishUpskill") === "on";
+        p.mathsUpskill = form.get("mathsUpskill") === "on";
         kind = "learner.save";
         if (item) p.id = item.id;
       } else if (type === "evidence") {
@@ -3708,6 +3785,7 @@ function ModalHost() {
         p.files = await filePayload(form.getAll("files").filter((f) => f.size));
       } else if (type === "evidenceDetail") {
         kind = "evidence.assess";
+        p.files = await filePayload(form.getAll("files").filter((f) => f.size));
         p.id = item.id;
         p.learnerId = item.learnerId;
       } else if (type === "assignStandard") {
@@ -4131,6 +4209,22 @@ function ModalHost() {
                     defaultValue={item?.[k]}
                   />
                 ))}
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    name="englishUpskill"
+                    defaultChecked={!!item?.englishUpskill}
+                  />
+                  English functional skills upskill option
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    name="mathsUpskill"
+                    defaultChecked={!!item?.mathsUpskill}
+                  />
+                  Maths functional skills upskill option
+                </label>
                 <Field
                   label="English"
                   name="english"
@@ -4146,7 +4240,7 @@ function ModalHost() {
                   defaultValue={item?.maths}
                 />
                 <Field
-                  label="Learner notes"
+                  label="Confidential staff notes (master admin and assessor)"
                   name="notes"
                   type="textarea"
                   defaultValue={item?.notes}
@@ -4270,10 +4364,33 @@ function ModalHost() {
                 </div>
                 <p className="preserve-text">{item.description}</p>
                 <Files files={item.files} />
+                <IntegrityReport
+                  evidence={item}
+                  busy={pending || busy}
+                  onRecheck={
+                    ["Manager", "Assessor", "Apprentice"].includes(user.role)
+                      ? async () => {
+                          try {
+                            await command("evidence.recheck", { id: item.id });
+                            setModal({
+                              ...modal,
+                              item: {
+                                ...item,
+                                integrity: { status: "Queued" },
+                              },
+                            });
+                          } catch (error) {
+                            E(error.message);
+                          }
+                        }
+                      : null
+                  }
+                />
                 {item.feedback && (
                   <div className="feedback-box">
                     <strong>Assessor feedback</strong>
                     <p>{item.feedback}</p>
+                    <Files files={item.feedbackFiles} />
                   </div>
                 )}
                 {item.decisions?.length > 0 && (
@@ -4285,6 +4402,7 @@ function ModalHost() {
                           {d.status} · {nameOf(s, d.by)} · {fmt(d.date)}
                         </strong>
                         <p>{d.feedback}</p>
+                        <Files files={d.files} />
                       </div>
                     ))}
                   </details>
@@ -4336,7 +4454,7 @@ function ModalHost() {
                         label="Assessment decision"
                         name="status"
                         type="select"
-                        options={["Accepted", "Changes requested", "Rejected"]}
+                        options={["Accepted", "Changes requested"]}
                       />
                       <Field
                         label="Assessor feedback"
@@ -4344,6 +4462,13 @@ function ModalHost() {
                         type="textarea"
                         rows={4}
                         required
+                      />
+                      <Field
+                        label="Attach assessor feedback files"
+                        name="files"
+                        type="file"
+                        multiple
+                        wide
                       />
                     </div>
                   )}
@@ -4640,6 +4765,21 @@ function ModalHost() {
                 <p className="body-copy wide">
                   {learner?.name} · {stdOf(s, learner)}
                 </p>
+                <FunctionalSkillsChecks
+                  learner={learner}
+                  user={user}
+                  command={command}
+                  busy={busy}
+                  notify={notify}
+                  onUpdated={() =>
+                    setModal((current) =>
+                      current?.type === "gateway" &&
+                      current.learner?.id === learner.id
+                        ? { ...current }
+                        : current,
+                    )
+                  }
+                />
                 <div className="gateway-checklist wide">
                   {learner?.gatewayChecks.map(([label, ok]) => (
                     <div key={label}>

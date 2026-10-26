@@ -84,14 +84,16 @@ function ReviewForm({ s, user, learner, modal, command, setModal, busy }) {
   const [checks, C] = useState({}),
     [error, E] = useState("");
   const [targets, T] = useState(() =>
-    TARGET_CATEGORIES.slice(0, 2).map((category) => ({
-      category,
-      what: "",
-      how: "",
-      why: "",
-      owner: defaultOwner,
-      due: "",
-    })),
+    ["Programme / workplace", "Support", "Off-the-job learning"].map(
+      (category) => ({
+        category,
+        what: "",
+        how: "",
+        why: "",
+        owner: defaultOwner,
+        due: "",
+      }),
+    ),
   );
   const [date, D] = useState(localDate()),
     [nextDate, N] = useState(() =>
@@ -450,18 +452,17 @@ function ReviewForm({ s, user, learner, modal, command, setModal, busy }) {
             required={false}
           />
         </Section>
-        <Section number="10" title="SMART targets to the next review">
+        <Section number="10" title="Targets for the next review">
           <p className="wide body-copy">
-            Agree specific, measurable, achievable, realistic and time-bound
-            actions. Include programme / workplace and off-the-job learning
-            targets. Saving creates an action with an owner and due date for
-            each target.
+            Agree a goal, how it will be completed, an owner and a deadline.
+            Every target is added to the action plan and learning plan. Target 3
+            covers off-the-job learning.
           </p>
           {targets.map((target, index) => (
             <div className="review-target wide" key={index}>
               <div className="review-target-heading">
                 <h4>Target {index + 1}</h4>
-                {targets.length > 2 && (
+                {index > 2 && (
                   <button
                     type="button"
                     className="text-link danger-text"
@@ -476,7 +477,9 @@ function ReviewForm({ s, user, learner, modal, command, setModal, busy }) {
               <div className="review-form-grid">
                 <Input
                   label={"Target " + (index + 1) + " category"}
-                  options={TARGET_CATEGORIES}
+                  options={
+                    index === 2 ? ["Off-the-job learning"] : TARGET_CATEGORIES
+                  }
                   value={target.category}
                   onChange={(e) =>
                     targetChange(index, "category", e.target.value)
@@ -492,7 +495,7 @@ function ReviewForm({ s, user, learner, modal, command, setModal, busy }) {
                   onChange={(e) => targetChange(index, "owner", e.target.value)}
                 />
                 <Input
-                  label={"Target " + (index + 1) + ": what will be achieved?"}
+                  label={"Target " + (index + 1) + ": Goal"}
                   type="textarea"
                   value={target.what}
                   maxLength={2000}
@@ -500,25 +503,26 @@ function ReviewForm({ s, user, learner, modal, command, setModal, busy }) {
                   wide
                 />
                 <Input
-                  label={
-                    "Target " +
-                    (index + 1) +
-                    ": how will it be achieved and measured?"
-                  }
+                  label={"Target " + (index + 1) + ": Steps and evidence"}
                   type="textarea"
                   value={target.how}
                   maxLength={4000}
                   onChange={(e) => targetChange(index, "how", e.target.value)}
                   wide
                 />
-                <Input
-                  label={"Target " + (index + 1) + ": why does it matter?"}
-                  type="textarea"
-                  value={target.why}
-                  maxLength={2000}
-                  onChange={(e) => targetChange(index, "why", e.target.value)}
-                  wide
-                />
+                {target.category === "Off-the-job learning" && (
+                  <Input
+                    label="Additional OTJ hours planned"
+                    type="number"
+                    min="0"
+                    max="1000"
+                    step="0.25"
+                    value={target.hours || ""}
+                    onChange={(e) =>
+                      targetChange(index, "hours", e.target.value)
+                    }
+                  />
+                )}
                 <Input
                   label={"Target " + (index + 1) + " due date"}
                   type="date"
@@ -796,7 +800,7 @@ export function ReviewDetails({ review: r }) {
           entry("Next learning objectives / EPA preparation", r.nextObjectives)}
       </section>
       <section>
-        <h4>SMART targets & agreed actions</h4>
+        <h4>Agreed targets and actions</h4>
         {t.targets.map((target, index) => (
           <div className="review-detail-target" key={index}>
             <strong>
@@ -806,8 +810,8 @@ export function ReviewDetails({ review: r }) {
               {target.category} · Owner: {target.ownerName} · Due:{" "}
               {fmt(target.due)}
             </p>
-            {entry("How", target.how)}
-            {entry("Why", target.why)}
+            {entry("Steps and evidence", target.how)}
+            {target.why && entry("Purpose", target.why)}
           </div>
         ))}
       </section>

@@ -1562,3 +1562,228 @@ test("action completion is explicit and repeatable, retains the completion recor
   assert.equal(reopened.status, "Open");
   assert.equal(reopened.completedAt, undefined);
 });
+
+test("feedback attachments, confidential portfolio notes and EPA exports enforce role and learner permissions", async () => {
+  const apprenticeLogin = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "apprentice@archetype.demo",
+      password: "NewLearnerPassword123!",
+    }),
+  });
+  assert.equal(apprenticeLogin.status, 200);
+  const apprentice = apprenticeLogin.cookie;
+  const learner = (await state(apprentice)).learners[0];
+  const full = await state();
+  const standard = full.standards.find((st) => st.id === learner.standardId);
+  let r = await command(
+    "evidence.save",
+    {
+      learnerId: learner.id,
+      title: "Feedback and EPA regression",
+      type: "Assignment",
+      date: today(),
+      description: "Synthetic apprentice submission",
+      criteria: [standard.criteria[0].code],
+      status: "Submitted",
+      files: [
+        {
+          name: "work.txt",
+          base64: Buffer.from("Synthetic work").toString("base64"),
+        },
+      ],
+    },
+    apprentice,
+  );
+  assert.equal(r.status, 200);
+  const evidence = r.data.state.evidence.find(
+    (e) => e.title === "Feedback and EPA regression",
+  );
+  assert.equal(
+    (
+      await command("evidence.assess", {
+        id: evidence.id,
+        status: "Rejected",
+        feedback: "Not a supported decision",
+      })
+    ).status,
+    400,
+  );
+  r = await command("evidence.assess", {
+    id: evidence.id,
+    status: "Accepted",
+    feedback: "Feedback with an attachment",
+    files: [
+      {
+        name: "feedback.txt",
+        base64: Buffer.from("Synthetic feedback").toString("base64"),
+      },
+    ],
+  });
+  assert.equal(r.status, 200);
+  const assessed = r.data.state.evidence.find((e) => e.id === evidence.id);
+  assert.equal(assessed.feedbackFiles.length, 1);
+  assert.equal(assessed.decisions.at(-1).files.length, 1);
+  const feedback = await fetch(
+    base + "/api/files/" + assessed.feedbackFiles[0].id,
+    { headers: { cookie: apprentice } },
+  );
+  assert.equal(feedback.status, 200);
+  assert.equal(await feedback.text(), "Synthetic feedback");
+  assert.equal(
+    (
+      await command(
+        "learner.privateNote",
+        {
+          learnerId: learner.id,
+          text: "Confidential portfolio regression note",
+        },
+        apprentice,
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await command("learner.privateNote", {
+        learnerId: learner.id,
+        text: "Confidential portfolio regression note",
+      })
+    ).status,
+    200,
+  );
+  const iqa = await login("iqa@archetype.demo");
+  assert.equal((await state(iqa)).privateLearnerNotes.length, 0);
+  assert.equal((await state(apprentice)).privateLearnerNotes.length, 0);
+  assert.ok(
+    (await state()).privateLearnerNotes.some(
+      (n) => n.text === "Confidential portfolio regression note",
+    ),
+  );
+  assert.equal(
+    (
+      await command(
+        "evidence.epa",
+        { id: evidence.id, selected: true },
+        apprentice,
+      )
+    ).status,
+    200,
+  );
+  const pack = await fetch(base + "/api/epa/" + learner.id + ".zip", {
+    headers: { cookie: apprentice },
+  });
+  assert.equal(pack.status, 200);
+  const { default: JSZip } = await import("jszip");
+  const archive = await JSZip.loadAsync(await pack.arrayBuffer());
+  const manifest = await archive.file("portfolio.json").async("string");
+  assert.ok(manifest.includes("Feedback and EPA regression"));
+  assert.ok(!manifest.includes("Confidential portfolio regression note"));
+  assert.ok(Object.keys(archive.files).some((n) => n.endsWith("feedback.txt")));
+  const employer = await login("employer@archetype.demo");
+  assert.equal(
+    (
+      await fetch(base + "/api/epa/" + learner.id + ".zip", {
+        headers: { cookie: employer },
+      })
+    ).status,
+    403,
+  );
+});
+
+test("learning methods and reusable activities preserve mappings without copying learner reflections", async () => {
+  const s = await state(),
+    learner = s.learners[0];
+  for (const method of [
+    "Discussion",
+    "Observation",
+    "Review",
+    "Learner support",
+  ]) {
+    const r = await command("plan.save", {
+      learnerId: learner.id,
+      title: "Reusable " + method,
+      description: "A reusable learning activity",
+      objectives: "Demonstrate learning",
+      method,
+      criteria: [],
+      resources: [],
+      startDate: today(),
+      due: addDays(today(), 7),
+      plannedHours: 1,
+      status: "Planned",
+    });
+    assert.equal(r.status, 200);
+    assert.equal(
+      r.data.state.learningPlans.find((a) => a.title === "Reusable " + method)
+        .method,
+      method,
+    );
+  }
+  const activity = (await state()).learningPlans.find(
+    (a) => a.title === "Reusable Discussion",
+  );
+  const r = await command("plan.template.save", { id: activity.id });
+  assert.equal(r.status, 200);
+  const template = r.data.state.learningTemplates.at(-1);
+  assert.equal(template.method, "Discussion");
+  assert.equal(template.learnerId, undefined);
+  assert.equal(template.reflection, undefined);
+  const iqa = await login("iqa@archetype.demo");
+  assert.equal((await state(iqa)).learningTemplates.length, 0);
+});
+
+test("review targets create linked learning-plan activities and optional functional skills decisions are audited", async () => {
+  let s = await state();
+  let learner = s.learners.find((l) => l.assessorId);
+  if (!learner) learner = s.learners[0];
+  // The fixture's original assessor may have changed roles in an earlier permissions test.
+  const owner = s.users.find((u) => u.id === "manager");
+  learner = { ...learner, assessorId: owner.id };
+  const p = reviewPayload(learner, today(), addDays(today(), 21));
+  p.template.targets.forEach((t) => {
+    t.owner = owner.id;
+    delete t.why;
+  });
+  p.template.targets[1].hours = 4;
+  const r = await command("review.add", p);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const review = r.data.state.reviews.at(-1);
+  assert.equal(review.targetPlanIds.length, p.template.targets.length);
+  const plans = r.data.state.learningPlans.filter(
+    (a) => a.reviewId === review.id,
+  );
+  assert.equal(plans.length, p.template.targets.length);
+  assert.equal(plans[1].plannedHours, 4);
+  assert.ok(plans.every((a) => a.reviewTaskId));
+  const hoursBefore = r.data.state.learners.find(
+    (l) => l.id === learner.id,
+  ).hours;
+  const completed = await command("task.setStatus", {
+    id: plans[0].reviewTaskId,
+    learnerId: learner.id,
+    status: "Complete",
+  });
+  assert.equal(
+    completed.data.state.learningPlans.find((a) => a.id === plans[0].id).status,
+    "Completed",
+  );
+  assert.equal(
+    completed.data.state.learners.find((l) => l.id === learner.id).hours,
+    hoursBefore,
+  );
+
+  const skills = await command("learner.functionalSkills", {
+    learnerId: learner.id,
+    englishNotRequired: true,
+    mathsNotRequired: true,
+  });
+  assert.equal(skills.status, 200);
+  const updated = skills.data.state.learners.find((l) => l.id === learner.id);
+  assert.equal(updated.functionalSkillsConfirmedBy, "manager");
+  assert.ok(
+    updated.gatewayChecks.some(
+      ([label, ok]) => label.startsWith("English") && ok,
+    ),
+  );
+});

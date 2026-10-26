@@ -303,18 +303,28 @@ export function schedulingCommand({
       learnerId: l.id,
       standardId: l.standardId,
       title: text(p.title, "Activity title", 200),
+      method: choice(
+        p.method || "Other",
+        [
+          "Discussion",
+          "Observation",
+          "Review",
+          "Learner support",
+          "Assignment",
+          "Project",
+          "Workshop",
+          "Teaching",
+          "Other",
+        ],
+        "assessment method",
+      ),
       description: text(p.description, "Learning activity details", 20000),
       objectives: text(p.objectives, "Learning objectives", 10000),
       criteria: mapping(),
       resources: resources(),
       startDate: start,
       due,
-      plannedHours: number(
-        p.plannedHours,
-        "Planned learning hours",
-        0.25,
-        1000,
-      ),
+      plannedHours: number(p.plannedHours, "Planned learning hours", 0, 1000),
       status: choice(
         p.status || "Planned",
         ["Planned", "In progress", "Completed", "Cancelled"],
@@ -333,6 +343,19 @@ export function schedulingCommand({
       fail("Record a completion outcome.");
     if (old) Object.assign(old, item);
     else s.learningPlans.push(item);
+    if (old?.reviewTaskId && item.status !== "Cancelled") {
+      const task = s.tasks.find((t) => t.id === old.reviewTaskId);
+      if (task) {
+        task.status = item.status === "Completed" ? "Complete" : "Open";
+        if (task.status === "Complete") {
+          task.completedAt ||= new Date().toISOString();
+          task.completedBy = u.id;
+        } else {
+          delete task.completedAt;
+          delete task.completedBy;
+        }
+      }
+    }
     return { activityId: item.id };
   }
   if (kind === "plan.reflect") {

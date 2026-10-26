@@ -1,3 +1,5 @@
+import { expectedOtjHours } from "../server/otj-target.mjs";
+import { OTJProgress, LearningTemplates } from "./learner-enhancements";
 import { sessionLink } from "./session";
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -107,6 +109,15 @@ function SessionCard({ a, s, setModal }) {
         <p>
           {s.learners.find((l) => l.id === a.learnerId)?.name} ·{" "}
           {a.location || "Location to be confirmed"}
+        </p>
+        <p>
+          Expected OTJ by this session:{" "}
+          {expectedOtjHours(
+            s.learners.find((l) => l.id === a.learnerId) || {},
+            a.date,
+          ) == null
+            ? "Target not set"
+            : `${expectedOtjHours(s.learners.find((l) => l.id === a.learnerId) || {}, a.date)}h`}
         </p>
         {a.objectives && <p className="session-preview">{a.objectives}</p>}
         <div className="session-codes">
@@ -374,6 +385,8 @@ export function SchedulingWorkspace({ s, user, setModal, openLearner }) {
   );
 }
 export function LearningPlan({
+  command,
+  notify,
   s,
   user,
   learnerId,
@@ -496,6 +509,8 @@ export function LearningPlan({
           <p>Open a session for full details and preparation</p>
         </div>
       </div>
+      <OTJProgress learner={l} />
+      <LearningTemplates s={s} user={user} learner={l} setModal={setModal} />
       <Panel
         title="Your learning activities"
         subtitle="Objectives, mapped KSBs, resources, target dates and learner reflections"
@@ -538,6 +553,7 @@ export function LearningPlan({
               </div>
               <Tag>{p.status}</Tag>
             </div>
+            <p>Assessment method: {p.method || "Other"}</p>
             <p className="preserve-text">{p.description}</p>
             <h4>Learning objectives</h4>
             <p className="preserve-text">{p.objectives}</p>
@@ -589,6 +605,19 @@ export function LearningPlan({
                       >
                         <Pencil size={15} />
                         Edit activity
+                      </Button>
+                      <Button
+                        secondary
+                        onClick={async () => {
+                          try {
+                            await command("plan.template.save", { id: p.id });
+                            notify("Learning activity saved for reuse.");
+                          } catch (error) {
+                            notify(error.message);
+                          }
+                        }}
+                      >
+                        Save as reusable activity
                       </Button>
                       {!p.sessionId && (
                         <Button
@@ -878,6 +907,7 @@ export function ScheduleDialog({
         </div>
         {!editing ? (
           <>
+            {l && <OTJProgress learner={l} initialDate={item.date} />}
             <div className="session-detail-cover">
               <span className="eyebrow">
                 {item.type || "Teaching session"} ·{" "}
@@ -1030,6 +1060,24 @@ export function ScheduleDialog({
                   {isPlan ? (
                     <>
                       <F
+                        label="Assessment method"
+                        name="method"
+                        type="select"
+                        value={prefill.method || "Other"}
+                        options={[
+                          "Discussion",
+                          "Observation",
+                          "Review",
+                          "Learner support",
+                          "Assignment",
+                          "Project",
+                          "Workshop",
+                          "Teaching",
+                          "Other",
+                        ]}
+                      />
+
+                      <F
                         label="Start date"
                         name="startDate"
                         type="date"
@@ -1047,10 +1095,10 @@ export function ScheduleDialog({
                         label="Planned learning hours"
                         name="plannedHours"
                         type="number"
-                        min="0.25"
+                        min="0"
                         max="1000"
                         step="0.25"
-                        value={prefill.plannedHours || 1}
+                        value={prefill.plannedHours ?? 1}
                         required
                       />
                       <F

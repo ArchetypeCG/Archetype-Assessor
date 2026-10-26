@@ -46,6 +46,7 @@ export default function ProgressReport({
     reference: l.ref,
     standard: standard?.name,
     standardVersion: standard?.version,
+    programmeStartDate: l.startDate,
     criterion: c.code,
     type: c.type,
     wording: c.text,
@@ -123,6 +124,10 @@ export default function ProgressReport({
         </header>
         <div className="report-meta">
           <div>
+            <span>Programme start date</span>
+            <strong>{fmt(l.startDate)}</strong>
+          </div>
+          <div>
             <span>Assessor</span>
             <strong>{name(l.assessorId)}</strong>
           </div>
@@ -139,6 +144,19 @@ export default function ProgressReport({
             <strong>{standard?.version}</strong>
           </div>
         </div>
+        <section className="report-section">
+          <h3>Functional skills</h3>
+          <p>
+            English: {l.english}
+            {l.englishUpskill ? " · Upskill option" : ""}
+            {l.englishNotRequired ? " · Staff marked not required" : ""}
+          </p>
+          <p>
+            Maths: {l.maths}
+            {l.mathsUpskill ? " · Upskill option" : ""}
+            {l.mathsNotRequired ? " · Staff marked not required" : ""}
+          </p>
+        </section>
         <section className="report-stat-grid">
           <ReportMetric
             icon={Target}
@@ -156,7 +174,7 @@ export default function ProgressReport({
             icon={Clock}
             value={l.hours + "h"}
             label="Approved OTJ learning"
-            detail={`${l.otjTarget}h planned target`}
+            detail={`${l.otjTarget}h total target · ${l.otjExpected == null ? "Expected-to-date target not set" : `${l.otjExpected}h expected to date · ${l.otjVariance >= 0 ? "On target" : `${Math.abs(l.otjVariance)}h behind`}`}`}
           />
           <ReportMetric
             icon={CalendarDays}

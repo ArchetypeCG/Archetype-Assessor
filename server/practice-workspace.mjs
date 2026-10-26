@@ -32,6 +32,7 @@ export function restorePracticeWorkspace(s, { makeId = id } = {}) {
       "samplingPlans",
       "quality",
       "messages",
+      "privateLearnerNotes",
     ]) {
       if (Array.isArray(data[collection]))
         data[collection] = data[collection].filter(

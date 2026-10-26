@@ -1,4 +1,6 @@
 import http from "node:http";
+import { createIntegrityService } from "./integrity.mjs";
+import JSZip from "jszip";
 import {
   practiceRestoreNeeded,
   importedLearnerIds,
@@ -81,6 +83,8 @@ const get = () =>
       db.prepare("SELECT data FROM workspace WHERE id=1").get().data,
     );
     s.learningPlans ||= [];
+    s.learningTemplates ||= [];
+    s.privateLearnerNotes ||= [];
     s.samplingPlans ||= [];
     return s;
   })();
@@ -204,10 +208,27 @@ if (!demo && practiceRestoreNeeded(get())) {
   db.exec("BEGIN IMMEDIATE");
   try {
     const s = get();
+    const importedIds = new Set(importedLearnerIds(s));
+    const removedEvidenceIds = s.evidence
+      .filter((e) => importedIds.has(e.learnerId))
+      .map((e) => e.id);
     const result = restorePracticeWorkspace(s);
     if (result) {
       for (const learnerId of result.removedIds)
         db.prepare("DELETE FROM files WHERE learner_id=?").run(learnerId);
+      if (
+        db
+          .prepare("SELECT name FROM sqlite_master WHERE name='evidence_text'")
+          .get()
+      )
+        for (const evidenceId of removedEvidenceIds) {
+          db.prepare("DELETE FROM evidence_text WHERE evidence_id=?").run(
+            evidenceId,
+          );
+          db.prepare("DELETE FROM integrity_jobs WHERE evidence_id=?").run(
+            evidenceId,
+          );
+        }
       put(s);
       console.log("Requested fictional practice workspace restored.");
     }
@@ -257,13 +278,24 @@ function visible(s, u) {
       })),
     learners: ls.map((l) => ({
       ...derive(l, s),
-      ...(!staff.includes(u.role) ? { tracker: undefined } : {}),
+      ...(!["Manager", "Assessor"].includes(u.role)
+        ? { tracker: undefined }
+        : {}),
+      ...(!["Manager", "Assessor"].includes(u.role)
+        ? { notes: undefined }
+        : {}),
       participantIds: s.users
         .filter((account) => account.active && canSee(account, l))
         .map((account) => account.id),
     })),
     audit: staff.includes(u.role)
       ? s.audit.filter((x) => u.role === "Manager" || ids.has(x.learnerId))
+      : [],
+    privateLearnerNotes: ["Manager", "Assessor"].includes(u.role)
+      ? (s.privateLearnerNotes || []).filter((n) => ids.has(n.learnerId))
+      : [],
+    learningTemplates: ["Manager", "Assessor"].includes(u.role)
+      ? s.learningTemplates || []
       : [],
     snapshots:
       u.role === "Manager"
@@ -372,6 +404,16 @@ function normalizeLearner(p, s, old) {
       "English status",
     ),
     maths: choice(p.maths, ["Pending", "Achieved", "Exempt"], "Maths status"),
+    englishUpskill:
+      p.englishUpskill === undefined
+        ? old?.englishUpskill || false
+        : p.englishUpskill === true,
+    mathsUpskill:
+      p.mathsUpskill === undefined
+        ? old?.mathsUpskill || false
+        : p.mathsUpskill === true,
+    englishNotRequired: old?.englishNotRequired || false,
+    mathsNotRequired: old?.mathsNotRequired || false,
     gatewayDate: old?.gatewayDate || "",
     epaDate: date(p.epaDate, "EPA date"),
     gatewayStatus: old?.gatewayStatus || "Not ready",
@@ -396,6 +438,14 @@ function uploadFiles(files, learnerId) {
   });
 }
 const mail = createMailService({ db, get, password, canSee });
+const integrity = createIntegrityService({
+  db,
+  get,
+  put,
+  enabled:
+    process.env.INTEGRITY_ENABLED === "1" ||
+    (!demo && process.env.INTEGRITY_ENABLED !== "0"),
+});
 function courseName(value) {
   return String(value)
     .trim()
@@ -443,6 +493,88 @@ function command(s, u, kind, p) {
   });
   if (scheduleResult !== null) return scheduleResult;
   switch (kind) {
+    case "learner.privateNote": {
+      requireRole(u, editors);
+      if (!l) fail("Select a learner.");
+      s.privateLearnerNotes.push({
+        id: id(),
+        learnerId: l.id,
+        text: text(p.text, "Confidential note", 20000),
+        by: u.id,
+        date: new Date().toISOString(),
+      });
+      break;
+    }
+    case "learner.functionalSkills": {
+      requireRole(u, editors);
+      if (!l) fail("Select a learner.");
+      if (
+        typeof p.englishNotRequired !== "boolean" ||
+        typeof p.mathsNotRequired !== "boolean"
+      )
+        fail("Choose valid functional skills requirements.");
+      l.englishNotRequired = p.englishNotRequired;
+      l.mathsNotRequired = p.mathsNotRequired;
+      l.functionalSkillsConfirmedBy = u.id;
+      l.functionalSkillsConfirmedAt = new Date().toISOString();
+      break;
+    }
+    case "evidence.recheck": {
+      requireRole(u, [...editors, "Apprentice"]);
+      const evidence = s.evidence.find((e) => e.id === p.id);
+      if (!evidence) fail("Evidence not found.", 404);
+      learnerFor(s, u, evidence.learnerId);
+      integrity.enqueue(evidence);
+      break;
+    }
+    case "evidence.epa": {
+      requireRole(u, [...editors, "Apprentice"]);
+      const e = s.evidence.find((e) => e.id === p.id);
+      if (!e) fail("Evidence not found.", 404);
+      const owner = learnerFor(s, u, e.learnerId);
+      if (
+        e.status !== "Accepted" ||
+        (e.standardId && e.standardId !== owner.standardId)
+      )
+        fail(
+          "Only accepted evidence for the current programme can be selected for EPA.",
+        );
+      if (typeof p.selected !== "boolean")
+        fail("Choose a valid EPA selection.");
+      e.epaSelected = p.selected;
+      e.epaSelectedBy = u.id;
+      e.epaSelectedAt = new Date().toISOString();
+      break;
+    }
+    case "plan.template.save": {
+      requireRole(u, editors);
+      const activity = s.learningPlans.find((a) => a.id === p.id);
+      if (!activity) fail("Learning activity not found.", 404);
+      learnerFor(s, u, activity.learnerId);
+      const {
+        title,
+        description,
+        objectives,
+        criteria,
+        resources,
+        plannedHours,
+        method,
+        standardId,
+      } = activity;
+      s.learningTemplates.push({
+        id: id(),
+        title,
+        description,
+        objectives,
+        criteria: [...criteria],
+        resources: [...resources],
+        plannedHours,
+        method: method || "Other",
+        standardId,
+        by: u.id,
+      });
+      break;
+    }
     case "learner.save": {
       requireRole(u, editors);
       const old = p.id ? s.learners.find((x) => x.id === p.id) : null;
@@ -462,6 +594,7 @@ function command(s, u, kind, p) {
     }
     case "learners.importTracker": {
       requireRole(u, ["Manager"]);
+      const previousEvidenceIds = s.evidence.map((e) => e.id);
       let result;
       try {
         result = importTracker(s, p.sheetRows, {
@@ -475,6 +608,16 @@ function command(s, u, kind, p) {
       }
       for (const learnerId of result.removedIds)
         db.prepare("DELETE FROM files WHERE learner_id=?").run(learnerId);
+      const remainingEvidenceIds = new Set(s.evidence.map((e) => e.id));
+      for (const evidenceId of previousEvidenceIds)
+        if (!remainingEvidenceIds.has(evidenceId)) {
+          db.prepare("DELETE FROM evidence_text WHERE evidence_id=?").run(
+            evidenceId,
+          );
+          db.prepare("DELETE FROM integrity_jobs WHERE evidence_id=?").run(
+            evidenceId,
+          );
+        }
       syncReviewParticipants(s);
       return {
         ...result,
@@ -658,6 +801,7 @@ function command(s, u, kind, p) {
         description: text(p.description, "Reflection", 20000),
         criteria: [...new Set(p.criteria)],
         status,
+        epaSelected: false,
         feedback: old?.feedback || "",
         files: [...(old?.files || []), ...uploadFiles(p.files || [], l.id)],
         by: old?.by || u.id,
@@ -665,6 +809,7 @@ function command(s, u, kind, p) {
         decisions: old?.decisions || [],
       };
       if (item.files.length > 10) fail("Maximum 10 files per evidence item.");
+      integrity.enqueue(item);
       if (old) Object.assign(old, item);
       else s.evidence.push(item);
       break;
@@ -696,16 +841,19 @@ function command(s, u, kind, p) {
         fail("Only submitted evidence can be assessed.");
       e.status = choice(
         p.status,
-        ["Accepted", "Changes requested", "Rejected"],
+        ["Accepted", "Changes requested"],
         "decision",
       );
       e.feedback = text(p.feedback, "Assessor feedback", 20000);
+      e.feedbackFiles = uploadFiles(p.files || [], e.learnerId);
       e.updated = new Date().toISOString();
+      e.decisions ||= [];
       e.decisions.push({
         by: u.id,
         date: e.updated,
         status: e.status,
         feedback: e.feedback,
+        files: e.feedbackFiles,
       });
       break;
     }
@@ -767,7 +915,7 @@ function command(s, u, kind, p) {
         actions: template.targets
           .map(
             (t) =>
-              `${t.category}: ${t.what}\nHow: ${t.how}\nWhy: ${t.why}\nOwner: ${t.ownerName} · Due: ${t.due}`,
+              `${t.category}: ${t.what}\nSteps: ${t.how}${t.why ? `\nPurpose: ${t.why}` : ""}\nOwner: ${t.ownerName} · Due: ${t.due}`,
           )
           .join("\n\n"),
         by: u.id,
@@ -818,12 +966,13 @@ function command(s, u, kind, p) {
         appointment.sequence = (appointment.sequence || 0) + 1;
       }
       if (r.nextDate <= r.date) fail("Next review must be after this review.");
+      r.targetPlanIds = [];
       r.targetTaskIds = template.targets.map((t) => {
         const task = {
           id: id(),
           learnerId: l.id,
           title: t.what,
-          description: `How: ${t.how}\nWhy: ${t.why}`,
+          description: t.how + (t.why ? `\nPurpose: ${t.why}` : ""),
           owner: t.owner,
           due: t.due,
           status: "Open",
@@ -832,6 +981,31 @@ function command(s, u, kind, p) {
           category: t.category,
         };
         s.tasks.push(task);
+        const activity = {
+          id: id(),
+          learnerId: l.id,
+          standardId: l.standardId,
+          title: t.what.slice(0, 200),
+          description: t.how,
+          objectives: t.what,
+          criteria: [],
+          resources: [],
+          startDate: r.date,
+          due: t.due,
+          plannedHours: t.hours || 0,
+          method: t.category === "Support" ? "Learner support" : "Review",
+          status: "Planned",
+          outcomeNotes: "",
+          by: u.id,
+          created: new Date().toISOString(),
+          updated: new Date().toISOString(),
+          reflection: "",
+          sessionId: "",
+          reviewId: r.id,
+          reviewTaskId: task.id,
+        };
+        s.learningPlans.push(activity);
+        r.targetPlanIds.push(activity.id);
         return task.id;
       });
       s.reviews.push(r);
@@ -889,6 +1063,16 @@ function command(s, u, kind, p) {
         } else {
           delete t.completedAt;
           delete t.completedBy;
+        }
+        for (const activity of s.learningPlans.filter(
+          (a) => a.reviewTaskId === t.id,
+        )) {
+          activity.status = status === "Complete" ? "Completed" : "In progress";
+          activity.outcomeNotes =
+            status === "Complete"
+              ? "Completed from the linked review action."
+              : "";
+          activity.updated = new Date().toISOString();
         }
       }
       break;
@@ -1437,6 +1621,106 @@ const server = http.createServer(async (req, res) => {
         });
         return res.end(readFileSync(file));
       }
+      if (path.startsWith("/api/epa/") && req.method === "GET") {
+        if (u.role === "Employer")
+          fail(
+            "EPA exports are restricted to the learner and assessment staff.",
+            403,
+          );
+        const learnerId = decodeURIComponent(
+          path.slice("/api/epa/".length).replace(/\.zip$/, ""),
+        );
+        const learner = learnerFor(s, u, learnerId);
+        const evidence = s.evidence.filter(
+          (e) =>
+            e.learnerId === learner.id &&
+            e.epaSelected &&
+            e.status === "Accepted" &&
+            (!e.standardId || e.standardId === learner.standardId),
+        );
+        if (!evidence.length)
+          fail("Select accepted evidence for the EPA portfolio first.");
+        const zip = new JSZip();
+        let bytes = 0;
+        const manifest = [];
+        for (const e of evidence) {
+          manifest.push({
+            id: e.id,
+            title: e.title,
+            type: e.type,
+            date: e.date,
+            description: e.description,
+            criteria: e.criteria,
+            status: e.status,
+            feedback: e.feedback,
+            assessments: (e.decisions || []).map((d) => ({
+              date: d.date,
+              status: d.status,
+              feedback: d.feedback,
+              assessor:
+                s.users.find((account) => account.id === d.by)?.name ||
+                "Assessment staff",
+            })),
+          });
+          const includedFiles = new Set();
+          for (const f of [
+            ...e.files,
+            ...(e.feedbackFiles || []),
+            ...(e.decisions || []).flatMap((d) => d.files || []),
+          ]) {
+            if (includedFiles.has(f.id)) continue;
+            includedFiles.add(f.id);
+            const file = db
+              .prepare("SELECT * FROM files WHERE id=? AND learner_id=?")
+              .get(f.id, learner.id);
+            if (!file) continue;
+            bytes += file.body.length;
+            if (bytes > 100 * 1024 * 1024)
+              fail(
+                "EPA export exceeds 100 MB; select fewer evidence items.",
+                413,
+              );
+            zip.file(
+              `${e.id}/${f.id}-${f.name.replace(/[^a-zA-Z0-9._ -]/g, "_")}`,
+              file.body,
+            );
+          }
+        }
+        zip.file(
+          "portfolio.json",
+          JSON.stringify(
+            {
+              learner: learner.name,
+              reference: learner.ref,
+              standard: s.standards.find((st) => st.id === learner.standardId)
+                ?.name,
+              evidence: manifest,
+            },
+            null,
+            2,
+          ),
+        );
+        zip.file(
+          "portfolio.txt",
+          `EPA portfolio\n${learner.name} · ${learner.ref}\n\n` +
+            manifest
+              .map(
+                (e, index) =>
+                  `${index + 1}. ${e.title}\nMethod: ${e.type}\nDate: ${e.date}\nKSBs: ${e.criteria.join(", ")}\n\n${e.description}\n\nAssessor feedback: ${e.feedback || ""}\nAttachments: ${e.id}/\n`,
+              )
+              .join("\n"),
+        );
+        const archive = await zip.generateAsync({
+          type: "nodebuffer",
+          compression: "DEFLATE",
+        });
+        res.writeHead(200, {
+          "Content-Type": "application/zip",
+          "Content-Disposition": 'attachment; filename="epa-portfolio.zip"',
+          "Cache-Control": "no-store",
+        });
+        return res.end(archive);
+      }
       if (path === "/api/calendar.ics" && req.method === "GET") {
         res.writeHead(200, {
           "Content-Type": "text/calendar; charset=utf-8",
@@ -1557,6 +1841,7 @@ server.listen(PORT, "0.0.0.0", () =>
 
 backups.start();
 mail.start();
+integrity.start();
 let closing = false;
 for (const signal of ["SIGTERM", "SIGINT"])
   process.on(signal, () => {
@@ -1564,6 +1849,7 @@ for (const signal of ["SIGTERM", "SIGINT"])
     closing = true;
     backups.stop();
     mail.stop();
+    integrity.stop();
     server.close(() => {
       db.close();
       process.exit(0);

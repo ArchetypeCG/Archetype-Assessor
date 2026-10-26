@@ -3566,3 +3566,22 @@ input[type="file"]::file-selector-button {
   width: 100%;
   justify-content: center;
 }
+
+.otj-status.on-target {
+  border-left: 4px solid #2e8261;
+}
+.otj-status.on-target > strong {
+  color: #236a50;
+}
+.otj-status.behind {
+  border-left: 4px solid #b84242;
+}
+.otj-status.behind > strong {
+  color: #a52e2e;
+}
+.otj-status.planned {
+  border-left: 4px solid #bd9239;
+}
+.otj-status.planned > strong {
+  color: #8a651c;
+}

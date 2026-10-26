@@ -208,6 +208,7 @@ export function removeFictionalLearners(s) {
     "samplingPlans",
     "quality",
     "messages",
+    "privateLearnerNotes",
   ]) {
     s[collection] = (s[collection] || []).filter(
       (record) => !ids.has(record.learnerId),
