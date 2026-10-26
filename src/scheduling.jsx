@@ -465,10 +465,19 @@ export function LearningPlan({
           </p>
         </div>
         {staff(user) && (
-          <Button onClick={() => setModal({ type: "plan", learner: l })}>
-            <Plus size={16} />
-            Add learning activity
-          </Button>
+          <div className="button-row">
+            <Button onClick={() => setModal({ type: "plan", learner: l })}>
+              <Plus size={16} />
+              Add learning activity
+            </Button>
+            <Button
+              secondary
+              onClick={() => setModal({ type: "session", learner: l })}
+            >
+              <CalendarDays size={16} />
+              Schedule session
+            </Button>
+          </div>
         )}
       </section>
       <div className="metrics three">
