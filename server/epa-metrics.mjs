@@ -1,5 +1,5 @@
 export const EPA_RESULTS = ["Not recorded", "Distinction", "Pass", "Fail"];
-export function epaPerformance(outcomes = [], assessorId) {
+export function latestEpaOutcomes(outcomes = [], assessorId) {
   const latest = new Map();
   for (const outcome of outcomes
     .filter(
@@ -12,7 +12,10 @@ export function epaPerformance(outcomes = [], assessorId) {
       (a.date || a.recordedAt).localeCompare(b.date || b.recordedAt),
     ))
     latest.set(outcome.learnerId, outcome);
-  const records = [...latest.values()],
+  return [...latest.values()];
+}
+export function epaPerformance(outcomes = [], assessorId) {
+  const records = latestEpaOutcomes(outcomes, assessorId),
     total = records.length;
   return {
     total,

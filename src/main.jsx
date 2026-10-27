@@ -1,3 +1,4 @@
+import { EpaResultsPage } from "./epa-results-page.jsx";
 import {
   AssessorReviewWorkspace,
   AssessorEvidenceWorkspace,
@@ -858,6 +859,8 @@ function Page({ page }) {
       return <Compliance />;
     case "Gateway & EPA":
       return <Gateway />;
+    case "EPA results":
+      return <EpaResultsPage context={pageContext} />;
     case "Calendar":
       return <Calendar />;
     case "Learning plan":
@@ -1378,7 +1381,7 @@ function IndividualReport() {
 }
 function PortfolioHub() {
   const ctx = useApp();
-  const { s, learnerId, user } = ctx,
+  const { s, learnerId, user, pageFilter } = ctx,
     l = s.learners.find((x) => x.id === learnerId);
   const content = (
     <>
@@ -1426,7 +1429,8 @@ function PortfolioHub() {
       )}
     </>
   );
-  return user.role === "Assessor" ? (
+  return user.role === "Assessor" ||
+    (user.role === "Manager" && pageFilter.view === "assessment-queue") ? (
     <AssessorEvidenceWorkspace context={ctx}>
       {content}
     </AssessorEvidenceWorkspace>
@@ -2197,7 +2201,7 @@ function OTJ({ learner }) {
 }
 function Reviews({ learner }) {
   const context = useApp();
-  const { s, user, setModal, act } = context,
+  const { s, user, setModal, act, pageFilter } = context,
     items = s.reviews
       .filter((x) => !learner || x.learnerId === learner.id)
       .slice()
@@ -2370,7 +2374,9 @@ function Reviews({ learner }) {
       </p>
     </Panel>
   );
-  return user.role === "Assessor" && !learner ? (
+  return !learner &&
+    (user.role === "Assessor" ||
+      (user.role === "Manager" && pageFilter.view)) ? (
     <AssessorReviewWorkspace context={context}>
       {content}
     </AssessorReviewWorkspace>

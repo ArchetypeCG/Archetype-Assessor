@@ -124,3 +124,30 @@ test("dashboard totals equal their queue rows and update after assessment, appro
   assert.equal(work.overdueReviews, 0);
   assert.equal(work.dueSoonLearners.length, 0);
 });
+
+test("master card queues cover the provision while assessor queues retain their active-caseload scope", () => {
+  const s = {
+    learners: [
+      learner("a", { name: "A", nextReview: "2026-10-20" }),
+      learner("b", { name: "B", assessorId: "b", nextReview: "2026-10-21" }),
+      learner("completed", {
+        name: "Completed",
+        status: "Completed",
+        nextReview: "2026-01-01",
+      }),
+    ],
+    evidence: [
+      { learnerId: "a", status: "Submitted" },
+      { learnerId: "b", status: "Submitted" },
+      { learnerId: "completed", status: "Submitted" },
+      { learnerId: "a", status: "Submitted", standardId: "old" },
+    ],
+  };
+  const now = new Date("2026-10-27T12:00:00Z");
+  const master = assessorDay(s, undefined, now),
+    own = assessorDay(s, "a", now);
+  assert.equal(master.pendingEvidence.length, 3);
+  assert.equal(master.overdueLearners.length, 2);
+  assert.equal(own.pendingEvidence.length, 1);
+  assert.equal(own.overdueLearners.length, 1);
+});

@@ -1,7 +1,8 @@
 import React from "react";
 import { Trophy } from "lucide-react";
 import { epaPerformance } from "../server/epa-metrics.mjs";
-export function EpaPerformance({ performance, overall = false }) {
+export function EpaPerformance({ performance, overall = false, onResult }) {
+  const GradeCard = onResult ? "button" : "div";
   const stats = performance || epaPerformance([], ""),
     distinction = stats.distinction.percentage,
     pass = stats.pass.percentage;
@@ -41,7 +42,19 @@ export function EpaPerformance({ performance, overall = false }) {
             ["pass", "Pass"],
             ["fail", "Fail"],
           ].map(([key, label]) => (
-            <div className={"epa-grade " + key} key={key}>
+            <GradeCard
+              className={
+                "epa-grade " + key + (onResult ? " actionable-epa-grade" : "")
+              }
+              key={key}
+              type={onResult ? "button" : undefined}
+              onClick={onResult ? () => onResult(label) : undefined}
+              aria-label={
+                onResult
+                  ? `View ${label} EPA results: ${stats[key].count} apprentices`
+                  : undefined
+              }
+            >
               <span className="epa-grade-label">
                 <i />
                 {label}
@@ -50,7 +63,7 @@ export function EpaPerformance({ performance, overall = false }) {
               <small>
                 {stats[key].count} apprentice{stats[key].count === 1 ? "" : "s"}
               </small>
-            </div>
+            </GradeCard>
           ))}
         </div>
       </div>

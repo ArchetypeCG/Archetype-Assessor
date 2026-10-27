@@ -1,3 +1,17 @@
+export function assessmentQueue(state, assessorId) {
+  return (state.evidence || []).filter((record) => {
+    const learner = (state.learners || []).find(
+      (l) => l.id === record.learnerId,
+    );
+    return (
+      learner &&
+      record.status === "Submitted" &&
+      (!record.standardId || record.standardId === learner.standardId) &&
+      (assessorId === undefined ||
+        (learner.assessorId === assessorId && learner.status === "Active"))
+    );
+  });
+}
 // All dates and session times follow the programme calendar in Europe/London.
 export function assessorDay(state, assessorId, now = new Date()) {
   const parts = Object.fromEntries(
@@ -19,7 +33,9 @@ export function assessorDay(state, assessorId, now = new Date()) {
   end.setUTCDate(end.getUTCDate() + 60);
   const horizon = end.toISOString().slice(0, 10);
   const learners = (state.learners || []).filter(
-    (l) => l.assessorId === assessorId && l.status === "Active",
+    (l) =>
+      (assessorId === undefined || l.assessorId === assessorId) &&
+      l.status === "Active",
   );
   const byId = new Map(learners.map((l) => [l.id, l]));
   const current = (record) => {
@@ -58,9 +74,7 @@ export function assessorDay(state, assessorId, now = new Date()) {
     })
     .filter(Boolean)
     .sort((a, b) => a.date.localeCompare(b.date));
-  const pendingEvidence = (state.evidence || []).filter(
-    (e) => current(e) && e.status === "Submitted",
-  );
+  const pendingEvidence = assessmentQueue(state, assessorId);
   const pendingLogs = (state.otj || []).filter(
     (e) => current(e) && e.status === "Pending",
   );

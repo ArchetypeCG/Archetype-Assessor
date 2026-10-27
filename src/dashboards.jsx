@@ -1,4 +1,4 @@
-import { assessorDay } from "./assessor-day.mjs";
+import { assessorDay, assessmentQueue } from "./assessor-day.mjs";
 import { adminWorkspace } from "./admin-workspace.mjs";
 import { AssessorDay } from "./assessor-day.jsx";
 import { EpaPerformance } from "./epa-performance";
@@ -217,9 +217,7 @@ function Master({ s, user, go, openLearner, setModal }) {
   const ls = s.learners,
     active = ls.filter((l) => l.status === "Active"),
     risks = ls.filter((l) => l.rag === "Red"),
-    pending = s.evidence.filter(
-      (e) => e.status === "Submitted" && activeRecord(s, e),
-    ),
+    pending = assessmentQueue(s),
     overdue = ls.filter((l) => l.exceptions.some((e) => e.type === "review")),
     workspace = adminWorkspace(s);
   return (
@@ -262,37 +260,46 @@ function Master({ s, user, go, openLearner, setModal }) {
       >
         <div className="command-kpis">
           <Kpi
+            onClick={() => go("Apprentices")}
             label="Apprentices"
             value={ls.length}
             detail={`${active.length} active learners`}
             icon={Users}
           />
           <Kpi
+            onClick={() => go("Apprentices", { sort: "progress" })}
             label="Verified progress"
             value={average(ls) + "%"}
             detail="Accepted KSB evidence"
             icon={Target}
           />
           <Kpi
+            onClick={() => go("Apprentices", { rag: "Red" })}
             label="High-risk learners"
             value={risks.length}
             detail="Priority intervention"
             icon={TriangleAlert}
           />
           <Kpi
+            onClick={() => go("Reviews Hub", { view: "overdue" })}
             label="Overdue reviews"
             value={overdue.length}
             detail="Conversations to arrange"
             icon={CalendarDays}
           />
           <Kpi
+            onClick={() => go("Portfolios", { view: "assessment-queue" })}
             label="Assessment queue"
             value={pending.length}
             detail="Evidence awaiting a decision"
             icon={Layers}
           />
         </div>
-        <EpaPerformance performance={s.epaPerformance} overall />
+        <EpaPerformance
+          performance={s.epaPerformance}
+          overall
+          onResult={(result) => go("EPA results", { result })}
+        />
       </Hero>
       <section className="admin-workspace" aria-label="Manage your provision">
         <div className="admin-section-intro">

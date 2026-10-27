@@ -1,29 +1,32 @@
 import React, { useState, useEffect } from "react";
 import { ArrowUpRight, FileText, Plus } from "lucide-react";
-import { assessorDay } from "./assessor-day.mjs";
+import { assessorDay, assessmentQueue } from "./assessor-day.mjs";
 import { fmt } from "./lib";
 export function AssessorEvidenceWorkspace({ context, children }) {
   const { s, user, setModal } = context;
-  const work = assessorDay(s, user.id);
+  const evidence = assessmentQueue(
+    s,
+    user.role === "Manager" ? undefined : user.id,
+  );
+  const title =
+    user.role === "Manager" ? "Assessment queue" : "Evidence awaiting feedback";
   return (
     <>
-      <section
-        className="workload-panel"
-        aria-label="Evidence awaiting feedback"
-      >
+      <section className="workload-panel" aria-label={title}>
         <div className="workload-heading">
           <div>
             <h2>
-              Evidence awaiting feedback <span>{work.evidence}</span>
+              {title} <span>{evidence.length}</span>
             </h2>
             <p>
-              Submitted work across your active caseload · current programmes
-              only
+              {user.role === "Manager"
+                ? "Submitted work across your provision · current programmes only"
+                : "Submitted work across your active caseload · current programmes only"}
             </p>
           </div>
         </div>
         <div className="workload-list">
-          {work.pendingEvidence.map((e) => (
+          {evidence.map((e) => (
             <button
               key={e.id}
               className="workload-row"
@@ -49,7 +52,7 @@ export function AssessorEvidenceWorkspace({ context, children }) {
             </button>
           ))}
         </div>
-        {!work.evidence && (
+        {!evidence.length && (
           <p className="workload-empty">
             No submitted work is waiting for your feedback.
           </p>
@@ -68,7 +71,7 @@ export function AssessorReviewWorkspace({ context, children }) {
   const { s, user, setModal, openLearner, pageFilter } = context;
   const [view, setView] = useState(pageFilter.view || "overdue");
   useEffect(() => setView(pageFilter.view || "overdue"), [pageFilter]);
-  const work = assessorDay(s, user.id);
+  const work = assessorDay(s, user.role === "Manager" ? undefined : user.id);
   const rows =
     view === "overdue"
       ? work.overdueLearners
