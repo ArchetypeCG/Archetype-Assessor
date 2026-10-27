@@ -58,17 +58,38 @@ export function assessorDay(state, assessorId, now = new Date()) {
     })
     .filter(Boolean)
     .sort((a, b) => a.date.localeCompare(b.date));
+  const pendingEvidence = (state.evidence || []).filter(
+    (e) => current(e) && e.status === "Submitted",
+  );
+  const pendingLogs = (state.otj || []).filter(
+    (e) => current(e) && e.status === "Pending",
+  );
+  const dueEnd = new Date(day + "T12:00:00Z");
+  dueEnd.setUTCDate(dueEnd.getUTCDate() + 14);
+  const dueDay = dueEnd.toISOString().slice(0, 10);
+  const reviewLearners = learners
+    .filter((l) => l.nextReview)
+    .sort(
+      (a, b) =>
+        a.nextReview.localeCompare(b.nextReview) ||
+        a.name.localeCompare(b.name),
+    );
+  const overdueLearners = reviewLearners.filter((l) => l.nextReview < day),
+    todayLearners = reviewLearners.filter((l) => l.nextReview === day),
+    dueSoonLearners = reviewLearners.filter((l) => l.nextReview <= dueDay);
   return {
     day,
     nextSession: sessions[0] || null,
-    overdueReviews: learners.filter((l) => l.nextReview && l.nextReview < day)
-      .length,
-    reviewsToday: learners.filter((l) => l.nextReview === day).length,
-    evidence: (state.evidence || []).filter(
-      (e) => current(e) && e.status === "Submitted",
-    ).length,
-    logs: (state.otj || []).filter((e) => current(e) && e.status === "Pending")
-      .length,
+    overdueReviews: overdueLearners.length,
+    reviewsToday: todayLearners.length,
+    evidence: pendingEvidence.length,
+    logs: pendingLogs.length,
     upcoming,
+    pendingEvidence,
+    pendingLogs,
+    reviewLearners,
+    overdueLearners,
+    todayLearners,
+    dueSoonLearners,
   };
 }

@@ -91,3 +91,36 @@ test("UK midnight and the 60-day gateway window use calendar dates without inven
     "2026-10-26",
   );
 });
+
+test("dashboard totals equal their queue rows and update after assessment, approval, and a completed review", () => {
+  const s = {
+    learners: [
+      learner("l", { name: "Learner", nextReview: "2026-10-20" }),
+      learner("paused", {
+        name: "Paused",
+        status: "Paused",
+        nextReview: "2026-01-01",
+      }),
+      learner("future", { name: "Future", nextReview: "2026-11-20" }),
+    ],
+    evidence: [
+      { id: "e", learnerId: "l", status: "Submitted" },
+      { id: "paused", learnerId: "paused", status: "Submitted" },
+    ],
+    otj: [{ id: "h", learnerId: "l", status: "Pending" }],
+  };
+  const now = new Date("2026-10-27T10:00:00Z");
+  let work = assessorDay(s, "a", now);
+  assert.equal(work.evidence, work.pendingEvidence.length);
+  assert.equal(work.logs, work.pendingLogs.length);
+  assert.equal(work.overdueReviews, work.overdueLearners.length);
+  assert.equal(work.dueSoonLearners.length, 1);
+  s.evidence[0].status = "Accepted";
+  s.otj[0].status = "Approved";
+  s.learners[0].nextReview = "2026-12-01";
+  work = assessorDay(s, "a", now);
+  assert.equal(work.evidence, 0);
+  assert.equal(work.logs, 0);
+  assert.equal(work.overdueReviews, 0);
+  assert.equal(work.dueSoonLearners.length, 0);
+});

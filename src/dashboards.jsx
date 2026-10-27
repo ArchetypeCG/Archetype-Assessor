@@ -1,3 +1,5 @@
+import { assessorDay } from "./assessor-day.mjs";
+import { adminWorkspace } from "./admin-workspace.mjs";
 import { AssessorDay } from "./assessor-day.jsx";
 import { EpaPerformance } from "./epa-performance";
 import { SuccessAndUpdates } from "./staff-development";
@@ -99,16 +101,21 @@ function Link({ children, onClick }) {
     </button>
   );
 }
-function Kpi({ label, value, detail, icon: Icon = Users }) {
+function Kpi({ label, value, detail, icon: Icon = Users, onClick }) {
+  const Element = onClick ? "button" : "div";
   return (
-    <div className="command-kpi">
+    <Element
+      className={"command-kpi" + (onClick ? " clickable-kpi" : "")}
+      onClick={onClick}
+      type={onClick ? "button" : undefined}
+    >
       <div>
         <Icon size={17} />
         <span>{label}</span>
       </div>
       <strong>{value}</strong>
       <small>{detail}</small>
-    </div>
+    </Element>
   );
 }
 function Action({ icon: Icon, label, detail, onClick }) {
@@ -214,28 +221,7 @@ function Master({ s, user, go, openLearner, setModal }) {
       (e) => e.status === "Submitted" && activeRecord(s, e),
     ),
     overdue = ls.filter((l) => l.exceptions.some((e) => e.type === "review")),
-    green = ls.filter((l) => l.rag === "Green").length,
-    amber = ls.filter((l) => l.rag === "Amber").length,
-    health = ls.length
-      ? Math.round(((green + amber * 0.5) / ls.length) * 100)
-      : 0;
-  const upcoming = ls
-    .flatMap((l) =>
-      [
-        ["Review", l.nextReview],
-        ["Gateway", l.gatewayDate],
-        ["EPA", l.epaDate],
-      ]
-        .filter(
-          ([, d]) =>
-            d &&
-            d >= localDate() &&
-            d <=
-              new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-        )
-        .map(([type, date]) => ({ l, type, date })),
-    )
-    .sort((a, b) => a.date.localeCompare(b.date));
+    workspace = adminWorkspace(s);
   return (
     <div data-dashboard="manager">
       {!s.learners.length && (
@@ -308,286 +294,278 @@ function Master({ s, user, go, openLearner, setModal }) {
         </div>
         <EpaPerformance performance={s.epaPerformance} overall />
       </Hero>
-      <div className="command-grid">
-        <Card
-          className="health-card"
-          title="Portfolio health"
-          subtitle="A clear view of learner progress and support needs"
-          action={<Link onClick={() => go("Analytics")}>Open analytics</Link>}
-        >
-          <div className="portfolio-health-view">
-            <div className="portfolio-health-summary">
-              <div>
-                <strong>{ls.length}</strong>
-                <span>apprentices across your provision</span>
-              </div>
-              <button
-                className="portfolio-health-all"
-                onClick={() => go("Apprentices")}
-              >
-                View all <ArrowUpRight size={14} />
-              </button>
-            </div>
-            <div className="portfolio-health-rows">
-              {[
-                ["Green", green, "On track", "Continue planned learning"],
-                ["Amber", amber, "Needs attention", "Check emerging concerns"],
-                [
-                  "Red",
-                  risks.length,
-                  "Priority support",
-                  "Agree the next action",
-                ],
-              ].map(([name, count, label, detail]) => (
-                <button
-                  key={name}
-                  type="button"
-                  className={`portfolio-health-row ${name.toLowerCase()}`}
-                  onClick={() => go("Apprentices", { rag: name })}
-                  aria-label={`View ${count} apprentices: ${label}`}
-                >
-                  <span className="portfolio-health-dot" />
-                  <div>
-                    <strong>{label}</strong>
-                    <small>{detail}</small>
-                  </div>
-                  <b>{count}</b>
-                  <ArrowUpRight size={15} />
-                </button>
-              ))}
-            </div>
-            {!ls.length && (
-              <p className="portfolio-health-empty">
-                Health will appear here once apprentices are enrolled.
-              </p>
-            )}
-            <button
-              className="portfolio-health-progress-link"
-              onClick={() => go("Progress report")}
-            >
-              <span>
-                <Target size={15} /> Average KSB progress
-              </span>
-              <strong>{average(ls)}%</strong>
-              <ArrowUpRight size={15} />
-            </button>
-            <button
-              className="portfolio-health-action"
-              onClick={() => go("Interventions")}
-            >
-              View support priorities <ArrowUpRight size={15} />
-            </button>
-          </div>
-        </Card>
-        <Card
-          title="Priority queue"
-          subtitle="Highest-value interventions today"
-          action={<Link onClick={() => go("Interventions")}>View all</Link>}
-        >
-          {[...ls]
-            .filter((l) => l.exceptions.length)
-            .sort((a, b) => b.exceptions.length - a.exceptions.length)
-            .slice(0, 4)
-            .map((l) => (
-              <Person
-                key={l.id}
-                learner={l}
-                onClick={() => openLearner(l.id)}
-                detail={l.exceptions[0].text}
-              >
-                <Status value={l.rag} />
-              </Person>
-            ))}
-          {!ls.some((l) => l.exceptions.length) && (
-            <Nothing>No delivery exceptions right now.</Nothing>
-          )}
-        </Card>
-      </div>
-      <div className="command-grid equal">
-        <Card
-          title="Team caseload pulse"
-          subtitle="Ownership, risk and review pressure"
-          action={<Link onClick={() => go("Team & caseloads")}>Team view</Link>}
-        >
-          {s.users
-            .filter((u) => u.role === "Assessor")
-            .map((u) => {
-              const cohort = ls.filter((l) => l.assessorId === u.id);
-              return (
-                <div className="caseload-pulse" key={u.id}>
-                  <span className="avatar cool">{initials(u.name)}</span>
-                  <div>
-                    <strong>{u.name}</strong>
-                    <small>
-                      {cohort.length} apprentices ·{" "}
-                      {cohort.filter((l) => l.rag === "Red").length} at risk
-                    </small>
-                    <Meter value={average(cohort)} />
-                  </div>
-                  <b>{average(cohort)}%</b>
-                </div>
-              );
-            })}
-        </Card>
-        <Card
-          title="Quick actions"
-          subtitle="Jump straight into operational work"
-        >
-          <div className="dashboard-actions two">
-            <Action
-              icon={Users}
-              label="Learner directory"
-              onClick={() => go("Apprentices")}
-            />
-            <Action
-              icon={TriangleAlert}
-              label="Risk alerts"
-              onClick={() => go("Alerts")}
-            />
-            <Action
-              icon={ListChecks}
-              label="Action plans"
-              onClick={() => go("Action plans")}
-            />
-            <Action
-              icon={ClipboardCheck}
-              label="Audit & quality"
-              onClick={() => go("Audit & quality")}
-            />
-          </div>
-          <div className="blue-callout">
-            <strong>One connected picture</strong>
+      <section className="admin-workspace" aria-label="Manage your provision">
+        <div className="admin-section-intro">
+          <div>
+            <span className="eyebrow">YOUR OPERATIONAL WORKSPACE</span>
+            <h2>Manage delivery.</h2>
             <p>
-              {s.standards.length} standards · {s.users.length} active accounts
-              · {ls.length} apprentice records. Every dashboard uses the same
-              saved records.
+              Resolve the next issue, plan the week and keep delivery moving.
             </p>
           </div>
-        </Card>
-      </div>
-      <div className="command-grid score-grid">
-        <Card
-          title="Portfolio health score"
-          subtitle="Live composite delivery indicator"
-        >
-          <div className="health-score">
-            <div className="score-ring" style={{ "--score": health + "%" }}>
-              <b>{health}%</b>
-            </div>
-            <div>
-              <h3>
-                {health >= 70
-                  ? "A strong foundation"
-                  : "Focus support where it matters"}
-              </h3>
-              <p>
-                Green learners count fully, amber learners count half. This
-                score is a delivery indicator, not a funding judgement.
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card
-          title="Next 30 days"
-          subtitle="Reviews, Gateway and EPA milestones approaching"
-          action={<span className="live-tag">LIVE</span>}
-        >
-          <div className="milestone-cards">
-            {upcoming.slice(0, 3).map((m, i) => (
-              <button
-                key={m.l.id + m.type + i}
-                onClick={() =>
-                  openLearner(
-                    m.l.id,
-                    m.type === "Review" ? "Reviews" : "Gateway",
-                  )
-                }
-              >
-                <CalendarDays size={19} />
-                <span>{m.type}</span>
-                <strong>{fmt(m.date)}</strong>
-                <small>{m.l.name}</small>
-              </button>
-            ))}
-          </div>
-          {!upcoming.length && (
-            <Nothing>No milestones due in the next 30 days.</Nothing>
-          )}
-        </Card>
-      </div>
-      <div className="command-grid equal">
-        <Card
-          title="Programme intelligence"
-          subtitle="Largest programmes and portfolio health"
-          action={<Link onClick={() => go("Standards & KSBs")}>Explore</Link>}
-        >
-          {s.standards.map((st) => {
-            const cohort = ls.filter((l) => l.standardId === st.id);
-            return (
-              <div className="programme-row" key={st.id}>
-                <div className="programme-icon">
-                  <BookOpen size={20} />
-                </div>
-                <div>
-                  <strong>{st.name}</strong>
-                  <small>
-                    Level {st.level} · {cohort.length} apprentices
-                  </small>
-                  <Meter value={average(cohort)} />
-                </div>
-                <b>{average(cohort)}%</b>
+          <button onClick={() => go("Report Studio")}>
+            <FileText size={15} /> Create a report <ArrowUpRight size={14} />
+          </button>
+        </div>
+        <div className="admin-work-grid">
+          <div className="admin-work-column">
+            <Card
+              className="admin-issue-card"
+              title="Priority queue"
+              subtitle="The most urgent learner issues, with a direct route to the next step"
+              action={<Link onClick={() => go("Alerts")}>All alerts</Link>}
+            >
+              <div className="admin-issue-list">
+                {workspace.issues.slice(0, 5).map(({ learner, exception }) => {
+                  const tab =
+                    {
+                      review: "Reviews",
+                      compliance: "Compliance",
+                      progress: "Learning plan",
+                      skills: "Gateway",
+                    }[exception.type] || "Overview";
+                  return (
+                    <button
+                      className="admin-issue-row"
+                      key={learner.id}
+                      onClick={() => openLearner(learner.id, tab)}
+                      aria-label={`Open ${learner.name}: ${exception.text}`}
+                    >
+                      <LearnerAvatar learner={learner} />
+                      <span>
+                        <strong>{learner.name}</strong>
+                        <small>{exception.text}</small>
+                        <span className="admin-issue-owner">
+                          {s.users.find((u) => u.id === learner.assessorId)
+                            ?.name || "No assessor assigned"}
+                          {exception.date
+                            ? ` · Due ${fmt(exception.date)}`
+                            : ""}
+                        </span>
+                      </span>
+                      <span
+                        className={`admin-issue-tag ${exception.severity.toLowerCase()}`}
+                      >
+                        {exception.severity === "Red"
+                          ? "Priority"
+                          : "Attention"}
+                      </span>
+                      <ArrowUpRight size={15} />
+                    </button>
+                  );
+                })}
               </div>
-            );
-          })}
-        </Card>
-        <Card
-          title="Compliance radar"
-          subtitle="Where the team should focus next"
-          action={
-            <Link onClick={() => go("Compliance Hub")}>Open compliance</Link>
-          }
-        >
-          <div className="compliance-tiles">
-            {[
-              ["Overdue reviews", "review"],
-              ["Compliance exceptions", "compliance"],
-              ["Behind target", "progress"],
-              ["Missing dates", "data"],
-            ].map(([label, type]) => (
-              <button
-                key={type}
-                onClick={() =>
-                  go(type === "compliance" ? "Compliance Hub" : "Alerts")
-                }
-              >
-                <ShieldCheck size={18} />
-                <b>
-                  {
-                    ls.filter((l) => l.exceptions.some((e) => e.type === type))
-                      .length
+              {!workspace.issues.length && (
+                <Nothing>
+                  No open learner issues to show. New delivery concerns will
+                  appear here.
+                </Nothing>
+              )}
+            </Card>
+            <Card
+              className="admin-team-card"
+              title="Assessor delivery oversight"
+              subtitle="See who owns the work, then open their active caseload"
+              action={
+                <Link onClick={() => go("Team & caseloads")}>
+                  Manage access
+                </Link>
+              }
+            >
+              {workspace.unassigned.length > 0 && (
+                <button
+                  className="admin-assignment-warning"
+                  onClick={() =>
+                    go("Apprentices", {
+                      assessor: "__unassigned__",
+                      status: "Active",
+                    })
                   }
-                </b>
-                <small>{label}</small>
-              </button>
-            ))}
+                >
+                  <TriangleAlert size={16} />
+                  <span>
+                    {workspace.unassigned.length} active apprentice
+                    {workspace.unassigned.length === 1 ? " needs" : "s need"} an
+                    assessor
+                  </span>
+                  <ArrowUpRight size={14} />
+                </button>
+              )}
+              <div className="admin-team-labels">
+                <span>Assessor / active caseload</span>
+                <span>Awaiting review</span>
+              </div>
+              {workspace.team
+                .slice(0, 6)
+                .map(({ assessor, learners, evidence, logs }) => (
+                  <button
+                    className="admin-team-row"
+                    key={assessor.id}
+                    onClick={() =>
+                      go("Apprentices", {
+                        assessor: assessor.id,
+                        status: "Active",
+                      })
+                    }
+                    aria-label={`Open ${assessor.name} active caseload`}
+                  >
+                    <span className="avatar cool">
+                      {initials(assessor.name)}
+                    </span>
+                    <span>
+                      <strong>{assessor.name}</strong>
+                      <small>
+                        {learners} active apprentice{learners === 1 ? "" : "s"}
+                        {!assessor.active ? " · Account inactive" : ""}
+                      </small>
+                    </span>
+                    <span className="admin-team-work">
+                      <b>{evidence} work</b>
+                      <small>
+                        {logs} OTJ log{logs === 1 ? "" : "s"}
+                      </small>
+                    </span>
+                    <ArrowUpRight size={15} />
+                  </button>
+                ))}
+              {!workspace.team.length && (
+                <Nothing>
+                  Add assessor accounts to assign caseloads and oversee
+                  delivery.
+                </Nothing>
+              )}
+              {workspace.team.length > 6 && (
+                <button
+                  className="admin-panel-footer"
+                  onClick={() => go("Team & caseloads")}
+                >
+                  View all assessors <ArrowUpRight size={14} />
+                </button>
+              )}
+            </Card>
           </div>
-        </Card>
-      </div>
+          <div className="admin-work-column">
+            <Card
+              className="admin-week-card"
+              title="Your delivery week"
+              subtitle="Scheduled sessions and reviews · next seven days"
+              action={<Link onClick={() => go("Calendar")}>Calendar</Link>}
+            >
+              <div className="admin-agenda-list">
+                {workspace.events
+                  .slice(0, 5)
+                  .map(({ appointment, learner }) => (
+                    <button
+                      className="admin-agenda-row"
+                      key={appointment.id}
+                      onClick={() =>
+                        setModal({
+                          type: "sessionDetail",
+                          item: appointment,
+                          learner,
+                        })
+                      }
+                      aria-label={`Open booking: ${appointment.title} with ${learner.name}`}
+                    >
+                      <span className="admin-agenda-day">
+                        <b>{appointment.date.slice(8)}</b>
+                        <small>
+                          {new Intl.DateTimeFormat("en-GB", {
+                            weekday: "short",
+                            timeZone: "Europe/London",
+                          }).format(new Date(appointment.date + "T12:00:00Z"))}
+                        </small>
+                      </span>
+                      <span>
+                        <strong>{appointment.title}</strong>
+                        <small>{learner.name}</small>
+                        <span className="admin-agenda-time">
+                          {appointment.date === workspace.day
+                            ? "Today"
+                            : fmt(appointment.date)}{" "}
+                          ·{" "}
+                          {appointment.allDay
+                            ? "All day"
+                            : appointment.time
+                              ? `${appointment.time}${appointment.endTime ? "–" + appointment.endTime : ""} UK time`
+                              : "Time to be confirmed"}
+                        </span>
+                      </span>
+                      <ArrowUpRight size={15} />
+                    </button>
+                  ))}
+              </div>
+              {!workspace.events.length && (
+                <Nothing>
+                  No sessions booked in the next seven days. Schedule the next
+                  conversation with an apprentice.
+                </Nothing>
+              )}
+              <button
+                className="admin-panel-footer"
+                onClick={() => setModal({ type: "session" })}
+              >
+                <Plus size={14} /> Schedule a session or review{" "}
+                <ArrowUpRight size={14} />
+              </button>
+            </Card>
+            <Card
+              className="admin-manage-card"
+              title="Manage your provision"
+              subtitle="Create, maintain and share—without searching through menus"
+            >
+              <div className="admin-manage-actions">
+                {[
+                  [
+                    Users,
+                    "Enrol an apprentice",
+                    "Add their programme and delivery details",
+                    () => setModal({ type: "learner" }),
+                  ],
+                  [
+                    ShieldCheck,
+                    "Create an account",
+                    "Set up access for a learner or colleague",
+                    () => setModal({ type: "user" }),
+                  ],
+                  [
+                    BookOpen,
+                    "Maintain standards & KSBs",
+                    "Keep course content and criteria current",
+                    () => go("Standards & KSBs"),
+                  ],
+                  [
+                    MessageSquare,
+                    "Publish success or an update",
+                    "Share news with assessors and apprentices",
+                    () => go("Success stories"),
+                  ],
+                ].map(([Icon, label, detail, action]) => (
+                  <button key={label} onClick={action}>
+                    <span className="admin-manage-icon">
+                      <Icon size={18} />
+                    </span>
+                    <span>
+                      <strong>{label}</strong>
+                      <small>{detail}</small>
+                    </span>
+                    <ArrowUpRight size={15} />
+                  </button>
+                ))}
+              </div>
+            </Card>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
 function Assessor({ s, user, go, openLearner, setModal }) {
-  const ls = s.learners,
-    pending = s.evidence.filter(
-      (e) => e.status === "Submitted" && activeRecord(s, e),
-    ),
-    logs = s.otj.filter((e) => e.status === "Pending" && activeRecord(s, e)),
-    reviews = ls.filter(
-      (l) =>
-        l.nextReview &&
-        l.nextReview <=
-          new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
-    ),
+  const workload = assessorDay(s, user.id),
+    ls = s.learners,
+    pending = workload.pendingEvidence,
+    logs = workload.pendingLogs,
+    reviews = workload.dueSoonLearners,
     find = (id) => ls.find((l) => l.id === id);
   return (
     <div data-dashboard="assessor">
@@ -634,35 +612,39 @@ function Assessor({ s, user, go, openLearner, setModal }) {
                   value: average(ls) + "%",
                   label: "Average KSB progress",
                   icon: Target,
-                  page: "Progress report",
+                  page: "Apprentices",
+                  filters: { sort: "progress" },
                 },
                 {
                   value: ls.filter((l) => l.rag === "Red").length,
                   label: "Apprentices needing support",
                   icon: TriangleAlert,
-                  page: "Interventions",
+                  page: "Apprentices",
+                  filters: { rag: "Red" },
                   attention: true,
                 },
-              ].map(({ value, label, icon: Icon, page, attention }) => (
-                <button
-                  type="button"
-                  key={page}
-                  className={
-                    attention
-                      ? "assessor-summary-card needs-support"
-                      : "assessor-summary-card"
-                  }
-                  onClick={() => go(page)}
-                  aria-label={`${label}: ${value}`}
-                >
-                  <span className="summary-card-top">
-                    <Icon size={17} />
-                    <ArrowUpRight size={13} />
-                  </span>
-                  <strong>{value}</strong>
-                  <span className="summary-card-label">{label}</span>
-                </button>
-              ))}
+              ].map(
+                ({ value, label, icon: Icon, page, filters, attention }) => (
+                  <button
+                    type="button"
+                    key={label}
+                    className={
+                      attention
+                        ? "assessor-summary-card needs-support"
+                        : "assessor-summary-card"
+                    }
+                    onClick={() => go(page, filters || {})}
+                    aria-label={`${label}: ${value}`}
+                  >
+                    <span className="summary-card-top">
+                      <Icon size={17} />
+                      <ArrowUpRight size={13} />
+                    </span>
+                    <strong>{value}</strong>
+                    <span className="summary-card-label">{label}</span>
+                  </button>
+                ),
+              )}
             </div>
           </>
         }
@@ -672,24 +654,30 @@ function Assessor({ s, user, go, openLearner, setModal }) {
       <SuccessAndUpdates stories={s.successStories || []} />
       <div className="role-stat-grid">
         <Kpi
+          onClick={() => go("Portfolios")}
           label="Evidence to assess"
           value={pending.length}
           detail="Submitted by your learners"
           icon={Layers}
         />
         <Kpi
+          onClick={() => go("Off-the-job learning")}
           label="Learning logs to verify"
           value={logs.length}
           detail="Approve eligible OTJ learning"
           icon={Clock}
         />
         <Kpi
+          onClick={() => go("Reviews Hub", { view: "soon" })}
           label="Reviews due soon"
           value={reviews.length}
           detail="Overdue or due within 14 days"
           icon={CalendarDays}
         />
         <Kpi
+          onClick={() =>
+            go("Action plans", { status: "Open", source: "learner" })
+          }
           label="Open learner actions"
           value={s.tasks.filter((t) => t.status === "Open").length}
           detail="Track agreed next steps"

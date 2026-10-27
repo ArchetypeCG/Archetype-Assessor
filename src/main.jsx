@@ -1,3 +1,7 @@
+import {
+  AssessorReviewWorkspace,
+  AssessorEvidenceWorkspace,
+} from "./assessor-workload.jsx";
 import { LearnerNotifications } from "./learner-notifications";
 import { alertFingerprint, alertIsCleared } from "../server/alerts.mjs";
 import { EPA_RESULTS } from "../server/epa-metrics.mjs";
@@ -167,6 +171,7 @@ function App() {
     [demo, setDemo] = useState(null),
     [page, setPage] = useState("Command centre"),
     [directoryFilter, setDirectoryFilter] = useState({}),
+    [pageFilter, setPageFilter] = useState({}),
     [learnerId, setLearnerId] = useState(""),
     [profile, setProfile] = useState(null),
     [modal, setModal] = useState(null),
@@ -260,6 +265,7 @@ function App() {
     return command(kind, payload).catch((e) => notify(e.message));
   }
   function go(p, filters = {}) {
+    setPageFilter(filters);
     setDirectoryFilter(p === "Apprentices" ? filters : {});
     setPage(p);
     setMobile(false);
@@ -291,6 +297,7 @@ function App() {
     act,
     go,
     directoryFilter,
+    pageFilter,
     openLearner,
     learnerId,
     setLearnerId,
@@ -931,13 +938,16 @@ function Learners() {
       directoryFilter,
     } = useApp(),
     [q, Q] = useState(""),
-    [status, S] = useState(""),
+    [status, S] = useState(directoryFilter.status || ""),
     [rag, R] = useState(directoryFilter.rag || ""),
-    [assessor, A] = useState(""),
-    [sort, SS] = useState("name"),
+    [assessor, A] = useState(directoryFilter.assessor || ""),
+    [sort, SS] = useState(directoryFilter.sort || "name"),
     [p, SP] = useState(1);
   useEffect(() => {
     R(directoryFilter.rag || "");
+    S(directoryFilter.status || "");
+    A(directoryFilter.assessor || "");
+    SS(directoryFilter.sort || "name");
     SP(1);
   }, [directoryFilter]);
   let ls = s.learners
@@ -945,7 +955,12 @@ function Learners() {
       (l) =>
         (!status || l.status === status) &&
         (!rag || l.rag === rag) &&
-        (!assessor || l.assessorId === assessor) &&
+        (!assessor ||
+          (assessor === "__unassigned__"
+            ? !s.users.some(
+                (u) => u.role === "Assessor" && u.id === l.assessorId,
+              )
+            : l.assessorId === assessor)) &&
         `${l.name} ${l.employer} ${l.ref}`
           .toLowerCase()
           .includes(q.toLowerCase()),
@@ -1008,9 +1023,12 @@ function Learners() {
               label: "All assessors",
               value: assessor,
               set: A,
-              options: s.users
-                .filter((u) => u.role === "Assessor")
-                .map((u) => ({ value: u.id, label: u.name })),
+              options: [
+                { value: "__unassigned__", label: "No assessor assigned" },
+                ...s.users
+                  .filter((u) => u.role === "Assessor")
+                  .map((u) => ({ value: u.id, label: u.name })),
+              ],
             },
           ]}
         >
@@ -1362,7 +1380,7 @@ function PortfolioHub() {
   const ctx = useApp();
   const { s, learnerId, user } = ctx,
     l = s.learners.find((x) => x.id === learnerId);
-  return (
+  const content = (
     <>
       <LearnerPicker />
       {l ? (
@@ -1407,6 +1425,13 @@ function PortfolioHub() {
         <Empty>Add an apprentice before opening a portfolio.</Empty>
       )}
     </>
+  );
+  return user.role === "Assessor" ? (
+    <AssessorEvidenceWorkspace context={ctx}>
+      {content}
+    </AssessorEvidenceWorkspace>
+  ) : (
+    content
   );
 }
 function Evidence({ learner }) {
@@ -1838,16 +1863,18 @@ function Alerts({ interventions = false }) {
   );
 }
 function Tasks({ learner }) {
-  const { s, user, command, notify, busy, setModal } = useApp(),
-    [filter, F] = useState("All");
-  const staffActions = learner
-    ? []
-    : (s.assessorActions || []).filter((action) =>
-        (s.assessorOneToOnes || []).some(
-          (record) =>
-            record.id === action.oneToOneId && record.status !== "Draft",
-        ),
-      );
+  const { s, user, command, notify, busy, setModal, pageFilter, go } = useApp(),
+    [filter, F] = useState(pageFilter.status || "All");
+  useEffect(() => F(pageFilter.status || "All"), [pageFilter]);
+  const staffActions =
+    learner || pageFilter.source === "learner"
+      ? []
+      : (s.assessorActions || []).filter((action) =>
+          (s.assessorOneToOnes || []).some(
+            (record) =>
+              record.id === action.oneToOneId && record.status !== "Draft",
+          ),
+        );
   const items = [...s.tasks, ...staffActions].filter(
     (x) =>
       (!learner || x.learnerId === learner.id) &&
@@ -1861,7 +1888,9 @@ function Tasks({ learner }) {
       subtitle={
         learner
           ? "Owned actions linked to each apprentice"
-          : "Learner actions and assessor development actions from 1:1s"
+          : pageFilter.source === "learner"
+            ? "Learner actions only · matching the dashboard count"
+            : "Learner actions and assessor development actions from 1:1s"
       }
       action={
         ["Manager", "Assessor"].includes(user.role) && (
@@ -1951,7 +1980,7 @@ function Tasks({ learner }) {
                           status,
                         },
                       );
-                      F("All");
+                      F(pageFilter.status || "All");
                       notify(
                         status === "Complete"
                           ? "Action marked complete."
@@ -1976,14 +2005,26 @@ function Tasks({ learner }) {
 }
 function OTJ({ learner }) {
   const { s, user, setModal, act, learnerId, setLearnerId } = useApp(),
-    [selected, SELECT] = useState(learner?.id || learnerId || ""),
+    [selected, SELECT] = useState(
+      user.role === "Assessor" && !learner
+        ? ""
+        : learner?.id || learnerId || "",
+    ),
     [showHistory, SHOWHISTORY] = useState(false),
-    [filter, F] = useState("");
+    [filter, F] = useState(
+      user.role === "Assessor" && !learner ? "Pending" : "",
+    );
   const selectedLearner =
       learner ||
       s.learners.find((l) => l.id === selected) ||
       (user.role === "Apprentice" ? s.learners[0] : null),
-    ls = selectedLearner ? [selectedLearner] : s.learners,
+    ls = selectedLearner
+      ? [selectedLearner]
+      : user.role === "Assessor"
+        ? s.learners.filter(
+            (l) => l.assessorId === user.id && l.status === "Active",
+          )
+        : s.learners,
     ids = new Set(ls.map((l) => l.id)),
     items = s.otj.filter(
       (x) =>
@@ -2004,7 +2045,11 @@ function OTJ({ learner }) {
               if (e.target.value) setLearnerId(e.target.value);
             }}
           >
-            <option value="">All apprentices</option>
+            <option value="">
+              {user.role === "Assessor"
+                ? "All active apprentices"
+                : "All apprentices"}
+            </option>
             {s.learners.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name} · {l.ref}
@@ -2151,7 +2196,8 @@ function OTJ({ learner }) {
   );
 }
 function Reviews({ learner }) {
-  const { s, user, setModal, act } = useApp(),
+  const context = useApp();
+  const { s, user, setModal, act } = context,
     items = s.reviews
       .filter((x) => !learner || x.learnerId === learner.id)
       .slice()
@@ -2169,7 +2215,7 @@ function Reviews({ learner }) {
     )
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 6);
-  return (
+  const content = (
     <Panel
       title="Progress reviews"
       subtitle="Training, support, functional skills, KSBs, SMART targets and three-party agreement"
@@ -2323,6 +2369,13 @@ function Reviews({ learner }) {
         qualified electronic signatures.
       </p>
     </Panel>
+  );
+  return user.role === "Assessor" && !learner ? (
+    <AssessorReviewWorkspace context={context}>
+      {content}
+    </AssessorReviewWorkspace>
+  ) : (
+    content
   );
 }
 function Compliance({ learner }) {

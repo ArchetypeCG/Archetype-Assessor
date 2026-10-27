@@ -72,6 +72,23 @@ Gateway/EPA highlights cover the next 60 days, ordered by recorded date. Confirm
 
 The master dashboard also shows **Overall EPA results**, with Distinction, Pass and Fail counts and percentages across all assessors. The denominator is apprentices with recorded outcomes; each apprentice counts once using their latest result, and completed/archived apprentices remain included. It calculates from the outcomes ledger rather than averaging assessor percentages. Assessor views retain their original assessor-specific attribution.
 
-The assessor welcome figures are three clickable summary cards: Your apprentices (My caseload), Average KSB progress (Progress report), and Apprentices needing support (Interventions). The support card uses an amber highlight; cards stack on phones to keep labels readable.
+The assessor welcome figures are three clickable summary cards: Your apprentices (My caseload), Average KSB progress (caseload sorted by progress), and Apprentices needing support (Red caseload filter). The support card uses an amber highlight; cards stack on phones to keep labels readable.
 
-Portfolio health on the master dashboard now uses actionable status rows rather than a chart. On track, Needs attention and Priority support open the apprentice directory prefiltered to Green, Amber or Red. View all opens the unfiltered directory; Average KSB progress opens Progress report, and View support priorities opens Interventions. The assessor blue welcome tile retains its agenda, summary cards and EPA results in a more compact layout, with smaller elements and balanced spacing.
+The assessor blue welcome tile retains its agenda, summary cards and EPA results in a more compact layout, with smaller elements and balanced spacing.
+
+### Admin dashboard layout
+
+The top blue Delivery Command Centre, its five headline figures and overall EPA results are unchanged. Below it, four operational panels replace the repeated health, programme, compliance and composite-score summaries:
+
+- **Priority queue:** the most urgent visible issue for each active apprentice; opens Reviews, Compliance, Learning plan or Gateway as appropriate. The administrator’s cleared alerts remain cleared here.
+- **Assessor delivery oversight:** active caseload ownership and work/OTJ waiting for review, with direct filters into each assessor’s active caseload. Unassigned active apprentices get a separate assignment shortcut. Inactive staff who still own active apprentices remain visible.
+- **Your delivery week:** real planned sessions/reviews in the next seven UK calendar days; opens the booking or creates a new one. Cancelled, attended, past and archived-programme sessions are excluded.
+- **Manage your provision:** direct apprentice enrolment and account creation, standards maintenance and success/update publishing. Report creation is available above these panels.
+
+Repeated counts, progress bars, programme charts and the composite health score are removed from the lower dashboard. Full analytics, alerts, compliance and reporting remain available through their dedicated pages.
+
+### Assessor counts and outstanding work
+
+The assessor day-at-a-glance counts, KPI cards and work queues use the same active-caseload/current-programme selectors. Awaiting feedback opens all submitted evidence in that scope, with individual portfolios available separately. The global OTJ tab opens all active apprentices with Pending selected, rather than silently retaining the last selected apprentice.
+
+Overdue reviews, reviews due today and reviews due within 14 days are separate filters over one next-review date per active apprentice. Reviews due within 14 days includes overdue reviews. Completed review records and calendar bookings are available in a separate disclosure, including acknowledgements; those historical records are not outstanding-review counts. Completing a review updates its learner’s next-review date, and the shared queues recalculate from saved state. The dashboard’s open learner-action card selects Open and excludes assessor development actions; ordinary Action plans navigation still includes both sources.

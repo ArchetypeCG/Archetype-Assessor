@@ -73,12 +73,17 @@ export function AssessorDay({ s, user, go, openLearner, setModal }) {
                 {day.overdueReviews}
               </b>{" "}
               overdue reviews
-              {day.reviewsToday > 0 && (
-                <small> · {day.reviewsToday} due today</small>
-              )}
             </span>
             <ArrowUpRight size={14} />
           </button>
+          {day.reviewsToday > 0 && (
+            <button onClick={() => go("Reviews Hub", { view: "today" })}>
+              <span>
+                <b>{day.reviewsToday}</b> reviews due today
+              </span>
+              <ArrowUpRight size={14} />
+            </button>
+          )}
           <button onClick={() => go("Portfolios")}>
             <span>
               <b>{day.evidence}</b> awaiting feedback
