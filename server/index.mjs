@@ -353,7 +353,11 @@ function visible(s, u) {
         )
       : [],
     epaPerformance:
-      u.role === "Assessor" ? epaPerformance(s.epaOutcomes || [], u.id) : null,
+      u.role === "Manager"
+        ? epaPerformance(s.epaOutcomes || [])
+        : u.role === "Assessor"
+          ? epaPerformance(s.epaOutcomes || [], u.id)
+          : null,
     epaOutcomes:
       u.role === "Manager"
         ? s.epaOutcomes || []

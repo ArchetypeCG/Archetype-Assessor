@@ -3797,3 +3797,29 @@ test("shared staff actions reach the apprentice alerts inbox and can be read and
     403,
   );
 });
+
+test("master dashboard exposes aggregate EPA results across the provision while assessor figures stay scoped", async () => {
+  const { epaPerformance } = await import("../server/epa-metrics.mjs");
+  const manager = await login("manager@archetype.demo");
+  let s = await state(manager);
+  const learner = s.learners.find(
+    (l) => l.standardId && l.assessorId && l.iqaId && l.employer,
+  );
+  assert.equal(
+    (
+      await command(
+        "learner.save",
+        { ...learner, epaResult: "Distinction", epaResultDate: today() },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  s = await state(manager);
+  assert.deepEqual(s.epaPerformance, epaPerformance(s.epaOutcomes));
+  assert.ok(s.epaPerformance.distinction.count >= 1);
+  assert.equal(
+    s.epaPerformance.total,
+    new Set(s.epaOutcomes.map((o) => o.learnerId)).size,
+  );
+});

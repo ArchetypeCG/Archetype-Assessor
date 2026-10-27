@@ -4,7 +4,7 @@ export function epaPerformance(outcomes = [], assessorId) {
   for (const outcome of outcomes
     .filter(
       (outcome) =>
-        outcome.assessorId === assessorId &&
+        (assessorId === undefined || outcome.assessorId === assessorId) &&
         EPA_RESULTS.slice(1).includes(outcome.result),
     )
     .slice()

@@ -1,24 +1,28 @@
 import React from "react";
 import { Trophy } from "lucide-react";
 import { epaPerformance } from "../server/epa-metrics.mjs";
-export function EpaPerformance({ performance }) {
+export function EpaPerformance({ performance, overall = false }) {
   const stats = performance || epaPerformance([], ""),
     distinction = stats.distinction.percentage,
     pass = stats.pass.percentage;
   const background = stats.total
     ? `conic-gradient(#ffda8c 0 ${distinction}%, #68e2c5 ${distinction}% ${distinction + pass}%, #ff9da9 ${distinction + pass}% 100%)`
     : "#ffffff20";
+  const title = overall
+    ? "Overall EPA results"
+    : "Your EPA performance as an assessor";
   return (
-    <section
-      className="assessor-epa-performance"
-      aria-label="Your EPA performance as an assessor"
-    >
+    <section className="assessor-epa-performance" aria-label={title}>
       <div className="epa-performance-heading">
         <span>
           <Trophy size={18} />
-          Your EPA performance as an assessor
+          {title}
         </span>
-        <small>Your apprentices’ recorded EPA results · all time</small>
+        <small>
+          {overall
+            ? "All apprentices’ recorded EPA results · all time"
+            : "Your apprentices’ recorded EPA results · all time"}
+        </small>
       </div>
       <div className="epa-performance-layout">
         <div
@@ -52,8 +56,12 @@ export function EpaPerformance({ performance }) {
       </div>
       <p>
         {stats.total
-          ? "Your performance is based on your apprentices with recorded EPA results. Percentages show the share awarded each grade. Completed and archived apprentices remain included."
-          : "Record your apprentices’ EPA results in Edit apprentice to see your performance as an assessor."}
+          ? overall
+            ? "Overall results across all assessors, based on apprentices with a recorded EPA result. Each apprentice is counted once using their latest result. Completed and archived apprentices remain included."
+            : "Your performance is based on your apprentices with recorded EPA results. Percentages show the share awarded each grade. Completed and archived apprentices remain included."
+          : overall
+            ? "Record confirmed EPA results in Edit apprentice to see overall performance across your provision."
+            : "Record your apprentices’ EPA results in Edit apprentice to see your performance as an assessor."}
       </p>
     </section>
   );

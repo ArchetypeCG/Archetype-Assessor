@@ -306,6 +306,7 @@ function Master({ s, user, go, openLearner, setModal }) {
             icon={Layers}
           />
         </div>
+        <EpaPerformance performance={s.epaPerformance} overall />
       </Hero>
       <div className="command-grid">
         <Card
@@ -596,17 +597,50 @@ function Assessor({ s, user, go, openLearner, setModal }) {
                 Learner progress reports
               </button>
             </div>
-            <div className="assessor-hero-summary">
-              <span>
-                <b>{ls.length}</b> apprentices
-              </span>
-              <span>
-                <b>{average(ls)}%</b> average coverage
-              </span>
-              <span>
-                <b>{ls.filter((l) => l.rag === "Red").length}</b> need priority
-                support
-              </span>
+            <div
+              className="assessor-summary-cards"
+              aria-label="Your caseload at a glance"
+            >
+              {[
+                {
+                  value: ls.length,
+                  label: "Your apprentices",
+                  icon: Users,
+                  page: "Apprentices",
+                },
+                {
+                  value: average(ls) + "%",
+                  label: "Average KSB progress",
+                  icon: Target,
+                  page: "Progress report",
+                },
+                {
+                  value: ls.filter((l) => l.rag === "Red").length,
+                  label: "Apprentices needing support",
+                  icon: TriangleAlert,
+                  page: "Interventions",
+                  attention: true,
+                },
+              ].map(({ value, label, icon: Icon, page, attention }) => (
+                <button
+                  type="button"
+                  key={page}
+                  className={
+                    attention
+                      ? "assessor-summary-card needs-support"
+                      : "assessor-summary-card"
+                  }
+                  onClick={() => go(page)}
+                  aria-label={`${label}: ${value}`}
+                >
+                  <span className="summary-card-top">
+                    <Icon size={17} />
+                    <ArrowUpRight size={13} />
+                  </span>
+                  <strong>{value}</strong>
+                  <span className="summary-card-label">{label}</span>
+                </button>
+              ))}
             </div>
           </>
         }

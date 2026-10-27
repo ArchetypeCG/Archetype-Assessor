@@ -84,3 +84,33 @@ test("EPA fictional examples run once and never modify real learners or create a
   assert.equal(epaPerformance(s.epaOutcomes, "a").pass.percentage, 50);
   assert.equal(seedFictionalEpa(s), null);
 });
+
+test("overall EPA results combine assessor caseloads, count each apprentice once and use latest recorded outcome", () => {
+  const outcomes = [
+    { learnerId: "one", assessorId: "a", result: "Pass", date: "2026-09-01" },
+    {
+      learnerId: "one",
+      assessorId: "b",
+      result: "Distinction",
+      date: "2026-10-01",
+    },
+    { learnerId: "two", assessorId: "a", result: "Pass", date: "2026-10-01" },
+    { learnerId: "three", assessorId: "b", result: "Fail", date: "2026-10-01" },
+    {
+      learnerId: "ungraded",
+      assessorId: "b",
+      result: "Not recorded",
+      date: "2026-10-01",
+    },
+  ];
+  const overall = epaPerformance(outcomes);
+  assert.equal(overall.total, 3);
+  for (const grade of ["distinction", "pass", "fail"]) {
+    assert.equal(overall[grade].count, 1);
+    assert.equal(overall[grade].percentage, 33.3);
+  }
+  assert.equal(epaPerformance(outcomes, "a").total, 2);
+  assert.equal(epaPerformance(outcomes, "a").pass.percentage, 100);
+  assert.equal(epaPerformance([]).total, 0);
+  assert.equal(epaPerformance([]).fail.percentage, 0);
+});

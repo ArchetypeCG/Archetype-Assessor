@@ -4680,3 +4680,14 @@ input[type="file"]::file-selector-button {
 .assessor-hero .command-hero-header .assessor-hero-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:30px;padding-top:22px}
 .assessor-hero .command-hero-header .assessor-hero-summary>span{line-height:1.6}
 .assessor-hero .command-hero-header .assessor-hero-summary b{display:block;font-size:25px;margin:0 0 4px}
+
+.assessor-summary-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:28px}
+.assessor-summary-card{min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:12px;padding:15px 13px;text-align:left;border:1px solid #ffffff2b;border-radius:15px;background:#ffffff0d;color:#fff;transition:background .15s,transform .15s}
+.assessor-summary-card:hover{background:#ffffff1c;transform:translateY(-2px)}
+.assessor-summary-card:focus-visible{outline:2px solid #ffda8c;outline-offset:4px}
+.summary-card-top{display:flex;justify-content:space-between;gap:10px;align-items:center;color:#b6e1ff}
+.assessor-summary-card strong{font-size:29px;line-height:1.1;letter-spacing:-.5px;font-weight:750}
+.summary-card-label{font-size:11px;line-height:1.6;color:#dfedff;overflow-wrap:anywhere}
+.assessor-summary-card.needs-support{background:#fbbf2412;border-color:#fbbf2452}
+.assessor-summary-card.needs-support .summary-card-top,.assessor-summary-card.needs-support strong{color:#ffda8c}
+@media(max-width:500px){.assessor-summary-cards{grid-template-columns:minmax(0,1fr);gap:9px;margin-top:23px}.assessor-summary-card{display:grid;grid-template-columns:25px 58px minmax(0,1fr);align-items:center;gap:13px;padding:15px}.summary-card-top>svg:last-child{display:none}.assessor-summary-card strong{font-size:27px}.summary-card-label{font-size:12px}}
