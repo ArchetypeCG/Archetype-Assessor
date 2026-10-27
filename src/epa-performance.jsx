@@ -9,13 +9,16 @@ export function EpaPerformance({ performance }) {
     ? `conic-gradient(#ffda8c 0 ${distinction}%, #68e2c5 ${distinction}% ${distinction + pass}%, #ff9da9 ${distinction + pass}% 100%)`
     : "#ffffff20";
   return (
-    <section className="assessor-epa-performance" aria-label="EPA performance">
+    <section
+      className="assessor-epa-performance"
+      aria-label="Your EPA performance as an assessor"
+    >
       <div className="epa-performance-heading">
         <span>
           <Trophy size={18} />
-          EPA performance
+          Your EPA performance as an assessor
         </span>
-        <small>Recorded learner results · all time</small>
+        <small>Your apprentices’ recorded EPA results · all time</small>
       </div>
       <div className="epa-performance-layout">
         <div
@@ -41,7 +44,7 @@ export function EpaPerformance({ performance }) {
               </span>
               <strong>{stats[key].percentage}%</strong>
               <small>
-                {stats[key].count} learner{stats[key].count === 1 ? "" : "s"}
+                {stats[key].count} apprentice{stats[key].count === 1 ? "" : "s"}
               </small>
             </div>
           ))}
@@ -49,8 +52,8 @@ export function EpaPerformance({ performance }) {
       </div>
       <p>
         {stats.total
-          ? "Percentages use learners with a recorded EPA result. Completed and archived learners remain included."
-          : "Record an EPA result in Edit apprentice to start building your performance picture."}
+          ? "Your performance is based on your apprentices with recorded EPA results. Percentages show the share awarded each grade. Completed and archived apprentices remain included."
+          : "Record your apprentices’ EPA results in Edit apprentice to see your performance as an assessor."}
       </p>
     </section>
   );
