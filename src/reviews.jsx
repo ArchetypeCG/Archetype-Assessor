@@ -73,14 +73,6 @@ function Section({ number, title, children }) {
   );
 }
 function ReviewForm({ s, user, learner, modal, command, setModal, busy }) {
-  const defaultOwner =
-    s.users.find(
-      (account) =>
-        account.role === "Apprentice" &&
-        learner.participantIds?.includes(account.id),
-    )?.id ||
-    learner.assessorId ||
-    user.id;
   const [checks, C] = useState({}),
     [error, E] = useState("");
   const [targets, T] = useState(() =>
@@ -90,7 +82,6 @@ function ReviewForm({ s, user, learner, modal, command, setModal, busy }) {
         what: "",
         how: "",
         why: "",
-        owner: defaultOwner,
         due: "",
       }),
     ),
@@ -113,10 +104,6 @@ function ReviewForm({ s, user, learner, modal, command, setModal, busy }) {
     );
   const standard = s.standards.find((st) => st.id === learner.standardId),
     assessor = s.users.find((u) => u.id === learner.assessorId);
-  const owners = s.users.filter(
-    (account) =>
-      account.active !== false && learner.participantIds?.includes(account.id),
-  );
   function targetChange(index, key, value) {
     T((items) =>
       items.map((t, i) => (i === index ? { ...t, [key]: value } : t)),
@@ -454,9 +441,10 @@ function ReviewForm({ s, user, learner, modal, command, setModal, busy }) {
         </Section>
         <Section number="10" title="Targets for the next review">
           <p className="wide body-copy">
-            Agree a goal, how it will be completed, an owner and a deadline.
-            Every target is added to the action plan and learning plan. Target 3
-            covers off-the-job learning.
+            Agree a goal, how it will be completed and a deadline. Targets
+            belong to the apprentice. Completing this review automatically adds
+            every target to the apprentice’s action plan and learning plan.
+            Target 3 covers off-the-job learning.
           </p>
           {targets.map((target, index) => (
             <div className="review-target wide" key={index}>
@@ -484,15 +472,6 @@ function ReviewForm({ s, user, learner, modal, command, setModal, busy }) {
                   onChange={(e) =>
                     targetChange(index, "category", e.target.value)
                   }
-                />
-                <Input
-                  label={"Target " + (index + 1) + " owner"}
-                  options={owners.map((u) => ({
-                    value: u.id,
-                    label: u.name + " · " + u.role,
-                  }))}
-                  value={target.owner}
-                  onChange={(e) => targetChange(index, "owner", e.target.value)}
                 />
                 <Input
                   label={"Target " + (index + 1) + ": Goal"}
@@ -546,7 +525,6 @@ function ReviewForm({ s, user, learner, modal, command, setModal, busy }) {
                   what: "",
                   how: "",
                   why: "",
-                  owner: defaultOwner,
                   due: "",
                 },
               ])
@@ -807,8 +785,7 @@ export function ReviewDetails({ review: r }) {
               {index + 1}. {target.what}
             </strong>
             <p>
-              {target.category} · Owner: {target.ownerName} · Due:{" "}
-              {fmt(target.due)}
+              {target.category} · Due: {fmt(target.due)}
             </p>
             {entry("Steps and evidence", target.how)}
             {target.why && entry("Purpose", target.why)}

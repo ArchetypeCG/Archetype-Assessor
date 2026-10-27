@@ -1,3 +1,4 @@
+import { EpaPerformance } from "./epa-performance";
 import { SuccessAndUpdates } from "./staff-development";
 import { LearnerAvatar } from "./learner-photo";
 import React from "react";
@@ -583,6 +584,7 @@ function Assessor({ s, user, go, openLearner, setModal }) {
             support
           </span>
         </div>
+        <EpaPerformance performance={s.epaPerformance} />
       </Hero>
       <SuccessAndUpdates stories={s.successStories || []} />
       <div className="role-stat-grid">

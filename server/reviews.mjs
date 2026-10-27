@@ -121,14 +121,12 @@ export function normalizeReview(
       "Record 2–20 SMART targets, including programme and off-the-job learning targets.",
     );
   result.targets = source.targets.map((target) => {
-    const owner = s.users.find(
+    const apprenticeAccount = s.users.find(
       (account) =>
-        account.id === target.owner && account.active && canSee(account, l),
+        account.role === "Apprentice" &&
+        account.active &&
+        account.learnerId === l.id,
     );
-    if (!owner)
-      fail(
-        "Each SMART target needs an active owner with access to this apprentice.",
-      );
     const due = date(target.due, "SMART target due date", true);
     if (due <= p.date || due > p.nextDate)
       fail(
@@ -148,8 +146,9 @@ export function normalizeReview(
         target.hours === undefined || target.hours === ""
           ? 0
           : number(target.hours, "Planned OTJ hours", 0, 1000),
-      owner: owner.id,
-      ownerName: owner.name,
+      owner: apprenticeAccount?.id || "",
+      ownerLearnerId: l.id,
+      ownerName: l.name,
       due,
     };
   });

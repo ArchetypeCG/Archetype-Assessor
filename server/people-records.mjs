@@ -20,6 +20,12 @@ export function saveLearnerSupport({
   const fields = [
     "address",
     "dateOfBirth",
+    "telephone",
+    "emergencyContactName",
+    "emergencyContactRelationship",
+    "emergencyContactTelephone",
+    "emergencyContactAlternativeTelephone",
+    "emergencyContactEmail",
     "alsStatus",
     "alsDetails",
     "reasonableAdjustments",
@@ -44,6 +50,21 @@ export function saveLearnerSupport({
     if (record.dateOfBirth > today())
       fail("Date of birth cannot be in the future.");
   }
+  for (const [field, max] of [
+    ["telephone", 80],
+    ["emergencyContactName", 160],
+    ["emergencyContactRelationship", 100],
+    ["emergencyContactTelephone", 80],
+    ["emergencyContactAlternativeTelephone", 80],
+    ["emergencyContactEmail", 254],
+  ]) {
+    if (Object.hasOwn(p, field)) record[field] = optional(p[field], max);
+  }
+  if (
+    record.emergencyContactEmail &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(record.emergencyContactEmail)
+  )
+    fail("Enter a valid emergency contact email address.");
   if (Object.hasOwn(p, "alsStatus"))
     record.alsStatus = choice(
       p.alsStatus || "Not recorded",

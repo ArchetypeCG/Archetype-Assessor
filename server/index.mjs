@@ -1,3 +1,7 @@
+import { createLearnerNotifications } from "./learner-notifications.mjs";
+import { alertFingerprint } from "./alerts.mjs";
+import { epaPerformance, EPA_RESULTS } from "./epa-metrics.mjs";
+import { saveEpaOutcome, seedFictionalEpa } from "./epa-results.mjs";
 import {
   peopleTables,
   peopleCommand,
@@ -104,6 +108,8 @@ const get = () =>
     s.successStories ||= [];
     s.cpdRecords ||= [];
     s.assessorActions ||= [];
+    s.epaOutcomes ||= [];
+    s.alertDismissals ||= [];
     return s;
   })();
 const put = (s) =>
@@ -275,6 +281,17 @@ if (!demo) {
     throw error;
   }
 }
+if (!demo) {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const s = get();
+    if (seedFictionalEpa(s)) put(s);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
 function fail(message, status = 400) {
   const e = Error(message);
   e.status = status;
@@ -328,6 +345,23 @@ function visible(s, u) {
     audit: staff.includes(u.role)
       ? s.audit.filter((x) => u.role === "Manager" || ids.has(x.learnerId))
       : [],
+    notifications: learnerNotifications.list(s, u),
+    alertDismissals: editors.includes(u.role)
+      ? (s.alertDismissals || []).filter(
+          (dismissal) =>
+            dismissal.userId === u.id && ids.has(dismissal.learnerId),
+        )
+      : [],
+    epaPerformance:
+      u.role === "Assessor" ? epaPerformance(s.epaOutcomes || [], u.id) : null,
+    epaOutcomes:
+      u.role === "Manager"
+        ? s.epaOutcomes || []
+        : u.role === "Assessor"
+          ? (s.epaOutcomes || []).filter((outcome) =>
+              ids.has(outcome.learnerId),
+            )
+          : [],
     learnerSupportRecords: editors.includes(u.role)
       ? (s.learnerSupportRecords || []).filter((r) => ids.has(r.learnerId))
       : [],
@@ -511,6 +545,14 @@ function normalizeLearner(p, s, old) {
         : p.mathsUpskill === true,
     englishNotRequired: old?.englishNotRequired || false,
     mathsNotRequired: old?.mathsNotRequired || false,
+    epaResult:
+      p.epaResult === undefined
+        ? old?.epaResult || "Not recorded"
+        : choice(p.epaResult, EPA_RESULTS, "EPA result"),
+    epaResultDate:
+      p.epaResultDate === undefined
+        ? old?.epaResultDate || ""
+        : date(p.epaResultDate, "EPA result date"),
     gatewayDate: old?.gatewayDate || "",
     epaDate: date(p.epaDate, "EPA date"),
     gatewayStatus: old?.gatewayStatus || "Not ready",
@@ -544,6 +586,7 @@ const outlook = createOutlook({
   get,
   origin: origins.primary || (demo ? `http://127.0.0.1:${PORT}` : undefined),
 });
+const learnerNotifications = createLearnerNotifications({ db, canSee });
 const mail = createMailService({ db, get, password, canSee });
 const integrity = createIntegrityService({
   db,
@@ -623,6 +666,57 @@ function command(s, u, kind, p) {
   });
   if (peopleResult !== null) return peopleResult;
   switch (kind) {
+    case "notification.read":
+    case "notifications.readAll":
+    case "notification.unread":
+    case "notification.clear":
+    case "notification.restore":
+      return learnerNotifications.update(s, u, kind, p);
+    case "alert.dismiss":
+    case "alerts.dismiss":
+    case "alert.restore": {
+      requireRole(u, editors);
+      const items =
+        kind === "alerts.dismiss"
+          ? p.items
+          : [{ learnerId: p.learnerId, key: p.key }];
+      if (!Array.isArray(items) || !items.length || items.length > 2000)
+        fail("Select 1–2,000 alerts.");
+      s.alertDismissals ||= [];
+      for (const item of items) {
+        const learner = derive(learnerFor(s, u, item.learnerId), s);
+        if (
+          typeof item.key !== "string" ||
+          !learner.exceptions.some(
+            (exception) => alertFingerprint(learner, exception) === item.key,
+          )
+        )
+          fail("This alert changed. Refresh the list and try again.", 409);
+        const exists = s.alertDismissals.some(
+          (dismissal) =>
+            dismissal.userId === u.id &&
+            dismissal.learnerId === learner.id &&
+            dismissal.key === item.key,
+        );
+        if (kind === "alert.restore")
+          s.alertDismissals = s.alertDismissals.filter(
+            (dismissal) =>
+              !(
+                dismissal.userId === u.id &&
+                dismissal.learnerId === learner.id &&
+                dismissal.key === item.key
+              ),
+          );
+        else if (!exists)
+          s.alertDismissals.push({
+            userId: u.id,
+            learnerId: learner.id,
+            key: item.key,
+            clearedAt: new Date().toISOString(),
+          });
+      }
+      return { count: items.length };
+    }
     case "calendar.subscribe": {
       return calendarSubscriptions.create(u);
     }
@@ -750,6 +844,7 @@ function command(s, u, kind, p) {
       if (u.role === "Assessor" && item.assessorId !== u.id)
         fail("Assessors can only create or retain their own caseload.", 403);
       setReviewSeries(s, item, old, p, u, { date, fail });
+      saveEpaOutcome({ s, u, p, learner: item, fail });
       saveLearnerSupport({
         s,
         u,
@@ -852,6 +947,8 @@ function command(s, u, kind, p) {
       l.gatewayStatus = "Not ready";
       l.gatewayDate = "";
       l.epaDate = "";
+      l.epaResult = "Not recorded";
+      l.epaResultDate = "";
       l.gatewayNotes = "";
       l.gatewayBy = "";
       if (l.initialReviewDate) syncReviewSeries(s, l);
@@ -1090,6 +1187,7 @@ function command(s, u, kind, p) {
       x.status = choice(p.status, ["Approved", "Returned"], "decision");
       x.feedback = optional(p.feedback);
       x.reviewedBy = u.id;
+      x.reviewedAt = new Date().toISOString();
       break;
     }
     case "review.add": {
@@ -1118,7 +1216,7 @@ function command(s, u, kind, p) {
         actions: template.targets
           .map(
             (t) =>
-              `${t.category}: ${t.what}\nSteps: ${t.how}${t.why ? `\nPurpose: ${t.why}` : ""}\nOwner: ${t.ownerName} · Due: ${t.due}`,
+              `${t.category}: ${t.what}\nSteps: ${t.how}${t.why ? `\nPurpose: ${t.why}` : ""}\nDue: ${t.due}`,
           )
           .join("\n\n"),
         by: u.id,
@@ -1177,6 +1275,8 @@ function command(s, u, kind, p) {
           title: t.what,
           description: t.how + (t.why ? `\nPurpose: ${t.why}` : ""),
           owner: t.owner,
+          ownerLearnerId: t.ownerLearnerId,
+          ownerName: t.ownerName,
           due: t.due,
           status: "Open",
           by: u.id,
@@ -1250,7 +1350,9 @@ function command(s, u, kind, p) {
       const t = s.tasks.find((x) => x.id === p.id);
       if (!t) fail("Action not found.", 404);
       learnerFor(s, u, t.learnerId);
-      if (!editors.includes(u.role) && t.owner !== u.id)
+      const apprenticeOwner =
+        u.role === "Apprentice" && t.ownerLearnerId === u.learnerId;
+      if (!editors.includes(u.role) && t.owner !== u.id && !apprenticeOwner)
         fail("Only the owner or assessor can update an action.", 403);
       const status =
         kind === "task.setStatus"
@@ -1260,6 +1362,7 @@ function command(s, u, kind, p) {
             : "Complete";
       if (t.status !== status) {
         t.status = status;
+        t.updated = new Date().toISOString();
         if (status === "Complete") {
           t.completedAt = new Date().toISOString();
           t.completedBy = u.id;
@@ -1387,11 +1490,66 @@ function command(s, u, kind, p) {
         fail("Use a unique valid email.");
       const role = choice(p.role, roles, "role");
       const pw = validateNewPassword(p.password);
-      if (
-        role === "Apprentice" &&
-        !s.learners.some((l) => l.id === p.learnerId)
-      )
-        fail("Link the apprentice to a learner.");
+      let accountLearnerId = p.learnerId || "";
+      if (role === "Apprentice") {
+        if (!accountLearnerId) {
+          const matches = s.learners.filter(
+            (learner) =>
+              learner.email && learner.email.trim().toLowerCase() === email,
+          );
+          if (matches.length > 1)
+            fail(
+              "More than one learner record uses this email. Select the existing apprentice profile.",
+            );
+          if (matches.length === 1) accountLearnerId = matches[0].id;
+        }
+        if (
+          accountLearnerId &&
+          !s.learners.some((l) => l.id === accountLearnerId)
+        )
+          fail("Apprentice not found.");
+        if (
+          accountLearnerId &&
+          s.users.some(
+            (account) =>
+              account.role === "Apprentice" &&
+              account.learnerId === accountLearnerId,
+          )
+        )
+          fail(
+            "This apprentice already has an account. Edit that account instead.",
+          );
+        if (!accountLearnerId) {
+          accountLearnerId = id();
+          s.learners.push({
+            id: accountLearnerId,
+            ref: "APP-" + accountLearnerId,
+            name: text(p.name, "Name", 160),
+            email,
+            employer: "",
+            standardId: "",
+            level: "",
+            assessorId: "",
+            iqaId: "",
+            status: "Paused",
+            target: 0,
+            otjTarget: 0,
+            startDate: "",
+            plannedEnd: "",
+            predictedEnd: "",
+            lastReview: "",
+            nextReview: "",
+            eliDue: "",
+            riskDue: "",
+            employerDue: "",
+            english: "Pending",
+            maths: "Pending",
+            gatewayStatus: "Not ready",
+            notes: "",
+            enrolmentPending: true,
+          });
+        }
+      }
       if (
         role === "Employer" &&
         !s.learners.some((l) => l.employer === p.employer)
@@ -1403,7 +1561,7 @@ function command(s, u, kind, p) {
         email,
         role,
         active: true,
-        ...(role === "Apprentice" ? { learnerId: p.learnerId } : {}),
+        ...(role === "Apprentice" ? { learnerId: accountLearnerId } : {}),
         ...(role === "Employer" ? { employer: p.employer } : {}),
       };
       s.users.push(user);
@@ -1416,6 +1574,22 @@ function command(s, u, kind, p) {
       const account = s.users.find((x) => x.id === p.id);
       if (!account) fail("Account not found.", 404);
       const role = choice(p.role, roles, "role");
+      if (
+        role === "Apprentice" &&
+        !p.learnerId &&
+        account.role === "Apprentice"
+      )
+        p.learnerId = account.learnerId;
+      if (
+        role === "Apprentice" &&
+        s.users.some(
+          (other) =>
+            other.id !== account.id &&
+            other.role === "Apprentice" &&
+            other.learnerId === p.learnerId,
+        )
+      )
+        fail("This apprentice already has an account.");
       const email = text(p.email, "Email", 200).toLowerCase();
       if (
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
@@ -1577,6 +1751,8 @@ function command(s, u, kind, p) {
           successStories: [],
           cpdRecords: [],
           assessorActions: [],
+          epaOutcomes: [],
+          alertDismissals: [],
           ...JSON.parse(JSON.stringify(snap.data)),
         },
         {
@@ -2147,7 +2323,20 @@ const server = http.createServer(async (req, res) => {
             );
           const actor = current.users.find((x) => x.id === u.id && x.active);
           if (!actor) fail("Please sign in.", 401);
+          const notificationBefore = learnerNotifications.before(
+            current,
+            p.kind,
+            p.payload || {},
+          );
           const result = command(current, actor, p.kind, p.payload || {});
+          learnerNotifications.publish(
+            current,
+            actor,
+            p.kind,
+            p.payload || {},
+            result,
+            notificationBefore,
+          );
           const s = current;
           s.audit.unshift({
             id: id(),

@@ -13,7 +13,10 @@ export function urgentItems(s, u, canSee, day = today()) {
       t.status === "Open" &&
       t.due &&
       t.due <= day &&
-      (!t.owner || t.owner === u.id || u.role === "Manager"),
+      (t.ownerLearnerId
+        ? u.role === "Manager" ||
+          (u.role === "Apprentice" && u.learnerId === t.ownerLearnerId)
+        : !t.owner || t.owner === u.id || u.role === "Manager"),
   ))
     items.push(
       `Action: ${t.title || t.text || "Outstanding task"} (due ${t.due})`,

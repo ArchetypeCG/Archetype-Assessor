@@ -1,3 +1,6 @@
+import { LearnerNotifications } from "./learner-notifications";
+import { alertFingerprint, alertIsCleared } from "../server/alerts.mjs";
+import { EPA_RESULTS } from "../server/epa-metrics.mjs";
 import { CPDLog } from "./cpd-log";
 import { Trophy } from "lucide-react";
 import { AssessorOneToOnes, SpotlightEditor } from "./staff-development";
@@ -341,6 +344,7 @@ function App() {
     user.role === "Apprentice"
       ? [
           "Command centre",
+          "Alerts",
           "Portfolios",
           "Progress report",
           "Learning plan",
@@ -356,6 +360,7 @@ function App() {
       : user.role === "Employer"
         ? [
             "Command centre",
+            "Alerts",
             "Apprentices",
             "Progress report",
             "Learning plan",
@@ -399,7 +404,14 @@ function App() {
                 "Audit & quality",
               ]
             : null;
-  const priority = state.learners.flatMap((l) => l.exceptions).length;
+  const priority = restricted
+    ? (state.notifications || []).filter((n) => !n.readAt && !n.clearedAt)
+        .length
+    : state.learners.flatMap((learner) =>
+        learner.exceptions.filter(
+          (exception) => !alertIsCleared(state, learner, exception),
+        ),
+      ).length;
   return (
     <Context.Provider value={ctx}>
       <div className="app-shell">
@@ -805,6 +817,11 @@ function Page({ page }) {
     case "Apprentices":
       return <Learners />;
     case "Alerts":
+      return ["Apprentice", "Employer"].includes(pageContext.user.role) ? (
+        <LearnerNotifications context={pageContext} />
+      ) : (
+        <Alerts />
+      );
     case "Interventions":
       return <Alerts interventions={page === "Interventions"} />;
     case "Action plans":
@@ -1609,16 +1626,19 @@ function Coverage({ learner }) {
   );
 }
 function Alerts({ interventions = false }) {
-  const { s, openLearner, setModal, user } = useApp(),
+  const { s, openLearner, setModal, user, command, busy, notify } = useApp(),
     [severity, S] = useState(""),
-    [type, T] = useState("");
+    [type, T] = useState(""),
+    [showCleared, SHOW_CLEARED] = useState(false);
   const alerts = s.learners
     .flatMap((l) =>
       l.exceptions.map((e, i) => ({ ...e, id: l.id + "-" + i, l })),
     )
     .filter(
       (e) =>
-        (!severity || e.severity === severity) && (!type || e.type === type),
+        (!severity || e.severity === severity) &&
+        (!type || e.type === type) &&
+        (showCleared ? alertIsCleared(s, e.l, e) : !alertIsCleared(s, e.l, e)),
     );
   return (
     <>
@@ -1643,8 +1663,14 @@ function Alerts({ interventions = false }) {
         />
       </div>
       <Panel
-        title={interventions ? "Intervention cohorts" : "Delivery alerts"}
-        subtitle="Calculated from the current learner records; resolve the underlying issue to clear an alert"
+        title={
+          showCleared
+            ? "Cleared alerts"
+            : interventions
+              ? "Intervention cohorts"
+              : "Delivery alerts"
+        }
+        subtitle="Clear alerts for your account without changing learner records or risk ratings. Changed issues appear as new alerts."
         action={
           <Button
             secondary
@@ -1670,6 +1696,37 @@ function Alerts({ interventions = false }) {
         }
       >
         <div className="filterbar">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={showCleared}
+              onChange={(event) => SHOW_CLEARED(event.target.checked)}
+            />
+            Show cleared alerts
+          </label>
+          {!showCleared &&
+            alerts.length > 0 &&
+            ["Manager", "Assessor"].includes(user.role) && (
+              <Button
+                secondary
+                disabled={busy}
+                onClick={async () => {
+                  try {
+                    await command("alerts.dismiss", {
+                      items: alerts.map((exception) => ({
+                        learnerId: exception.l.id,
+                        key: alertFingerprint(exception.l, exception),
+                      })),
+                    });
+                    notify("Listed alerts cleared");
+                  } catch (error) {
+                    notify(error.message);
+                  }
+                }}
+              >
+                Clear listed alerts
+              </Button>
+            )}
           <select
             aria-label="Alert severity"
             value={severity}
@@ -1715,6 +1772,29 @@ function Alerts({ interventions = false }) {
               <td>{fmt(e.date)}</td>
               <td>{nameOf(s, e.l.assessorId)}</td>
               <td>
+                {["Manager", "Assessor"].includes(user.role) && (
+                  <button
+                    type="button"
+                    className="text-link clear-alert-button"
+                    disabled={busy}
+                    aria-label={`${showCleared ? "Restore alert" : "Clear alert"}: ${e.l.name} · ${e.text}`}
+                    onClick={async () => {
+                      try {
+                        await command(
+                          showCleared ? "alert.restore" : "alert.dismiss",
+                          { learnerId: e.l.id, key: alertFingerprint(e.l, e) },
+                        );
+                        notify(
+                          showCleared ? "Alert restored" : "Alert cleared",
+                        );
+                      } catch (error) {
+                        notify(error.message);
+                      }
+                    }}
+                  >
+                    {showCleared ? "Restore alert" : "Clear alert"}
+                  </button>
+                )}
                 {["Manager", "Assessor"].includes(user.role) ? (
                   <button
                     className="text-link"
@@ -1812,7 +1892,14 @@ function Tasks({ learner }) {
                 t.learnerName || "Assessor development"
               )}
             </td>
-            <td>{nameOf(s, t.owner)}</td>
+            <td>
+              {t.ownerLearnerId
+                ? s.learners.find((learner) => learner.id === t.ownerLearnerId)
+                    ?.name ||
+                  t.ownerName ||
+                  "Apprentice"
+                : nameOf(s, t.owner)}
+            </td>
             <td
               className={
                 t.status === "Open" && t.due < localDate() ? "danger-text" : ""
@@ -1825,7 +1912,9 @@ function Tasks({ learner }) {
             </td>
             <td>
               {(["Manager", "Assessor"].includes(user.role) ||
-                t.owner === user.id) && (
+                t.owner === user.id ||
+                (user.role === "Apprentice" &&
+                  t.ownerLearnerId === user.learnerId)) && (
                 <button
                   className="text-link"
                   disabled={busy}
@@ -3840,6 +3929,8 @@ function ModalHost() {
     [error, E] = useState(""),
     [pending, P] = useState(false),
     [learnerEditTab, LEARNER_TAB] = useState("Programme"),
+    [accountRole, ACCOUNT_ROLE] = useState(modal.item?.role || "Assessor"),
+    [useExistingProfile, USE_EXISTING_PROFILE] = useState(false),
     [criteria, C] = useState(modal.item?.criteria || []),
     [raw, RAW] = useState(
       modal.type === "standard"
@@ -4417,6 +4508,35 @@ function ModalHost() {
                       defaultValue={item?.[k]}
                     />
                   ))}
+                  <section className="wide epa-result-fields">
+                    <h3>End-point assessment result</h3>
+                    <p>
+                      Record the confirmed EPA result before closing or
+                      archiving the apprentice. The result updates the
+                      assessor’s performance percentages.
+                    </p>
+                    <div className="form-grid">
+                      <Field
+                        label="EPA result"
+                        name="epaResult"
+                        type="select"
+                        options={EPA_RESULTS}
+                        defaultValue={item?.epaResult || "Not recorded"}
+                      />
+                      <Field
+                        label="EPA result date"
+                        name="epaResultDate"
+                        type="date"
+                        max={localDate()}
+                        defaultValue={item?.epaResultDate || ""}
+                      />
+                    </div>
+                    <p className="caption">
+                      If no result date is entered, today’s date is used.
+                      Percentages include recorded Distinction, Pass and Fail
+                      results.
+                    </p>
+                  </section>
                   <label className="checkbox-label">
                     <input
                       type="checkbox"
@@ -5114,6 +5234,7 @@ function ModalHost() {
                   name="role"
                   type="select"
                   defaultValue={item?.role || "Assessor"}
+                  onChange={(event) => ACCOUNT_ROLE(event.target.value)}
                   options={[
                     "Manager",
                     "Assessor",
@@ -5132,24 +5253,58 @@ function ModalHost() {
                     required
                   />
                 )}
-                <Field
-                  label="Linked apprentice (apprentice role only)"
-                  name="learnerId"
-                  defaultValue={item?.learnerId}
-                  type="select"
-                  options={[{ value: "", label: "Not linked" }, ...learners]}
-                />
-                <Field
-                  label="Employer organisation (employer role only)"
-                  name="employer"
-                  defaultValue={item?.employer}
-                  type="select"
-                  options={[
-                    { value: "", label: "Not linked" },
-                    ...[...new Set(s.learners.map((l) => l.employer))],
-                  ]}
-                />
-                {item && (
+                {accountRole === "Apprentice" &&
+                  (!item || item.role !== "Apprentice") && (
+                    <label className="wide">
+                      <input
+                        type="checkbox"
+                        checked={useExistingProfile}
+                        onChange={(event) =>
+                          USE_EXISTING_PROFILE(event.target.checked)
+                        }
+                      />{" "}
+                      This apprentice already has a learner record
+                    </label>
+                  )}
+                {accountRole === "Apprentice" &&
+                  useExistingProfile &&
+                  (!item || item.role !== "Apprentice") && (
+                    <Field
+                      label="Existing apprentice profile (optional)"
+                      name="learnerId"
+                      defaultValue={item?.learnerId}
+                      type="select"
+                      options={[
+                        {
+                          value: "",
+                          label:
+                            "Create their own apprentice profile automatically",
+                        },
+                        ...learners,
+                      ]}
+                    />
+                  )}
+                {accountRole === "Apprentice" && (
+                  <p className="caption wide">
+                    New apprentice accounts get their own profile automatically.
+                    Complete their programme, employer and caseload details in
+                    Edit apprentice. Use an existing profile only if their
+                    learner record is already in the system.
+                  </p>
+                )}
+                {accountRole === "Employer" && (
+                  <Field
+                    label="Employer organisation (employer role only)"
+                    name="employer"
+                    defaultValue={item?.employer}
+                    type="select"
+                    options={[
+                      { value: "", label: "Not linked" },
+                      ...[...new Set(s.learners.map((l) => l.employer))],
+                    ]}
+                  />
+                )}
+                {item && ["Assessor", "IQA"].includes(accountRole) && (
                   <fieldset className="wide">
                     <legend>Assessor / IQA caseload</legend>
                     <p>

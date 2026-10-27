@@ -32,6 +32,63 @@ export function LearnerSupportFields({ record = {} }) {
         />
       </label>
       <label>
+        Telephone number
+        <input
+          type="tel"
+          name="telephone"
+          maxLength={80}
+          autoComplete="tel"
+          defaultValue={record.telephone || ""}
+        />
+      </label>
+      <h3 className="wide personal-details-subheading">Emergency contact</h3>
+      <label>
+        Emergency contact name
+        <input
+          name="emergencyContactName"
+          maxLength={160}
+          defaultValue={record.emergencyContactName || ""}
+        />
+      </label>
+      <label>
+        Relationship to apprentice
+        <input
+          name="emergencyContactRelationship"
+          maxLength={100}
+          defaultValue={record.emergencyContactRelationship || ""}
+        />
+      </label>
+      <label>
+        Emergency contact telephone
+        <input
+          type="tel"
+          name="emergencyContactTelephone"
+          maxLength={80}
+          defaultValue={record.emergencyContactTelephone || ""}
+        />
+      </label>
+      <label>
+        Emergency contact alternative telephone
+        <input
+          type="tel"
+          name="emergencyContactAlternativeTelephone"
+          maxLength={80}
+          defaultValue={record.emergencyContactAlternativeTelephone || ""}
+        />
+      </label>
+      <label className="wide">
+        Emergency contact email (optional)
+        <input
+          type="email"
+          name="emergencyContactEmail"
+          maxLength={254}
+          defaultValue={record.emergencyContactEmail || ""}
+        />
+      </label>
+      <h3 className="wide personal-details-subheading">
+        Additional learning support
+      </h3>
+      <label>
         Additional learning support status
         <select
           name="alsStatus"

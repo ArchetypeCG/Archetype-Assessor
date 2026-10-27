@@ -1049,7 +1049,10 @@ test("complete review snapshots programme context, creates owned SMART actions, 
   assert(
     tasks.every(
       (t) =>
-        t.owner === l.assessorId && t.due === nextDate && t.status === "Open",
+        t.ownerLearnerId === l.id &&
+        t.ownerName === l.name &&
+        t.due === nextDate &&
+        t.status === "Open",
     ),
   );
   assert.equal(
@@ -1081,7 +1084,7 @@ test("complete review snapshots programme context, creates owned SMART actions, 
   assert.equal(signature.role, "Assessor");
   assert.equal(signature.name, s.users.find((u) => u.id === l.assessorId).name);
 });
-test("review completion rejects missing coverage, unexplained concerns, invalid owners and targets outside the review period atomically", async () => {
+test("review completion rejects missing coverage, unexplained concerns, targets outside the review period atomically", async () => {
   const l = (await state()).learners[0],
     day = today(),
     next = new Date(Date.now() + 28 * 86400000).toISOString().slice(0, 10),
@@ -1096,9 +1099,6 @@ test("review completion rejects missing coverage, unexplained concerns, invalid 
   const dates = structuredClone(valid);
   dates.template.targets[0].due = day;
   assert.equal((await command("review.add", dates)).status, 400);
-  const owner = structuredClone(valid);
-  owner.template.targets[0].owner = "missing-user";
-  assert.equal((await command("review.add", owner)).status, 400);
   const category = structuredClone(valid);
   category.template.targets[1].category = "Maths";
   assert.equal((await command("review.add", category)).status, 400);
@@ -2386,6 +2386,12 @@ test("personal and ALS records and supporting documents are private to the manag
     assessorId: s.users.find((u) => u.active && u.role === "Assessor").id,
     iqaId: s.users.find((u) => u.active && u.role === "IQA").id,
     address: "PRIVATE ADDRESS 42 Example Lane",
+    telephone: "07700 900123",
+    emergencyContactName: "Fictional Contact",
+    emergencyContactRelationship: "Parent",
+    emergencyContactTelephone: "+44 7700 900456",
+    emergencyContactAlternativeTelephone: "07700 900789",
+    emergencyContactEmail: "contact@example.test",
     dateOfBirth: "2001-04-14",
     alsStatus: "Support in place",
     alsDetails: "PRIVATE ALS assessment",
@@ -2403,6 +2409,15 @@ test("personal and ALS records and supporting documents are private to the manag
   s = await state(manager);
   const support = s.learnerSupportRecords.find((r) => r.learnerId === l.id);
   assert.equal(support.address, payload.address);
+  for (const field of [
+    "telephone",
+    "emergencyContactName",
+    "emergencyContactRelationship",
+    "emergencyContactTelephone",
+    "emergencyContactAlternativeTelephone",
+    "emergencyContactEmail",
+  ])
+    assert.equal(support[field], payload[field]);
   assert.equal(support.dateOfBirth, payload.dateOfBirth);
   assert.equal(support.documents.length, 1);
   const path = "/api/learner-documents/" + support.documents[0].id;
@@ -3472,4 +3487,313 @@ test("CPD evidence and assessor 1:1 actions remain stored after restart with the
   assert.equal(visible.cpdRecords.length, 0);
   assert.equal(visible.assessorActions.length, 0);
   assert.equal(visible.assessorOneToOnes.length, 0);
+});
+
+test("completed review targets always belong to the apprentice and create linked learning activities even before a learner account exists", async () => {
+  const manager = await login("manager@archetype.demo");
+  let s = await state(manager);
+  const linked = s.users.find(
+      (u) => u.active && u.role === "Apprentice" && u.learnerId,
+    ),
+    l = s.learners.find((l) => l.id === linked.learnerId);
+  assert(l);
+  const p = reviewPayload(l, today(), addDays(today(), 28));
+  p.template.targets.forEach((target) => {
+    target.owner = "manager";
+  });
+  let result = await command("review.add", p, manager);
+  assert.equal(result.status, 200);
+  let saved = result.data.state.reviews.at(-1);
+  const tasks = result.data.state.tasks.filter(
+      (task) => task.reviewId === saved.id,
+    ),
+    plans = result.data.state.learningPlans.filter(
+      (plan) => plan.reviewId === saved.id,
+    );
+  assert.equal(tasks.length, p.template.targets.length);
+  assert.equal(plans.length, p.template.targets.length);
+  assert(
+    tasks.every(
+      (task) => task.owner === linked.id && task.ownerLearnerId === l.id,
+    ),
+  );
+  assert(saved.template.targets.every((target) => target.ownerName === l.name));
+  assert(!saved.actions.includes("Owner:"));
+  for (let i = 0; i < plans.length; i++) {
+    assert.equal(plans[i].objectives, p.template.targets[i].what);
+    assert.equal(plans[i].description, p.template.targets[i].how);
+    assert.equal(plans[i].due, p.template.targets[i].due);
+    assert.equal(plans[i].reviewTaskId, tasks[i].id);
+  }
+  s = await state(manager);
+  const noAccount = s.learners.find(
+    (l) =>
+      !s.users.some(
+        (u) => u.active && u.role === "Apprentice" && u.learnerId === l.id,
+      ),
+  );
+  assert(noAccount);
+  const noAccountPayload = reviewPayload(
+    noAccount,
+    today(),
+    addDays(today(), 21),
+  );
+  noAccountPayload.template.targets.forEach((target) => delete target.owner);
+  result = await command("review.add", noAccountPayload, manager);
+  assert.equal(result.status, 200);
+  saved = result.data.state.reviews.at(-1);
+  const futureTask = result.data.state.tasks.find(
+    (task) => task.reviewId === saved.id,
+  );
+  assert.equal(futureTask.ownerLearnerId, noAccount.id);
+  assert.equal(futureTask.owner, "");
+  assert.equal(
+    result.data.state.learningPlans.filter((plan) => plan.reviewId === saved.id)
+      .length,
+    noAccountPayload.template.targets.length,
+  );
+  assert.equal(
+    (
+      await command(
+        "user.add",
+        {
+          name: "New review apprentice",
+          email: "new-review-apprentice@example.test",
+          role: "Apprentice",
+          learnerId: noAccount.id,
+          password: "Review apprentice temporary 2026!",
+        },
+        manager,
+      )
+    ).status,
+    200,
+  );
+  const firstLogin = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "new-review-apprentice@example.test",
+      password: "Review apprentice temporary 2026!",
+    }),
+  });
+  assert.equal(firstLogin.status, 200);
+  assert.equal(
+    (
+      await command(
+        "password.change",
+        {
+          current: "Review apprentice temporary 2026!",
+          password: "Review apprentice chosen 2026!",
+        },
+        firstLogin.cookie,
+      )
+    ).status,
+    200,
+  );
+  const loginResult = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "new-review-apprentice@example.test",
+      password: "Review apprentice chosen 2026!",
+    }),
+  });
+  assert.equal(loginResult.status, 200);
+  assert.equal(
+    (
+      await command(
+        "task.setStatus",
+        { id: futureTask.id, learnerId: noAccount.id, status: "Complete" },
+        loginResult.cookie,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await state(manager)).learningPlans.find(
+      (plan) => plan.reviewTaskId === futureTask.id,
+    ).status,
+    "Completed",
+  );
+});
+
+test("apprentice account creation automatically provisions its own isolated profile without a manual link", async () => {
+  const manager = await login("manager@archetype.demo");
+  const old = await state(manager);
+  const created = await command(
+    "user.add",
+    {
+      name: "Independent apprentice",
+      email: "own-profile@example.test",
+      role: "Apprentice",
+      password: "Initial apprentice 2026!",
+    },
+    manager,
+  );
+  assert.equal(created.status, 200, JSON.stringify(created.data));
+  const s = await state(manager);
+  const account = s.users.find((u) => u.email === "own-profile@example.test");
+  const learner = s.learners.find((l) => l.id === account.learnerId);
+  assert.equal(s.learners.length, old.learners.length + 1);
+  assert.equal(learner.name, "Independent apprentice");
+  assert.equal(learner.email, account.email);
+  assert.equal(learner.enrolmentPending, true);
+  assert.equal(learner.standardId, "");
+  const signed = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: account.email,
+      password: "Initial apprentice 2026!",
+    }),
+  });
+  assert.equal(signed.status, 200);
+  assert.equal(
+    (
+      await command(
+        "password.change",
+        {
+          current: "Initial apprentice 2026!",
+          password: "Chosen apprentice 2026!",
+        },
+        signed.cookie,
+      )
+    ).status,
+    200,
+  );
+  const again = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: account.email,
+      password: "Chosen apprentice 2026!",
+    }),
+  });
+  assert.equal(again.status, 200);
+  assert.deepEqual(
+    (await state(again.cookie)).learners.map((l) => l.id),
+    [learner.id],
+  );
+  const edited = await command(
+    "user.update",
+    {
+      id: account.id,
+      name: "Updated apprentice",
+      email: account.email,
+      role: "Apprentice",
+      caseload: [],
+    },
+    manager,
+  );
+  assert.equal(edited.status, 200);
+  assert.equal(
+    (await state(manager)).users.find((u) => u.id === account.id).learnerId,
+    learner.id,
+  );
+  assert.equal(
+    (
+      await command(
+        "user.add",
+        {
+          name: "Duplicate",
+          email: "duplicate-own@example.test",
+          role: "Apprentice",
+          learnerId: learner.id,
+          password: "Duplicate password2026!",
+        },
+        manager,
+      )
+    ).status,
+    400,
+  );
+});
+
+test("staff can clear and restore their own alerts without changing the underlying learner risk", async () => {
+  const { alertFingerprint } = await import("../server/alerts.mjs");
+  const manager = await login("manager@archetype.demo");
+  let s = await state(manager);
+  const learner = s.learners.find((l) => l.exceptions.length);
+  const exception = learner.exceptions[0];
+  const key = alertFingerprint(learner, exception);
+  assert.equal(
+    (await command("alert.dismiss", { learnerId: learner.id, key }, manager))
+      .status,
+    200,
+  );
+  s = await state(manager);
+  assert.ok(s.alertDismissals.some((a) => a.key === key));
+  assert.equal(s.learners.find((l) => l.id === learner.id).rag, learner.rag);
+  assert.equal(
+    (await command("alert.restore", { learnerId: learner.id, key }, manager))
+      .status,
+    200,
+  );
+  assert.ok(!(await state(manager)).alertDismissals.some((a) => a.key === key));
+  assert.equal(
+    (
+      await command(
+        "alert.dismiss",
+        { learnerId: learner.id, key: "stale" },
+        manager,
+      )
+    ).status,
+    409,
+  );
+});
+
+test("shared staff actions reach the apprentice alerts inbox and can be read and cleared without completing the action", async () => {
+  const manager = await login("manager@archetype.demo");
+  const s = await state(manager);
+  const account = s.users.find((u) => u.email === "own-profile@example.test");
+  const signed = await request("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: account.email,
+      password: "Chosen apprentice 2026!",
+    }),
+  });
+  assert.equal(signed.status, 200);
+  const result = await command(
+    "task.add",
+    {
+      learnerId: account.learnerId,
+      title: "Please update your induction record",
+      owner: account.id,
+      due: today(),
+      priority: "High",
+    },
+    manager,
+  );
+  assert.equal(result.status, 200, JSON.stringify(result.data));
+  let apprenticeState = await state(signed.cookie);
+  const alert = apprenticeState.notifications.find(
+    (n) =>
+      n.title === "An action needs attention" &&
+      n.body === "Please update your induction record",
+  );
+  assert.ok(alert);
+  assert.equal(alert.needsAction, true);
+  assert.equal(alert.readAt, null);
+  assert.equal(
+    (await command("notification.read", { id: alert.id }, signed.cookie))
+      .status,
+    200,
+  );
+  assert.ok(
+    (await state(signed.cookie)).notifications.find((n) => n.id === alert.id)
+      .readAt,
+  );
+  assert.equal(
+    (await command("notification.clear", { id: alert.id }, signed.cookie))
+      .status,
+    200,
+  );
+  apprenticeState = await state(signed.cookie);
+  assert.ok(
+    apprenticeState.notifications.find((n) => n.id === alert.id).clearedAt,
+  );
+  assert.equal(
+    apprenticeState.tasks.find((t) => t.id === alert.entityId).status,
+    "Open",
+  );
+  assert.equal(
+    (await command("notification.clear", { id: alert.id }, manager)).status,
+    403,
+  );
 });

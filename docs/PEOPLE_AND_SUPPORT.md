@@ -2,7 +2,7 @@
 
 ## Edit an apprentice
 
-Open an apprentice → Edit apprentice. Programme details stay in **Programme**. **Personal & ALS** adds the home address, date of birth, additional-learning-support status and record, reasonable adjustments/support plan and a support-review date. A future date of birth is rejected. Switching tabs keeps unsaved values until you save or close the editor.
+Open an apprentice → Edit apprentice. Programme details stay in **Programme**. **Personal & ALS** adds the home address, date of birth, telephone number, emergency contact name/relationship/numbers/optional email, additional-learning-support status and record, reasonable adjustments/support plan and a support-review date. A future date of birth is rejected. Switching tabs keeps unsaved values until you save or close the editor.
 
 **Documents** uploads certificates, ALS assessments/diagnoses, medical information and other supporting documents. Choose a category and up to five files (5 MB each), then save the apprentice. Existing documents have download/remove controls. Removing a document hides it from current access; historical backups/snapshots can retain previous records.
 
@@ -43,3 +43,23 @@ Calendar and learning-plan session cards provide **Mark attended** and an attend
 ## Reusable learning activities
 
 In a learning plan, **Reusable learning activities** is a dropdown of templates for the current standard. Select one to preview its method, description, criteria and planned hours, then choose **Use selected activity**. Review the dates and wording before saving. Changing apprentice resets the selection; templates for other standards are excluded. Saving activities as reusable templates remains available on learning-plan cards.
+
+## Review target ownership and learning plans
+
+Target owners are no longer selected or displayed in the review form/report. New review targets belong to the apprentice automatically. The system links ownership to the apprentice record, so reviews can be completed before a learner login is created. A subsequently linked apprentice account can manage those target actions.
+
+Completing a review atomically creates one learner action and one linked learning-plan activity for every target, using its goal, steps, due date and planned hours. Completing the action updates its linked learning activity; planned hours do not become approved OTJ hours automatically. Validation failures do not create partial actions or learning-plan entries.
+
+### EPA results and performance
+
+Edit apprentice → Programme records Not recorded, Distinction, Pass or Fail and the result date. The assessor workspace hero shows counts and percentages of learners with recorded results, rather than dividing by the whole caseload. Result corrections retain history. The original assessor retains credit when a learner is reassigned; completed/archived learner outcomes remain in the separate results ledger. Clearing a mistakenly entered result removes it from the percentages. A once-only migration adds varied results to existing fictional practice learners only, without changing real learners or accounts.
+
+### Alerts
+
+Apprentice and employer accounts have an Alerts inbox with Unread, Action needed, All and Cleared views. Shared staff decisions on evidence and OTJ logs, completed reviews, actions, learning activities, sessions, programme changes and direct messages generate recipient-scoped notifications. Existing outstanding records are included on rollout. Review targets are reached through the review notification and linked learning-plan activities. Employer notices respect their organisation access and take evidence/OTJ notices to the progress report rather than exposing portfolio files. Confidential portfolio notes, personal/ALS records, medical uploads, staff-only session notes, CPD and assessor supervision are excluded.
+
+Read/clear state persists in SQLite per recipient, including across restarts. Clear does not complete an action or resolve returned work. Staff can separately clear/restore derived risk alerts; clearing does not change learner RAG. A materially changed warning appears again. These controls do not change morning reminder preferences or delivery schedules.
+
+### Apprentice accounts
+
+Accounts & caseload → Add workspace account → Apprentice automatically creates that person's own apprentice profile when no existing record is selected. No separate manual linking step is required. An existing profile with the same unique email is reused automatically. New profiles start paused with no invented programme, employer, dates or hours; complete these in Edit apprentice before activating the programme. The optional existing-profile selection allows staff to give an already enrolled apprentice a login without duplicating their portfolio. A learner can have only one apprentice login. Editing an apprentice login retains its own profile automatically and preserves its password.
