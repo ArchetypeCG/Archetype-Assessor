@@ -63,3 +63,9 @@ Read/clear state persists in SQLite per recipient, including across restarts. Cl
 ### Apprentice accounts
 
 Accounts & caseload → Add workspace account → Apprentice automatically creates that person's own apprentice profile when no existing record is selected. No separate manual linking step is required. An existing profile with the same unique email is reused automatically. New profiles start paused with no invented programme, employer, dates or hours; complete these in Edit apprentice before activating the programme. The optional existing-profile selection allows staff to give an already enrolled apprentice a login without duplicating their portfolio. A learner can have only one apprentice login. Editing an apprentice login retains its own profile automatically and preserves its password.
+
+### Assessor day at a glance
+
+The assessor welcome panel includes a live agenda beside the greeting (stacked on smaller screens). It shows the next planned session or review, overdue/today review counts, submitted evidence awaiting feedback and pending OTJ logs, with links into the relevant workspace. It uses the assessor’s active caseload and current programme only; cancelled, attended and past sessions are excluded. Session times and the day boundary use Europe/London.
+
+Gateway/EPA highlights cover the next 60 days, ordered by recorded date. Confirmed EPA/gateway dates are labelled as bookings; a predicted course end (or planned end when no prediction exists) is labelled “Course end · plan gateway” and does not create or imply a booking. Apprentices with recorded EPA results are excluded. Selecting a highlighted apprentice opens their gateway checklist. Empty states link to Calendar or Gateway & EPA without adding fictional records.

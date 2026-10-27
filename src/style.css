@@ -4644,3 +4644,39 @@ input[type="file"]::file-selector-button {
 }
 
 .notification-summary{display:flex;gap:20px;margin:22px 0}.notification-summary>div{background:var(--surface,#fff);border:1px solid #dfe8ef;border-radius:16px;padding:18px 28px;display:flex;gap:15px;align-items:center}.notification-summary strong{font-size:32px;color:#176d80}.notification-summary span{color:#637588}.notification-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}.notification-list{display:grid;gap:15px}.notification-card{padding:24px!important;border-left:4px solid transparent}.notification-card.is-unread{border-left-color:#19a5a3;background:linear-gradient(115deg,#f0fbfb,#fff 55%)}.notification-card-top{display:flex;justify-content:space-between;gap:14px;color:#6a7c8e;font-size:12px;flex-wrap:wrap}.notification-card h3{display:flex;align-items:center;gap:10px;margin:14px 0 9px}.notification-card p{line-height:1.65;overflow-wrap:anywhere}.notification-card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.notification-action-badge{display:inline-block;padding:6px 10px;border-radius:20px;background:#fff0d4;color:#855505;font-size:12px;font-weight:700}.unread-dot{width:8px;height:8px;flex-shrink:0;border-radius:50%;background:#14a5a2}.notification-empty{padding:40px;text-align:center}.notifications-inbox>.page-heading{display:flex;justify-content:space-between;gap:18px;align-items:center}@media(max-width:650px){.notification-summary{gap:10px}.notification-summary>div{padding:14px;flex-direction:column;align-items:start;gap:5px;flex:1}.notifications-inbox>.page-heading{align-items:start;flex-direction:column}.notification-card{padding:18px!important}}
+
+/* The assessor's live agenda sits beside the welcome, above EPA performance. */
+.assessor-hero .command-hero-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.84fr);gap:30px;align-items:start}
+.assessor-hero .command-hero-header>div{min-width:0}
+.command-hero-aside{display:flex;flex-direction:column;align-items:stretch;gap:15px}
+.command-hero-aside>.command-live{align-self:flex-end;margin:0}
+.assessor-day{border:1px solid #ffffff30;border-radius:19px;background:linear-gradient(135deg,#ffffff17,#052a5026);padding:18px 19px;box-shadow:0 12px 35px #001c4120;color:#fff}
+.assessor-day-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}
+.assessor-day-heading>span{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
+.assessor-day-heading svg{color:#ffda8c}
+.assessor-day-heading time{font-size:11px;color:#d1e8ff;white-space:nowrap}
+.assessor-day-section+.assessor-day-section{border-top:1px solid #ffffff25;margin-top:12px;padding-top:12px}
+.assessor-day .assessor-day-section h3{display:flex;align-items:center;gap:7px;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:#c2e2ff;margin:0 0 8px;line-height:1.5}
+.assessor-day h3 small{font-size:9px;text-transform:none;letter-spacing:0;font-weight:400;margin-left:auto;white-space:nowrap}
+.assessor-day button{color:inherit;text-align:left;border-radius:8px;transition:background .15s}
+.assessor-day button:hover{background:#ffffff15}
+.assessor-day button:focus-visible{outline:2px solid #ffda8c;outline-offset:3px}
+.assessor-day-session,.assessor-day-gateway>button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:5px 4px}
+.assessor-day-session>span:first-child,.assessor-day-gateway>button>span{display:grid;gap:4px;min-width:0}
+.assessor-day-session strong{font-size:13px;font-weight:650;line-height:1.5;overflow-wrap:anywhere}
+.assessor-day-session>span>span{font-size:12px;color:#e4f1ff}
+.assessor-day-session small,.assessor-day-gateway small{font-size:10px;color:#bfdcf6;line-height:1.5}
+.assessor-day-priorities{display:grid;gap:3px}
+.assessor-day-priorities>button{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 4px;width:100%;font-size:11px}
+.assessor-day-priorities b{display:inline-block;min-width:21px;font-size:13px;color:#9df0db}
+.assessor-day-priorities b.day-urgent{color:#ffccad}
+.assessor-day-priorities small{font-size:10px;color:#d1e8ff}
+.assessor-day-gateway{display:grid;gap:3px}
+.assessor-day-gateway strong{font-size:11px;font-weight:600}
+.assessor-day-empty{font-size:11px;color:#d1e6fc;line-height:1.7}
+.assessor-day-empty button,.assessor-day-more{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#fff;padding:4px;margin-top:3px;text-decoration:underline;text-underline-offset:3px}
+@media(max-width:1100px){.assessor-hero .command-hero-header{grid-template-columns:minmax(0,1fr)}.command-hero-aside>.command-live{align-self:flex-start}.assessor-day{width:100%}}
+@media(max-width:500px){.assessor-day{padding:16px 13px}.assessor-day-heading>span{font-size:13px}.assessor-day .assessor-day-section h3{letter-spacing:.3px}.assessor-hero .command-hero-header{gap:20px}}
+.assessor-hero .command-hero-header .assessor-hero-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:30px;padding-top:22px}
+.assessor-hero .command-hero-header .assessor-hero-summary>span{line-height:1.6}
+.assessor-hero .command-hero-header .assessor-hero-summary b{display:block;font-size:25px;margin:0 0 4px}

@@ -1,3 +1,4 @@
+import { AssessorDay } from "./assessor-day.jsx";
 import { EpaPerformance } from "./epa-performance";
 import { SuccessAndUpdates } from "./staff-development";
 import { LearnerAvatar } from "./learner-photo";
@@ -158,6 +159,8 @@ function Hero({
   title,
   description,
   children,
+  introduction,
+  aside,
   badge = "Live workspace · autosave on",
   className = "",
 }) {
@@ -168,11 +171,22 @@ function Hero({
           <div className="eyebrow">{eyebrow}</div>
           <h2>{title}</h2>
           <p>{description}</p>
+          {introduction}
         </div>
-        <span className="command-live">
-          <i />
-          {badge}
-        </span>
+        {aside ? (
+          <div className="command-hero-aside">
+            <span className="command-live">
+              <i />
+              {badge}
+            </span>
+            {aside}
+          </div>
+        ) : (
+          <span className="command-live">
+            <i />
+            {badge}
+          </span>
+        )}
       </div>
       {children}
     </section>
@@ -560,30 +574,43 @@ function Assessor({ s, user, go, openLearner, setModal }) {
         description="Your learners, your assessment priorities, and the next step for every apprentice."
         badge="Your assigned caseload only"
         className="assessor-hero"
+        aside={
+          <AssessorDay
+            s={s}
+            user={user}
+            go={go}
+            openLearner={openLearner}
+            setModal={setModal}
+          />
+        }
+        introduction={
+          <>
+            <div className="assessor-hero-actions">
+              <button onClick={() => go("Portfolios")}>
+                <ClipboardCheck size={17} />
+                Start assessing
+                <ArrowRight size={17} />
+              </button>
+              <button onClick={() => go("Progress report")}>
+                <FileText size={17} />
+                Learner progress reports
+              </button>
+            </div>
+            <div className="assessor-hero-summary">
+              <span>
+                <b>{ls.length}</b> apprentices
+              </span>
+              <span>
+                <b>{average(ls)}%</b> average coverage
+              </span>
+              <span>
+                <b>{ls.filter((l) => l.rag === "Red").length}</b> need priority
+                support
+              </span>
+            </div>
+          </>
+        }
       >
-        <div className="assessor-hero-actions">
-          <button onClick={() => go("Portfolios")}>
-            <ClipboardCheck size={17} />
-            Start assessing
-            <ArrowRight size={17} />
-          </button>
-          <button onClick={() => go("Progress report")}>
-            <FileText size={17} />
-            Learner progress reports
-          </button>
-        </div>
-        <div className="assessor-hero-summary">
-          <span>
-            <b>{ls.length}</b> apprentices
-          </span>
-          <span>
-            <b>{average(ls)}%</b> average coverage
-          </span>
-          <span>
-            <b>{ls.filter((l) => l.rag === "Red").length}</b> need priority
-            support
-          </span>
-        </div>
         <EpaPerformance performance={s.epaPerformance} />
       </Hero>
       <SuccessAndUpdates stories={s.successStories || []} />
