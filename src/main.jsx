@@ -166,6 +166,7 @@ function App() {
     [user, setUser] = useState(null),
     [demo, setDemo] = useState(null),
     [page, setPage] = useState("Command centre"),
+    [directoryFilter, setDirectoryFilter] = useState({}),
     [learnerId, setLearnerId] = useState(""),
     [profile, setProfile] = useState(null),
     [modal, setModal] = useState(null),
@@ -258,7 +259,8 @@ function App() {
   function act(kind, payload) {
     return command(kind, payload).catch((e) => notify(e.message));
   }
-  function go(p) {
+  function go(p, filters = {}) {
+    setDirectoryFilter(p === "Apprentices" ? filters : {});
     setPage(p);
     setMobile(false);
     setProfile(null);
@@ -288,6 +290,7 @@ function App() {
     command,
     act,
     go,
+    directoryFilter,
     openLearner,
     learnerId,
     setLearnerId,
@@ -917,13 +920,26 @@ function FilterBar({ query, setQuery, filters = [], children }) {
   );
 }
 function Learners() {
-  const { s, openLearner, setModal, user, notify, command, busy } = useApp(),
+  const {
+      s,
+      openLearner,
+      setModal,
+      user,
+      notify,
+      command,
+      busy,
+      directoryFilter,
+    } = useApp(),
     [q, Q] = useState(""),
     [status, S] = useState(""),
-    [rag, R] = useState(""),
+    [rag, R] = useState(directoryFilter.rag || ""),
     [assessor, A] = useState(""),
     [sort, SS] = useState("name"),
     [p, SP] = useState(1);
+  useEffect(() => {
+    R(directoryFilter.rag || "");
+    SP(1);
+  }, [directoryFilter]);
   let ls = s.learners
     .filter(
       (l) =>

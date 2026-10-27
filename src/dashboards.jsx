@@ -312,49 +312,71 @@ function Master({ s, user, go, openLearner, setModal }) {
         <Card
           className="health-card"
           title="Portfolio health"
-          subtitle="RAG distribution and progress position"
+          subtitle="A clear view of learner progress and support needs"
           action={<Link onClick={() => go("Analytics")}>Open analytics</Link>}
         >
-          <div className="reference-health">
-            <div className="health-well">
-              <div
-                className="reference-donut"
-                style={{
-                  background: `conic-gradient(#ef4444 0 ${ls.length ? (risks.length / ls.length) * 100 : 0}%,#f59e0b 0 ${ls.length ? ((risks.length + amber) / ls.length) * 100 : 0}%,#22c55e 0 100%)`,
-                }}
+          <div className="portfolio-health-view">
+            <div className="portfolio-health-summary">
+              <div>
+                <strong>{ls.length}</strong>
+                <span>apprentices across your provision</span>
+              </div>
+              <button
+                className="portfolio-health-all"
+                onClick={() => go("Apprentices")}
               >
-                <div>
-                  <b>{ls.length}</b>
-                  <small>APPRENTICES</small>
-                </div>
-              </div>
+                View all <ArrowUpRight size={14} />
+              </button>
             </div>
-            <div>
-              <div className="health-cohorts">
-                {[
-                  ["Green", green, "On track"],
-                  ["Amber", amber, "Needs attention"],
-                  ["Red", risks.length, "Priority support"],
-                ].map(([name, n, label]) => (
-                  <button key={name} onClick={() => go("Alerts")}>
-                    <Status value={name} />
-                    <b>{n}</b>
-                    <small>{label}</small>
-                    <span>View cohort →</span>
-                  </button>
-                ))}
-              </div>
-              <div className="health-progress">
-                <div>
-                  <strong>Verified portfolio progress</strong>
-                  <b>{average(ls)}%</b>
-                </div>
-                <Meter value={average(ls)} />
-                <p>
-                  Derived from accepted evidence against assigned standards.
-                </p>
-              </div>
+            <div className="portfolio-health-rows">
+              {[
+                ["Green", green, "On track", "Continue planned learning"],
+                ["Amber", amber, "Needs attention", "Check emerging concerns"],
+                [
+                  "Red",
+                  risks.length,
+                  "Priority support",
+                  "Agree the next action",
+                ],
+              ].map(([name, count, label, detail]) => (
+                <button
+                  key={name}
+                  type="button"
+                  className={`portfolio-health-row ${name.toLowerCase()}`}
+                  onClick={() => go("Apprentices", { rag: name })}
+                  aria-label={`View ${count} apprentices: ${label}`}
+                >
+                  <span className="portfolio-health-dot" />
+                  <div>
+                    <strong>{label}</strong>
+                    <small>{detail}</small>
+                  </div>
+                  <b>{count}</b>
+                  <ArrowUpRight size={15} />
+                </button>
+              ))}
             </div>
+            {!ls.length && (
+              <p className="portfolio-health-empty">
+                Health will appear here once apprentices are enrolled.
+              </p>
+            )}
+            <button
+              className="portfolio-health-progress-link"
+              onClick={() => go("Progress report")}
+            >
+              <span>
+                <Target size={15} /> Average KSB progress
+              </span>
+              <strong>{average(ls)}%</strong>
+              <ArrowUpRight size={15} />
+            </button>
+            <button
+              className="portfolio-health-action"
+              onClick={() => go("Interventions")}
+            >
+              View support priorities <ArrowUpRight size={15} />
+            </button>
           </div>
         </Card>
         <Card
